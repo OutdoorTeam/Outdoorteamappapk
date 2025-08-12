@@ -106,6 +106,7 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
         email: email.toLowerCase().trim(),
         password_hash: passwordHash,
         role,
+        plan_type: role === 'admin' ? 'Programa Totum' : 'Healthy Habits Academy',
         is_active: 1,
         features_json: '{}',
         created_at: new Date().toISOString(),
@@ -302,9 +303,9 @@ app.get('/api/daily-habits/weekly-points', authenticateToken, async (req: any, r
 app.get('/api/daily-habits/calendar', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const startDate = threeMonthsAgo.toISOString().split('T')[0];
     
     console.log('Fetching calendar data for user:', userId, 'from:', startDate);
     
@@ -405,6 +406,78 @@ app.put('/api/daily-habits/update', authenticateToken, async (req: any, res: exp
   } catch (error) {
     console.error('Error updating daily habits:', error);
     res.status(500).json({ error: 'Error al actualizar hábitos diarios' });
+  }
+});
+
+// Daily Notes Routes
+app.get('/api/daily-notes/today', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+    
+    console.log('Fetching daily note for user:', userId, 'date:', today);
+    
+    const note = await db
+      .selectFrom('user_notes')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', today)
+      .executeTakeFirst();
+    
+    if (note) {
+      res.json(note);
+    } else {
+      res.json({ content: '' });
+    }
+  } catch (error) {
+    console.error('Error fetching daily note:', error);
+    res.status(500).json({ error: 'Error al obtener nota diaria' });
+  }
+});
+
+app.post('/api/daily-notes', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { content, date } = req.body;
+    const userId = req.user.id;
+    console.log('Saving note for user:', userId, 'date:', date);
+    
+    // Check if note already exists for this date
+    const existingNote = await db
+      .selectFrom('user_notes')
+      .select(['id'])
+      .where('user_id', '=', userId)
+      .where('date', '=', date)
+      .executeTakeFirst();
+    
+    if (existingNote) {
+      // Update existing note
+      const updatedNote = await db
+        .updateTable('user_notes')
+        .set({ content })
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .returning(['id', 'content', 'date'])
+        .executeTakeFirst();
+      
+      res.json(updatedNote);
+    } else {
+      // Create new note
+      const note = await db
+        .insertInto('user_notes')
+        .values({
+          user_id: userId,
+          content,
+          date: date || new Date().toISOString().split('T')[0],
+          created_at: new Date().toISOString()
+        })
+        .returning(['id', 'content', 'date'])
+        .executeTakeFirst();
+      
+      res.status(201).json(note);
+    }
+  } catch (error) {
+    console.error('Error saving note:', error);
+    res.status(500).json({ error: 'Error al guardar nota' });
   }
 });
 

@@ -30,6 +30,40 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isActive = (path: string) => location.pathname === path;
   
+  // Don't show navigation on dashboard for users
+  const showFullNav = !user || user.role === 'admin' || !location.pathname.startsWith('/dashboard');
+  
+  if (user && user.role === 'user' && location.pathname === '/dashboard') {
+    // Minimal header for dashboard
+    return (
+      <div className="min-h-screen">
+        <nav className="bg-black border-b border-gray-800 px-4 py-2">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <Link to="/" className="text-xl font-bold text-brand-gold">
+              Outdoor Team
+            </Link>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-300">
+                {user.full_name.split(' ')[0]}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleLogout}
+                className="border-brand-gold text-brand-gold hover:bg-brand-gold hover:text-black"
+              >
+                Salir
+              </Button>
+            </div>
+          </div>
+        </nav>
+        <main>
+          {children}
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b bg-white shadow-sm">
@@ -155,7 +189,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           {/* Mobile Menu */}
-          {user && (
+          {user && showFullNav && (
             <div className="md:hidden mt-4 pb-4 border-t pt-4">
               <div className="flex flex-col space-y-2">
                 <Link 
