@@ -52,6 +52,16 @@ export interface DatabaseSchema {
     message: string;
     created_at: string;
   };
+  plans: {
+    id: number;
+    name: string;
+    description: string;
+    price: number;
+    services_included: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 const dataDirectory = process.env.DATA_DIRECTORY || './data';

@@ -28,21 +28,52 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               Outdoor Team
             </Link>
             <div className="hidden md:flex items-center space-x-6">
-              <Link to="/" className={`hover:text-primary ${isActive('/') ? 'text-primary font-medium' : ''}`}>
+              <Link 
+                to="/" 
+                className={`hover:text-primary transition-colors ${
+                  isActive('/') ? 'text-primary font-medium' : ''
+                }`}
+              >
                 Inicio
               </Link>
-              <Link to="/planes" className={`hover:text-primary ${isActive('/planes') ? 'text-primary font-medium' : ''}`}>
+              <Link 
+                to="/planes" 
+                className={`hover:text-primary transition-colors ${
+                  isActive('/planes') ? 'text-primary font-medium' : ''
+                }`}
+              >
                 Planes
               </Link>
+              
+              {user && (
+                <Link 
+                  to="/planes-manage" 
+                  className={`hover:text-primary transition-colors ${
+                    isActive('/planes-manage') ? 'text-primary font-medium' : ''
+                  }`}
+                >
+                  Ver Planes
+                </Link>
+              )}
               
               {user ? (
                 <div className="flex items-center space-x-4">
                   {user.role === 'admin' ? (
-                    <Link to="/admin" className={`hover:text-primary ${isActive('/admin') ? 'text-primary font-medium' : ''}`}>
+                    <Link 
+                      to="/admin" 
+                      className={`hover:text-primary transition-colors ${
+                        isActive('/admin') ? 'text-primary font-medium' : ''
+                      }`}
+                    >
                       Panel Admin
                     </Link>
                   ) : (
-                    <Link to="/dashboard" className={`hover:text-primary ${isActive('/dashboard') ? 'text-primary font-medium' : ''}`}>
+                    <Link 
+                      to="/dashboard" 
+                      className={`hover:text-primary transition-colors ${
+                        isActive('/dashboard') ? 'text-primary font-medium' : ''
+                      }`}
+                    >
                       Mi Panel
                     </Link>
                   )}
@@ -56,10 +87,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               ) : (
                 <div className="flex items-center space-x-2">
                   <Link to="/login">
-                    <Button variant="outline" size="sm">Iniciar Sesión</Button>
+                    <Button variant="outline" size="sm">
+                      Iniciar Sesión
+                    </Button>
                   </Link>
                   <Link to="/register">
-                    <Button size="sm">Registrarse</Button>
+                    <Button size="sm">
+                      Registrarse
+                    </Button>
                   </Link>
                 </div>
               )}

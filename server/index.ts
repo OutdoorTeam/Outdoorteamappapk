@@ -184,6 +184,76 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(userResponse);
 });
 
+// Plans Routes
+app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching all plans');
+    const plans = await db.selectFrom('plans').selectAll().execute();
+    console.log('Plans fetched:', plans.length);
+    res.json(plans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    res.status(500).json({ error: 'Error al obtener planes' });
+  }
+});
+
+app.get('/api/plans/:id', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    console.log('Fetching plan by ID:', id);
+    const plan = await db
+      .selectFrom('plans')
+      .selectAll()
+      .where('id', '=', parseInt(id))
+      .executeTakeFirst();
+    
+    if (!plan) {
+      console.log('Plan not found:', id);
+      res.status(404).json({ error: 'Plan no encontrado' });
+      return;
+    }
+    
+    console.log('Plan found:', plan.name);
+    res.json(plan);
+  } catch (error) {
+    console.error('Error fetching plan:', error);
+    res.status(500).json({ error: 'Error al obtener plan' });
+  }
+});
+
+app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const { name, description, price, services_included, is_active } = req.body;
+    console.log('Admin updating plan:', id);
+    
+    const plan = await db
+      .updateTable('plans')
+      .set({ 
+        name,
+        description,
+        price,
+        services_included: JSON.stringify(services_included),
+        is_active: is_active ? 1 : 0,
+        updated_at: new Date().toISOString()
+      })
+      .where('id', '=', parseInt(id))
+      .returning(['id', 'name', 'description', 'price', 'services_included', 'is_active'])
+      .executeTakeFirst();
+    
+    if (!plan) {
+      res.status(404).json({ error: 'Plan no encontrado' });
+      return;
+    }
+    
+    console.log('Plan updated:', plan.name);
+    res.json(plan);
+  } catch (error) {
+    console.error('Error updating plan:', error);
+    res.status(500).json({ error: 'Error al actualizar plan' });
+  }
+});
+
 // Protected API Routes
 app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
   try {

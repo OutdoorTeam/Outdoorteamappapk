@@ -121,7 +121,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loginWithGoogle = async () => {
     console.log('Google login clicked - to be implemented');
-    // TODO: Implement Google OAuth
     throw new Error('Login con Google aún no está implementado');
   };
 
@@ -134,5 +133,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loginWithGoogle,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
