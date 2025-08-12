@@ -676,28 +676,48 @@ app.put('/api/users/:id/toggle-status', authenticateToken, requireAdmin, async (
     const { is_active } = req.body;
     console.log('Admin toggling user status:', id, 'to:', is_active, 'by:', req.user.email);
     
+    // Validate the user ID
+    const userId = parseInt(id);
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'ID de usuario inválido' });
+      return;
+    }
+    
     // Prevent admin from deactivating themselves
-    if (parseInt(id) === req.user.id) {
+    if (userId === req.user.id) {
       res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
       return;
     }
     
+    // Check if user exists first
+    const existingUser = await db
+      .selectFrom('users')
+      .select(['id', 'email'])
+      .where('id', '=', userId)
+      .executeTakeFirst();
+    
+    if (!existingUser) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+    
+    // Update user status
     const user = await db
       .updateTable('users')
       .set({ 
         is_active: is_active ? 1 : 0,
         updated_at: new Date().toISOString()
       })
-      .where('id', '=', parseInt(id))
+      .where('id', '=', userId)
       .returning(['id', 'email', 'is_active'])
       .executeTakeFirst();
     
     if (!user) {
-      res.status(404).json({ error: 'Usuario no encontrado' });
+      res.status(500).json({ error: 'Error al actualizar estado del usuario' });
       return;
     }
     
-    console.log('User status updated:', user.email, 'Active:', user.is_active);
+    console.log('User status updated successfully:', user.email, 'Active:', user.is_active);
     res.json(user);
   } catch (error) {
     console.error('Error updating user status:', error);
