@@ -86,6 +86,25 @@ export interface DatabaseSchema {
     is_active: number;
     created_at: string;
   };
+  workout_of_day: {
+    id: number;
+    title: string;
+    description: string | null;
+    exercises_json: string;
+    date: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+  };
+  meditation_sessions: {
+    id: number;
+    user_id: number;
+    duration_minutes: number;
+    meditation_type: string;
+    breathing_cycle_json: string | null;
+    comment: string | null;
+    completed_at: string;
+  };
 }
 
 const dataDirectory = process.env.DATA_DIRECTORY || './data';

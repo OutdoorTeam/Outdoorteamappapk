@@ -2,6 +2,9 @@ import express from 'express';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
 
@@ -9,6 +12,36 @@ dotenv.config();
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 // Body parsing middleware
 app.use(express.json());
@@ -549,6 +582,34 @@ app.post('/api/daily-notes', authenticateToken, async (req: any, res: express.Re
   }
 });
 
+// Meditation Sessions Routes
+app.post('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { duration_minutes, meditation_type, comment, breathing_cycle_json } = req.body;
+    const userId = req.user.id;
+    
+    console.log('Saving meditation session for user:', userId);
+    
+    const session = await db
+      .insertInto('meditation_sessions')
+      .values({
+        user_id: userId,
+        duration_minutes: duration_minutes || 0,
+        meditation_type: meditation_type || 'free',
+        comment: comment || null,
+        breathing_cycle_json: breathing_cycle_json ? JSON.stringify(breathing_cycle_json) : null,
+        completed_at: new Date().toISOString()
+      })
+      .returning(['id', 'duration_minutes', 'meditation_type'])
+      .executeTakeFirst();
+    
+    res.status(201).json(session);
+  } catch (error) {
+    console.error('Error saving meditation session:', error);
+    res.status(500).json({ error: 'Error al guardar sesión de meditación' });
+  }
+});
+
 // Content Library Routes
 app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
   try {
@@ -564,6 +625,25 @@ app.get('/api/content-library', authenticateToken, async (req: any, res: express
   } catch (error) {
     console.error('Error fetching content library:', error);
     res.status(500).json({ error: 'Error al obtener biblioteca de contenido' });
+  }
+});
+
+// Workout of Day Routes
+app.get('/api/workout-of-day', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching workout of day for user:', req.user.email);
+    const workout = await db
+      .selectFrom('workout_of_day')
+      .selectAll()
+      .where('is_active', '=', 1)
+      .orderBy('created_at', 'desc')
+      .executeTakeFirst();
+    
+    console.log('Workout of day fetched:', workout?.title || 'None');
+    res.json(workout);
+  } catch (error) {
+    console.error('Error fetching workout of day:', error);
+    res.status(500).json({ error: 'Error al obtener entrenamiento del día' });
   }
 });
 
@@ -584,6 +664,82 @@ app.get('/api/user-files', authenticateToken, async (req: any, res: express.Resp
   } catch (error) {
     console.error('Error fetching user files:', error);
     res.status(500).json({ error: 'Error al obtener archivos del usuario' });
+  }
+});
+
+// File upload route
+app.post('/api/upload-user-file', authenticateToken, requireAdmin, upload.single('file'), async (req: any, res: express.Response) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No se proporcionó archivo' });
+      return;
+    }
+
+    const { user_id, file_type } = req.body;
+    
+    if (!user_id || !file_type) {
+      res.status(400).json({ error: 'user_id y file_type son requeridos' });
+      return;
+    }
+
+    console.log('Uploading file for user:', user_id, 'type:', file_type);
+
+    const userFile = await db
+      .insertInto('user_files')
+      .values({
+        user_id: parseInt(user_id),
+        filename: req.file.originalname,
+        file_type,
+        file_path: req.file.path,
+        uploaded_by: req.user.id,
+        created_at: new Date().toISOString()
+      })
+      .returning(['id', 'filename', 'file_type'])
+      .executeTakeFirst();
+
+    console.log('File uploaded successfully:', userFile?.filename);
+    res.status(201).json(userFile);
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    res.status(500).json({ error: 'Error al subir archivo' });
+  }
+});
+
+// File download route
+app.get('/api/files/:id', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    const file = await db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('id', '=', parseInt(id))
+      .executeTakeFirst();
+
+    if (!file) {
+      res.status(404).json({ error: 'Archivo no encontrado' });
+      return;
+    }
+
+    // Check if user can access this file
+    if (userRole !== 'admin' && file.user_id !== userId) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
+    if (!fs.existsSync(file.file_path)) {
+      res.status(404).json({ error: 'Archivo físico no encontrado' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
+    res.sendFile(path.resolve(file.file_path));
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    res.status(500).json({ error: 'Error al descargar archivo' });
   }
 });
 
@@ -896,6 +1052,7 @@ export async function startServer(port: number) {
       console.log('Database connection established');
       console.log('Authentication system initialized');
       console.log('Role-based access control enabled');
+      console.log('File upload system enabled');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
     });
   } catch (err) {
