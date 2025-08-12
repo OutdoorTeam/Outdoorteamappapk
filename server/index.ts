@@ -60,6 +60,35 @@ const requireAdmin = (req: any, res: express.Response, next: express.NextFunctio
   next();
 };
 
+// Helper function to parse user features
+const getUserFeatures = (featuresJson: string) => {
+  try {
+    return JSON.parse(featuresJson || '{}');
+  } catch (error) {
+    console.error('Error parsing features JSON:', error);
+    return {};
+  }
+};
+
+// Helper function to format user response with features
+const formatUserResponse = (user: any) => {
+  const features = getUserFeatures(user.features_json);
+  return {
+    id: user.id,
+    email: user.email,
+    full_name: user.full_name,
+    role: user.role,
+    plan_type: user.plan_type,
+    features: {
+      habits: features.habits || false,
+      training: features.training || false,
+      nutrition: features.nutrition || false,
+      meditation: features.meditation || false,
+      active_breaks: features.active_breaks || false
+    }
+  };
+};
+
 // Auth Routes
 app.post('/api/auth/register', async (req: express.Request, res: express.Response) => {
   try {
@@ -97,6 +126,9 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
 
     // Determine role - make franciscodanielechs@gmail.com admin
     const role = email.toLowerCase() === 'franciscodanielechs@gmail.com' ? 'admin' : 'user';
+    
+    // Set default features for new users (empty - they need to select a plan)
+    const defaultFeatures = '{}';
 
     // Create user
     const newUser = await db
@@ -106,13 +138,13 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
         email: email.toLowerCase().trim(),
         password_hash: passwordHash,
         role,
-        plan_type: role === 'admin' ? 'Programa Totum' : 'Healthy Habits Academy',
+        plan_type: role === 'admin' ? 'Programa Totum' : null, // Admin gets full access, users start with no plan
         is_active: 1,
-        features_json: '{}',
+        features_json: role === 'admin' ? '{"habits": true, "training": true, "nutrition": true, "meditation": true, "active_breaks": true}' : defaultFeatures,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .returning(['id', 'email', 'full_name', 'role', 'plan_type'])
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json'])
       .executeTakeFirst();
 
     if (!newUser) {
@@ -133,13 +165,7 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
 
     console.log('User registered successfully:', newUser.email, 'Role:', newUser.role);
     res.status(201).json({ 
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        full_name: newUser.full_name,
-        role: newUser.role,
-        plan_type: newUser.plan_type
-      }, 
+      user: formatUserResponse(newUser),
       token 
     });
   } catch (error) {
@@ -215,16 +241,11 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
       .where('id', '=', user.id)
       .execute();
 
-    const userResponse = {
-      id: user.id,
-      email: user.email,
-      full_name: user.full_name,
-      role: user.role,
-      plan_type: user.plan_type
-    };
-
-    console.log('Login successful for user:', user.email, 'Role:', user.role);
-    res.json({ user: userResponse, token });
+    console.log('Login successful for user:', user.email, 'Role:', user.role, 'Plan:', user.plan_type);
+    res.json({ 
+      user: formatUserResponse(user), 
+      token 
+    });
   } catch (error) {
     console.error('Error logging in user:', error);
     res.status(500).json({ error: 'Error interno del servidor al iniciar sesión' });
@@ -232,14 +253,61 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
 });
 
 app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => {
-  const userResponse = {
-    id: req.user.id,
-    email: req.user.email,
-    full_name: req.user.full_name,
-    role: req.user.role,
-    plan_type: req.user.plan_type
-  };
-  res.json(userResponse);
+  res.json(formatUserResponse(req.user));
+});
+
+// Plan Selection and Assignment
+app.post('/api/users/:id/assign-plan', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const { planId } = req.body;
+    const requestingUserId = req.user.id;
+    const requestingUserRole = req.user.role;
+
+    // Users can only assign plans to themselves unless they're admin
+    if (requestingUserRole !== 'admin' && parseInt(id) !== requestingUserId) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
+    console.log('Assigning plan', planId, 'to user', id);
+
+    // Get the plan details
+    const plan = await db
+      .selectFrom('plans')
+      .selectAll()
+      .where('id', '=', parseInt(planId))
+      .where('is_active', '=', 1)
+      .executeTakeFirst();
+
+    if (!plan) {
+      res.status(404).json({ error: 'Plan no encontrado' });
+      return;
+    }
+
+    // Update user with new plan and features
+    const updatedUser = await db
+      .updateTable('users')
+      .set({
+        plan_type: plan.name,
+        features_json: plan.features_json,
+        updated_at: new Date().toISOString()
+      })
+      .where('id', '=', parseInt(id))
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json'])
+      .executeTakeFirst();
+
+    if (!updatedUser) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    console.log('Plan assigned successfully:', plan.name, 'to user:', updatedUser.email);
+    res.json(formatUserResponse(updatedUser));
+  } catch (error) {
+    console.error('Error assigning plan:', error);
+    res.status(500).json({ error: 'Error al asignar plan' });
+  }
 });
 
 // Daily Habits Routes
@@ -524,7 +592,7 @@ app.get('/api/test/admin-user', async (req: express.Request, res: express.Respon
   try {
     const adminUser = await db
       .selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'is_active', 'password_hash'])
+      .select(['id', 'email', 'full_name', 'role', 'is_active', 'password_hash', 'plan_type', 'features_json'])
       .where('email', '=', 'franciscodanielechs@gmail.com')
       .executeTakeFirst();
     
@@ -537,7 +605,9 @@ app.get('/api/test/admin-user', async (req: express.Request, res: express.Respon
           email: adminUser.email,
           full_name: adminUser.full_name,
           role: adminUser.role,
-          is_active: adminUser.is_active
+          is_active: adminUser.is_active,
+          plan_type: adminUser.plan_type,
+          features: getUserFeatures(adminUser.features_json)
         },
         password_hash_exists: adminUser.password_hash ? 'Yes' : 'No'
       });
@@ -557,7 +627,14 @@ app.get('/api/plans', authenticateToken, async (req: any, res: express.Response)
     console.log('Fetching all plans for user:', req.user.email);
     const plans = await db.selectFrom('plans').selectAll().execute();
     console.log('Plans fetched:', plans.length);
-    res.json(plans);
+    
+    const formattedPlans = plans.map(plan => ({
+      ...plan,
+      services_included: JSON.parse(plan.services_included),
+      features: getUserFeatures(plan.features_json)
+    }));
+    
+    res.json(formattedPlans);
   } catch (error) {
     console.error('Error fetching plans:', error);
     res.status(500).json({ error: 'Error al obtener planes' });
@@ -581,7 +658,11 @@ app.get('/api/plans/:id', authenticateToken, async (req: any, res: express.Respo
     }
     
     console.log('Plan found:', plan.name);
-    res.json(plan);
+    res.json({
+      ...plan,
+      services_included: JSON.parse(plan.services_included),
+      features: getUserFeatures(plan.features_json)
+    });
   } catch (error) {
     console.error('Error fetching plan:', error);
     res.status(500).json({ error: 'Error al obtener plan' });
@@ -591,7 +672,7 @@ app.get('/api/plans/:id', authenticateToken, async (req: any, res: express.Respo
 app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
   try {
     const { id } = req.params;
-    const { name, description, price, services_included, is_active } = req.body;
+    const { name, description, price, services_included, features, is_active } = req.body;
     console.log('Admin updating plan:', id, 'by user:', req.user.email);
     
     const plan = await db
@@ -601,11 +682,12 @@ app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res:
         description,
         price: parseFloat(price) || 0,
         services_included: JSON.stringify(services_included),
+        features_json: JSON.stringify(features || {}),
         is_active: is_active ? 1 : 0,
         updated_at: new Date().toISOString()
       })
       .where('id', '=', parseInt(id))
-      .returning(['id', 'name', 'description', 'price', 'services_included', 'is_active'])
+      .returning(['id', 'name', 'description', 'price', 'services_included', 'features_json', 'is_active'])
       .executeTakeFirst();
     
     if (!plan) {
@@ -614,7 +696,11 @@ app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res:
     }
     
     console.log('Plan updated successfully:', plan.name);
-    res.json(plan);
+    res.json({
+      ...plan,
+      services_included: JSON.parse(plan.services_included),
+      features: getUserFeatures(plan.features_json)
+    });
   } catch (error) {
     console.error('Error updating plan:', error);
     res.status(500).json({ error: 'Error al actualizar plan' });
@@ -627,10 +713,16 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
     console.log('Admin fetching all users - requested by:', req.user.email);
     const users = await db
       .selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'created_at'])
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'features_json', 'created_at'])
       .execute();
     console.log('Users fetched:', users.length);
-    res.json(users);
+    
+    const formattedUsers = users.map(user => ({
+      ...user,
+      features: getUserFeatures(user.features_json)
+    }));
+    
+    res.json(formattedUsers);
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Error al obtener usuarios' });
@@ -652,7 +744,7 @@ app.get('/api/users/:id', authenticateToken, async (req: any, res: express.Respo
     console.log('Fetching user by ID:', id);
     const user = await db
       .selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'created_at'])
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'features_json', 'created_at'])
       .where('id', '=', parseInt(id))
       .executeTakeFirst();
     
@@ -663,7 +755,10 @@ app.get('/api/users/:id', authenticateToken, async (req: any, res: express.Respo
     }
     
     console.log('User found:', user.email);
-    res.json(user);
+    res.json({
+      ...user,
+      features: getUserFeatures(user.features_json)
+    });
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Error al obtener usuario' });
@@ -725,6 +820,47 @@ app.put('/api/users/:id/toggle-status', authenticateToken, requireAdmin, async (
   }
 });
 
+app.put('/api/users/:id/features', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const { features, plan_type } = req.body;
+    console.log('Admin updating user features:', id, 'by:', req.user.email, 'features:', features);
+    
+    const userId = parseInt(id);
+    if (isNaN(userId)) {
+      res.status(400).json({ error: 'ID de usuario inválido' });
+      return;
+    }
+    
+    const updateData: any = {
+      features_json: JSON.stringify(features || {}),
+      updated_at: new Date().toISOString()
+    };
+    
+    if (plan_type !== undefined) {
+      updateData.plan_type = plan_type;
+    }
+    
+    const updatedUser = await db
+      .updateTable('users')
+      .set(updateData)
+      .where('id', '=', userId)
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json'])
+      .executeTakeFirst();
+    
+    if (!updatedUser) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+    
+    console.log('User features updated successfully:', updatedUser.email);
+    res.json(formatUserResponse(updatedUser));
+  } catch (error) {
+    console.error('Error updating user features:', error);
+    res.status(500).json({ error: 'Error al actualizar características del usuario' });
+  }
+});
+
 app.post('/api/broadcast', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
   try {
     const { message } = req.body;
@@ -759,8 +895,8 @@ export async function startServer(port: number) {
       console.log(`API Server running on port ${port}`);
       console.log('Database connection established');
       console.log('Authentication system initialized');
+      console.log('Role-based access control enabled');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
-      console.log('Test admin endpoint: GET /api/test/admin-user');
     });
   } catch (err) {
     console.error('Failed to start server:', err);

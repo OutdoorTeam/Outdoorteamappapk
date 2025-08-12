@@ -2,8 +2,9 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Activity, Target, Apple, Brain, Coffee } from 'lucide-react';
 
 interface DailyHabit {
   training_completed: boolean;
@@ -37,13 +38,74 @@ const DashboardPage: React.FC = () => {
   });
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [calendarData, setCalendarData] = React.useState<{[key: string]: number}>({});
+  const [contentLibrary, setContentLibrary] = React.useState([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [activeTab, setActiveTab] = React.useState('habits');
 
   const today = new Date().toISOString().split('T')[0];
+
+  // Determine available tabs based on user features
+  const getAvailableTabs = () => {
+    if (!user?.features) return [];
+
+    const tabs = [];
+    
+    if (user.features.habits) {
+      tabs.push({
+        id: 'habits',
+        label: 'Hábitos',
+        icon: Target
+      });
+    }
+    
+    if (user.features.training) {
+      tabs.push({
+        id: 'training',
+        label: 'Entrenamientos',
+        icon: Activity
+      });
+    }
+    
+    if (user.features.active_breaks) {
+      tabs.push({
+        id: 'active_breaks',
+        label: 'Pausas Activas',
+        icon: Coffee
+      });
+    }
+    
+    if (user.features.nutrition) {
+      tabs.push({
+        id: 'nutrition',
+        label: 'Nutrición',
+        icon: Apple
+      });
+    }
+    
+    if (user.features.meditation) {
+      tabs.push({
+        id: 'meditation',
+        label: 'Respiración',
+        icon: Brain
+      });
+    }
+    
+    return tabs;
+  };
+
+  const availableTabs = getAvailableTabs();
+
+  React.useEffect(() => {
+    // Set the first available tab as active
+    if (availableTabs.length > 0 && !availableTabs.find(tab => tab.id === activeTab)) {
+      setActiveTab(availableTabs[0].id);
+    }
+  }, [availableTabs, activeTab]);
 
   React.useEffect(() => {
     fetchDashboardData();
     fetchDailyNote();
+    fetchContentLibrary();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -111,6 +173,22 @@ const DashboardPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching daily note:', error);
+    }
+  };
+
+  const fetchContentLibrary = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch('/api/content-library', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const content = await response.json();
+        setContentLibrary(content);
+      }
+    } catch (error) {
+      console.error('Error fetching content library:', error);
     }
   };
 
@@ -212,33 +290,50 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const habits = [
-    {
-      key: 'training_completed' as const,
-      name: 'Ejercicio',
-      description: 'Completaste tu rutina de entrenamiento',
-      completed: todayHabits.training_completed
-    },
-    {
-      key: 'movement_completed' as const,
-      name: 'Pasos diarios',
-      description: `Alcanzaste tu meta de ${userPlan.step_goal.toLocaleString()} pasos`,
-      completed: todayHabits.movement_completed
-    },
-    {
-      key: 'nutrition_completed' as const,
-      name: 'Alimentación',
-      description: 'Seguiste tu plan nutricional',
-      completed: todayHabits.nutrition_completed
-    },
-    {
-      key: 'meditation_completed' as const,
-      name: 'Respiración',
-      description: 'Realizaste ejercicios de respiración o meditación',
-      completed: todayHabits.meditation_completed
-    }
-  ];
+  const getHabitsForUser = () => {
+    const habits = [];
 
+    if (user?.features.training) {
+      habits.push({
+        key: 'training_completed' as const,
+        name: 'Ejercicio',
+        description: 'Completaste tu rutina de entrenamiento',
+        completed: todayHabits.training_completed
+      });
+    }
+
+    // Always include movement/steps if habits are enabled
+    if (user?.features.habits) {
+      habits.push({
+        key: 'movement_completed' as const,
+        name: 'Pasos diarios',
+        description: `Alcanzaste tu meta de ${userPlan.step_goal.toLocaleString()} pasos`,
+        completed: todayHabits.movement_completed
+      });
+    }
+
+    if (user?.features.nutrition) {
+      habits.push({
+        key: 'nutrition_completed' as const,
+        name: 'Alimentación',
+        description: 'Seguiste tu plan nutricional',
+        completed: todayHabits.nutrition_completed
+      });
+    }
+
+    if (user?.features.meditation) {
+      habits.push({
+        key: 'meditation_completed' as const,
+        name: 'Respiración',
+        description: 'Realizaste ejercicios de respiración o meditación',
+        completed: todayHabits.meditation_completed
+      });
+    }
+
+    return habits;
+  };
+
+  const habits = getHabitsForUser();
   const completedHabitsCount = habits.filter(h => h.completed).length;
   const stepProgress = Math.min((todayHabits.steps / userPlan.step_goal) * 100, 100);
 
@@ -283,224 +378,12 @@ const DashboardPage: React.FC = () => {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
+  const getContentByCategory = (category: string) => {
+    return contentLibrary.filter((content: any) => content.category === category);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-lg text-white">Cargando tu panel...</div>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-black text-white p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-brand-gold mb-2">{userPlan.name}</h1>
-          <p className="text-gray-300">¡Bienvenido, {user?.full_name.split(' ')[0]}!</p>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Step Counter */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-brand-gold text-xl">Contador de Pasos</CardTitle>
-                <p className="text-gray-400 text-sm">Registra tu actividad física diaria</p>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center mb-6">
-                  <div className="text-6xl font-bold text-white mb-2">
-                    {todayHabits.steps.toLocaleString()}
-                  </div>
-                  <div className="text-brand-gold">
-                    Meta diaria: {userPlan.step_goal.toLocaleString()}
-                  </div>
-                  <div className="progress-bar mt-4">
-                    <div className="progress-fill" style={{ width: `${stepProgress}%` }}></div>
-                  </div>
-                  <div className="text-sm text-gray-400 mt-2">
-                    {Math.round(stepProgress)}% completado
-                  </div>
-                </div>
-                
-                <div className="flex justify-center gap-2">
-                  <button 
-                    className="step-counter-btn" 
-                    onClick={() => adjustSteps(-500)}
-                  >
-                    -500
-                  </button>
-                  <button 
-                    className="step-counter-btn" 
-                    onClick={() => adjustSteps(-100)}
-                  >
-                    -100
-                  </button>
-                  <button 
-                    className="step-counter-btn" 
-                    onClick={() => adjustSteps(-todayHabits.steps)}
-                  >
-                    0
-                  </button>
-                  <button 
-                    className="step-counter-btn" 
-                    onClick={() => adjustSteps(100)}
-                  >
-                    +100
-                  </button>
-                  <button 
-                    className="step-counter-btn" 
-                    onClick={() => adjustSteps(500)}
-                  >
-                    +500
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Habits */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-brand-gold text-xl">¿Cómo te fue hoy?</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {habits.map((habit) => (
-                    <div key={habit.key} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-white">{habit.name}</h3>
-                        <p className="text-sm text-gray-400">{habit.description}</p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-brand-gold font-bold">+1</span>
-                        <div
-                          className={`habit-toggle ${habit.completed ? 'completed' : ''}`}
-                          onClick={() => updateHabit(habit.key, !habit.completed)}
-                        >
-                          {habit.completed && <Check size={14} />}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Daily Notes */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-brand-gold text-xl">Notas del Día</CardTitle>
-                <p className="text-gray-400 text-sm">Reflexiona sobre tu día, logros y desafíos</p>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="¿Cómo te sentiste hoy? ¿Qué lograste? ¿Qué desafíos enfrentaste?"
-                  value={dailyNote}
-                  onChange={(e) => setDailyNote(e.target.value)}
-                  className="mb-4 bg-gray-800 border-gray-600 text-white min-h-[120px]"
-                />
-                <Button 
-                  onClick={saveNote}
-                  className="bg-brand-gold text-black hover:bg-yellow-500"
-                >
-                  Guardar Nota
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Stats Box */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-brand-gold text-lg">Resumen</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-2xl font-bold text-white">{todayHabits.daily_points}</div>
-                    <div className="text-gray-400 text-sm">Puntos Hoy</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">{completedHabitsCount}/4</div>
-                    <div className="text-gray-400 text-sm">Hábitos</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-white">{weeklyPoints}</div>
-                    <div className="text-gray-400 text-sm">Esta Semana</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Calendar */}
-            <Card className="bg-gray-900 border-gray-700">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-brand-gold text-lg">Calendario de Hábitos</CardTitle>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => navigateMonth(-1)}
-                      className="p-1 hover:bg-gray-700 rounded"
-                    >
-                      <ChevronLeft className="text-brand-gold" size={20} />
-                    </button>
-                    <button
-                      onClick={() => navigateMonth(1)}
-                      className="p-1 hover:bg-gray-700 rounded"
-                    >
-                      <ChevronRight className="text-brand-gold" size={20} />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-400">
-                  {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
-                    <div key={day} className="text-xs text-gray-400 text-center p-1">
-                      {day}
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {generateCalendarDays().map((day, index) => (
-                    <div
-                      key={index}
-                      className={`
-                        calendar-day text-xs
-                        ${!day.isCurrentMonth ? 'opacity-30' : ''}
-                        ${day.isToday ? 'today' : ''}
-                        ${day.points >= 2 ? 'completed-full' : ''}
-                        ${day.points === 1 ? 'completed-partial' : ''}
-                      `}
-                    >
-                      {day.date.getDate()}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 space-y-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    <span className="text-gray-400">2+ hábitos completados</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-orange-500 rounded"></div>
-                    <span className="text-gray-400">1 hábito completado</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default DashboardPage;

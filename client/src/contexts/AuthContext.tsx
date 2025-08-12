@@ -1,11 +1,20 @@
 import * as React from 'react';
 
+interface UserFeatures {
+  habits: boolean;
+  training: boolean;
+  nutrition: boolean;
+  meditation: boolean;
+  active_breaks: boolean;
+}
+
 interface User {
   id: number;
   email: string;
   full_name: string;
   role: string;
-  plan_type?: string;
+  plan_type?: string | null;
+  features: UserFeatures;
 }
 
 interface AuthContextType {
@@ -15,6 +24,8 @@ interface AuthContextType {
   register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   loginWithGoogle: () => Promise<void>;
+  assignPlan: (planId: number) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
@@ -56,7 +67,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         const userData = await response.json();
-        console.log('Auth check successful for:', userData.email);
+        console.log('Auth check successful for:', userData.email, 'Plan:', userData.plan_type, 'Features:', userData.features);
         setUser(userData);
       } else {
         console.log('Auth check failed, removing token');
@@ -67,6 +78,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('auth_token');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('User data refreshed:', userData.email, 'Plan:', userData.plan_type);
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
     }
   };
 
@@ -94,7 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (data.token && data.user) {
       localStorage.setItem('auth_token', data.token);
       setUser(data.user);
-      console.log('Login successful for user:', data.user.email, 'Role:', data.user.role);
+      console.log('Login successful for user:', data.user.email, 'Role:', data.user.role, 'Plan:', data.user.plan_type);
     } else {
       throw new Error('Respuesta de login inválida');
     }
@@ -137,10 +169,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (data.token && data.user) {
       localStorage.setItem('auth_token', data.token);
       setUser(data.user);
-      console.log('Registration successful for user:', data.user.email, 'Role:', data.user.role);
+      console.log('Registration successful for user:', data.user.email, 'Role:', data.user.role, 'Plan:', data.user.plan_type);
     } else {
       throw new Error('Respuesta de registro inválida');
     }
+  };
+
+  const assignPlan = async (planId: number) => {
+    if (!user) {
+      throw new Error('No user logged in');
+    }
+
+    console.log('Assigning plan', planId, 'to user', user.id);
+
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`/api/users/${user.id}/assign-plan`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ planId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Plan assignment failed:', data.error);
+      throw new Error(data.error || 'Error al asignar plan');
+    }
+
+    setUser(data);
+    console.log('Plan assigned successfully:', data.plan_type);
   };
 
   const logout = () => {
@@ -161,6 +221,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     loginWithGoogle,
+    assignPlan,
+    refreshUser,
   }), [user, isLoading]);
 
   return (
