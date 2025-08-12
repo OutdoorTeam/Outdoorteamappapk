@@ -186,7 +186,6 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
     }
 
     console.log('Checking password for user:', email);
-    console.log('Password hash in database:', user.password_hash ? 'exists' : 'missing');
     
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     console.log('Password validation result:', isValidPassword);
@@ -247,16 +246,22 @@ app.get('/api/test/admin-user', async (req: express.Request, res: express.Respon
   try {
     const adminUser = await db
       .selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'is_active'])
+      .select(['id', 'email', 'full_name', 'role', 'is_active', 'password_hash'])
       .where('email', '=', 'franciscodanielechs@gmail.com')
       .executeTakeFirst();
     
     if (adminUser) {
-      console.log('Admin user found:', adminUser);
+      console.log('Admin user found:', { ...adminUser, password_hash: adminUser.password_hash ? '[HIDDEN]' : 'NULL' });
       res.json({ 
         message: 'Admin user exists',
-        user: adminUser,
-        password_hash_exists: adminUser ? 'Yes' : 'No'
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          full_name: adminUser.full_name,
+          role: adminUser.role,
+          is_active: adminUser.is_active
+        },
+        password_hash_exists: adminUser.password_hash ? 'Yes' : 'No'
       });
     } else {
       console.log('Admin user not found');

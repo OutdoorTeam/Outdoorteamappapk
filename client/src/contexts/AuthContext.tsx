@@ -91,9 +91,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error(data.error || 'Error al iniciar sesión');
     }
 
-    localStorage.setItem('auth_token', data.token);
-    setUser(data.user);
-    console.log('Login successful for user:', data.user.email, 'Role:', data.user.role);
+    if (data.token && data.user) {
+      localStorage.setItem('auth_token', data.token);
+      setUser(data.user);
+      console.log('Login successful for user:', data.user.email, 'Role:', data.user.role);
+    } else {
+      throw new Error('Respuesta de login inválida');
+    }
   };
 
   const register = async (fullName: string, email: string, password: string) => {
@@ -130,9 +134,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error(data.error || 'Error al registrarse');
     }
 
-    localStorage.setItem('auth_token', data.token);
-    setUser(data.user);
-    console.log('Registration successful for user:', data.user.email, 'Role:', data.user.role);
+    if (data.token && data.user) {
+      localStorage.setItem('auth_token', data.token);
+      setUser(data.user);
+      console.log('Registration successful for user:', data.user.email, 'Role:', data.user.role);
+    } else {
+      throw new Error('Respuesta de registro inválida');
+    }
   };
 
   const logout = () => {
@@ -146,14 +154,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     throw new Error('Login con Google aún no está implementado. Por favor usa email y contraseña.');
   };
 
-  const value = {
+  const value = React.useMemo(() => ({
     user,
     isLoading,
     login,
     register,
     logout,
     loginWithGoogle,
-  };
+  }), [user, isLoading]);
 
   return (
     <AuthContext.Provider value={value}>

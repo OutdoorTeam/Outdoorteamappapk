@@ -65,6 +65,11 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleFillAdminCredentials = () => {
+    setEmail('franciscodanielechs@gmail.com');
+    setPassword('admin123');
+  };
+
   if (user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -162,10 +167,7 @@ const LoginPage: React.FC = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setEmail('franciscodanielechs@gmail.com');
-                    setPassword('admin123');
-                  }}
+                  onClick={handleFillAdminCredentials}
                 >
                   Usar credenciales admin
                 </Button>
