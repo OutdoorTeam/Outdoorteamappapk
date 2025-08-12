@@ -39,7 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="min-h-screen">
         <nav className="bg-black border-b border-gray-800 px-4 py-2">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <Link to="/" className="text-xl font-bold text-brand-gold">
+            <Link to="/" className="text-xl font-bold text-[#D3B869]">
               Outdoor Team
             </Link>
             <div className="flex items-center space-x-4">
@@ -50,7 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 variant="outline" 
                 size="sm" 
                 onClick={handleLogout}
-                className="border-brand-gold text-brand-gold hover:bg-brand-gold hover:text-black"
+                className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
               >
                 Salir
               </Button>
@@ -83,6 +83,55 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 Inicio
               </Link>
+
+              {/* Training Tab - visible for users with training feature */}
+              {user && user.features?.training && (
+                <Link 
+                  to="/entrenamiento" 
+                  className={`hover:text-brand-gold transition-colors ${
+                    isActive('/entrenamiento') ? 'text-brand-gold font-medium' : 'text-brand-black'
+                  }`}
+                >
+                  Entrenamiento
+                </Link>
+              )}
+
+              {/* Nutrition Tab - visible for users with nutrition feature */}
+              {user && user.features?.nutrition && (
+                <Link 
+                  to="/nutricion" 
+                  className={`hover:text-brand-gold transition-colors ${
+                    isActive('/nutricion') ? 'text-brand-gold font-medium' : 'text-brand-black'
+                  }`}
+                >
+                  Nutrición
+                </Link>
+              )}
+
+              {/* Active Breaks Tab - visible for users with active_breaks feature */}
+              {user && user.features?.active_breaks && (
+                <Link 
+                  to="/pausas-activas" 
+                  className={`hover:text-brand-gold transition-colors ${
+                    isActive('/pausas-activas') ? 'text-brand-gold font-medium' : 'text-brand-black'
+                  }`}
+                >
+                  Pausas Activas
+                </Link>
+              )}
+
+              {/* Meditation Tab - visible for users with meditation feature */}
+              {user && user.features?.meditation && (
+                <Link 
+                  to="/ejercicios" 
+                  className={`hover:text-brand-gold transition-colors ${
+                    isActive('/ejercicios') ? 'text-brand-gold font-medium' : 'text-brand-black'
+                  }`}
+                >
+                  Ejercicios
+                </Link>
+              )}
+              
               <Link 
                 to="/planes" 
                 className={`hover:text-brand-gold transition-colors ${
@@ -91,7 +140,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 Planes
               </Link>
-              
+
               {user && user.role === 'user' && (
                 <Link 
                   to="/planes-manage" 
@@ -200,6 +249,55 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 >
                   Inicio
                 </Link>
+
+                {/* Mobile: Training */}
+                {user.features?.training && (
+                  <Link 
+                    to="/entrenamiento" 
+                    className={`px-3 py-2 rounded-md text-sm ${
+                      isActive('/entrenamiento') ? 'bg-brand-gold text-brand-black' : 'text-brand-black hover:bg-gray-100'
+                    }`}
+                  >
+                    Entrenamiento
+                  </Link>
+                )}
+
+                {/* Mobile: Nutrition */}
+                {user.features?.nutrition && (
+                  <Link 
+                    to="/nutricion" 
+                    className={`px-3 py-2 rounded-md text-sm ${
+                      isActive('/nutricion') ? 'bg-brand-gold text-brand-black' : 'text-brand-black hover:bg-gray-100'
+                    }`}
+                  >
+                    Nutrición
+                  </Link>
+                )}
+
+                {/* Mobile: Active Breaks */}
+                {user.features?.active_breaks && (
+                  <Link 
+                    to="/pausas-activas" 
+                    className={`px-3 py-2 rounded-md text-sm ${
+                      isActive('/pausas-activas') ? 'bg-brand-gold text-brand-black' : 'text-brand-black hover:bg-gray-100'
+                    }`}
+                  >
+                    Pausas Activas
+                  </Link>
+                )}
+
+                {/* Mobile: Meditation/Exercises */}
+                {user.features?.meditation && (
+                  <Link 
+                    to="/ejercicios" 
+                    className={`px-3 py-2 rounded-md text-sm ${
+                      isActive('/ejercicios') ? 'bg-brand-gold text-brand-black' : 'text-brand-black hover:bg-gray-100'
+                    }`}
+                  >
+                    Ejercicios
+                  </Link>
+                )}
+                
                 <Link 
                   to="/planes" 
                   className={`px-3 py-2 rounded-md text-sm ${

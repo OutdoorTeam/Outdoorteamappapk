@@ -11,6 +11,10 @@ import RegisterPage from '@/pages/RegisterPage';
 import DashboardPage from '@/pages/DashboardPage';
 import PlanSelectionPage from '@/pages/PlanSelectionPage';
 import AdminPage from '@/pages/AdminPage';
+import TrainingPage from '@/pages/TrainingPage';
+import NutritionPage from '@/pages/NutritionPage';
+import ActiveBreaksPage from '@/pages/ActiveBreaksPage';
+import ExercisesPage from '@/pages/ExercisesPage';
 
 const AppRoutes: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -37,6 +41,62 @@ const AppRoutes: React.FC = () => {
       />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      
+      {/* Training Page - only accessible with training features */}
+      <Route 
+        path="/entrenamiento" 
+        element={
+          <ProtectedRoute>
+            {user && user.features?.training ? (
+              <TrainingPage />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )}
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Nutrition Page - only accessible with nutrition features */}
+      <Route 
+        path="/nutricion" 
+        element={
+          <ProtectedRoute>
+            {user && user.features?.nutrition ? (
+              <NutritionPage />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )}
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Active Breaks Page - only accessible with active_breaks features */}
+      <Route 
+        path="/pausas-activas" 
+        element={
+          <ProtectedRoute>
+            {user && user.features?.active_breaks ? (
+              <ActiveBreaksPage />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )}
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Exercises (Meditation) Page - only accessible with meditation features */}
+      <Route 
+        path="/ejercicios" 
+        element={
+          <ProtectedRoute>
+            {user && user.features?.meditation ? (
+              <ExercisesPage />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )}
+          </ProtectedRoute>
+        } 
+      />
       
       {/* Plan selection - only for users without a plan */}
       <Route 
