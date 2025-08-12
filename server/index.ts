@@ -185,7 +185,12 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
       return;
     }
 
+    console.log('Checking password for user:', email);
+    console.log('Password hash in database:', user.password_hash ? 'exists' : 'missing');
+    
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('Password validation result:', isValidPassword);
+    
     if (!isValidPassword) {
       console.log('Invalid password for user:', email);
       res.status(401).json({ error: 'Credenciales inválidas' });
@@ -235,6 +240,32 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
     plan_type: req.user.plan_type
   };
   res.json(userResponse);
+});
+
+// Test endpoint to verify admin user setup
+app.get('/api/test/admin-user', async (req: express.Request, res: express.Response) => {
+  try {
+    const adminUser = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'is_active'])
+      .where('email', '=', 'franciscodanielechs@gmail.com')
+      .executeTakeFirst();
+    
+    if (adminUser) {
+      console.log('Admin user found:', adminUser);
+      res.json({ 
+        message: 'Admin user exists',
+        user: adminUser,
+        password_hash_exists: adminUser ? 'Yes' : 'No'
+      });
+    } else {
+      console.log('Admin user not found');
+      res.status(404).json({ message: 'Admin user not found' });
+    }
+  } catch (error) {
+    console.error('Error checking admin user:', error);
+    res.status(500).json({ error: 'Error checking admin user' });
+  }
 });
 
 // Plans Routes
@@ -539,6 +570,7 @@ export async function startServer(port: number) {
       console.log('Database connection established');
       console.log('Authentication system initialized');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
+      console.log('Test admin endpoint: GET /api/test/admin-user');
     });
   } catch (err) {
     console.error('Failed to start server:', err);

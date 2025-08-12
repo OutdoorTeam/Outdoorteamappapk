@@ -34,6 +34,7 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
+      console.log('Attempting login with:', { email, passwordLength: password.length });
       await login(email, password);
     } catch (error: any) {
       console.error('Login error:', error);
@@ -50,6 +51,17 @@ const LoginPage: React.FC = () => {
     } catch (error: any) {
       console.error('Google login error:', error);
       setError(error.message || 'Error con el login de Google');
+    }
+  };
+
+  const handleTestAdmin = async () => {
+    try {
+      const response = await fetch('/api/test/admin-user');
+      const data = await response.json();
+      console.log('Admin user test:', data);
+      alert(`Admin user test: ${JSON.stringify(data, null, 2)}`);
+    } catch (error) {
+      console.error('Error testing admin user:', error);
     }
   };
 
@@ -145,7 +157,7 @@ const LoginPage: React.FC = () => {
 
             <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-xs text-blue-600 mb-2">Credenciales de administrador:</p>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -156,6 +168,14 @@ const LoginPage: React.FC = () => {
                   }}
                 >
                   Usar credenciales admin
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestAdmin}
+                >
+                  Verificar usuario admin
                 </Button>
               </div>
             </div>
