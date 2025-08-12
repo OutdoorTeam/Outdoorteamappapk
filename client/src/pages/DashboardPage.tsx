@@ -387,3 +387,360 @@ const DashboardPage: React.FC = () => {
       <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-lg text-white">Cargando tu panel...</div>
       </div>
+    );
+  }
+
+  // Check if user needs to select a plan
+  if (!user?.plan_type || Object.values(user.features).every(f => !f)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black">
+        <div className="text-center text-white p-8">
+          <h1 className="text-2xl font-bold mb-4">¡Bienvenido!</h1>
+          <p className="mb-4">Necesitas seleccionar un plan para continuar.</p>
+          <Button onClick={() => window.location.href = '/plan-selection'}>
+            Seleccionar Plan
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-bg min-h-screen text-white">
+      <div className="container mx-auto p-6">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-brand-gold mb-2">
+            ¡Hola, {user?.full_name.split(' ')[0]}!
+          </h1>
+          <p className="text-gray-300">Plan: {userPlan.name}</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-brand-gold">Hoy</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">
+                {completedHabitsCount}/{habits.length}
+              </div>
+              <p className="text-gray-400">Hábitos completados</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-brand-gold">Esta Semana</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">{weeklyPoints}</div>
+              <p className="text-gray-400">Puntos totales</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-brand-gold">Pasos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">
+                {todayHabits.steps.toLocaleString()}
+              </div>
+              <div className="progress-bar mt-2">
+                <div 
+                  className="progress-fill" 
+                  style={{ width: `${stepProgress}%` }}
+                />
+              </div>
+              <p className="text-gray-400 mt-1">
+                Meta: {userPlan.step_goal.toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full bg-gray-800 border border-gray-600" style={{ gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))` }}>
+            {availableTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger 
+                  key={tab.id} 
+                  value={tab.id}
+                  className="data-[state=active]:bg-brand-gold data-[state=active]:text-black text-white"
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {tab.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          {/* Habits Tab */}
+          {user?.features.habits && (
+            <TabsContent value="habits" className="space-y-6">
+              <div className="grid gap-6">
+                {/* Daily Habits */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-brand-gold">Hábitos Diarios</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {habits.map((habit) => (
+                      <div key={habit.key} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-white">{habit.name}</h3>
+                          <p className="text-sm text-gray-400">{habit.description}</p>
+                        </div>
+                        <button
+                          className={`habit-toggle ${habit.completed ? 'completed' : ''}`}
+                          onClick={() => updateHabit(habit.key, !habit.completed)}
+                        >
+                          {habit.completed && <Check size={16} />}
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Step Counter */}
+                    <div className="p-4 bg-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-medium text-white">Contador de Pasos</h3>
+                          <p className="text-sm text-gray-400">Ajusta manualmente tus pasos</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center space-x-4">
+                        <Button
+                          className="step-counter-btn"
+                          onClick={() => adjustSteps(-100)}
+                        >
+                          -100
+                        </Button>
+                        <Button
+                          className="step-counter-btn"
+                          onClick={() => adjustSteps(-500)}
+                        >
+                          -500
+                        </Button>
+                        <span className="text-xl font-bold text-brand-gold px-4">
+                          {todayHabits.steps.toLocaleString()}
+                        </span>
+                        <Button
+                          className="step-counter-btn"
+                          onClick={() => adjustSteps(500)}
+                        >
+                          +500
+                        </Button>
+                        <Button
+                          className="step-counter-btn"
+                          onClick={() => adjustSteps(100)}
+                        >
+                          +100
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Calendar */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-brand-gold">Calendario de Progreso</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        onClick={() => navigateMonth(-1)}
+                        className="text-white hover:text-brand-gold"
+                      >
+                        <ChevronLeft />
+                      </Button>
+                      <h3 className="text-lg font-medium text-white">
+                        {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        onClick={() => navigateMonth(1)}
+                        className="text-white hover:text-brand-gold"
+                      >
+                        <ChevronRight />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day) => (
+                        <div key={day} className="p-2 text-sm font-medium text-gray-400">
+                          {day}
+                        </div>
+                      ))}
+                      {generateCalendarDays().map((day, index) => (
+                        <div
+                          key={index}
+                          className={`calendar-day ${
+                            !day.isCurrentMonth ? 'opacity-30' : ''
+                          } ${
+                            day.isToday ? 'today' : ''
+                          } ${
+                            day.points === 4 ? 'completed-full' :
+                            day.points > 0 ? 'completed-partial' : ''
+                          }`}
+                        >
+                          {day.date.getDate()}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Daily Notes */}
+                <Card className="bg-gray-900 border-gray-700">
+                  <CardHeader>
+                    <CardTitle className="text-brand-gold">Notas Diarias</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      placeholder="¿Cómo te sientes hoy? Escribe tus pensamientos..."
+                      value={dailyNote}
+                      onChange={(e) => setDailyNote(e.target.value)}
+                      onBlur={saveNote}
+                      className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                      rows={4}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
+
+          {/* Training Tab */}
+          {user?.features.training && (
+            <TabsContent value="training" className="space-y-6">
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-brand-gold">Entrenamientos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {getContentByCategory('exercise').map((content: any) => (
+                      <div key={content.id} className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="font-medium text-white mb-2">{content.title}</h3>
+                        <p className="text-sm text-gray-400 mb-3">{content.description}</p>
+                        {content.video_url && (
+                          <Button 
+                            size="sm" 
+                            className="bg-brand-gold hover:bg-brand-gold/90 text-black"
+                            onClick={() => window.open(content.video_url, '_blank')}
+                          >
+                            Ver Video
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Active Breaks Tab */}
+          {user?.features.active_breaks && (
+            <TabsContent value="active_breaks" className="space-y-6">
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-brand-gold">Pausas Activas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {getContentByCategory('active_breaks').map((content: any) => (
+                      <div key={content.id} className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="font-medium text-white mb-2">{content.title}</h3>
+                        <p className="text-sm text-gray-400 mb-3">{content.description}</p>
+                        {content.video_url && (
+                          <Button 
+                            size="sm" 
+                            className="bg-brand-gold hover:bg-brand-gold/90 text-black"
+                            onClick={() => window.open(content.video_url, '_blank')}
+                          >
+                            Ver Video
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Nutrition Tab */}
+          {user?.features.nutrition && (
+            <TabsContent value="nutrition" className="space-y-6">
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-brand-gold">Plan de Nutrición</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-300 mb-4">
+                    Tu plan de nutrición personalizado por la Lic. Ana Saloco
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {getContentByCategory('nutrition').map((content: any) => (
+                      <div key={content.id} className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="font-medium text-white mb-2">{content.title}</h3>
+                        <p className="text-sm text-gray-400 mb-3">{content.description}</p>
+                        {content.video_url && (
+                          <Button 
+                            size="sm" 
+                            className="bg-brand-gold hover:bg-brand-gold/90 text-black"
+                            onClick={() => window.open(content.video_url, '_blank')}
+                          >
+                            Ver Contenido
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Meditation Tab */}
+          {user?.features.meditation && (
+            <TabsContent value="meditation" className="space-y-6">
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-brand-gold">Ejercicios de Respiración</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {getContentByCategory('meditation').map((content: any) => (
+                      <div key={content.id} className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="font-medium text-white mb-2">{content.title}</h3>
+                        <p className="text-sm text-gray-400 mb-3">{content.description}</p>
+                        {content.video_url && (
+                          <Button 
+                            size="sm" 
+                            className="bg-brand-gold hover:bg-brand-gold/90 text-black"
+                            onClick={() => window.open(content.video_url, '_blank')}
+                          >
+                            Comenzar
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default DashboardPage;
