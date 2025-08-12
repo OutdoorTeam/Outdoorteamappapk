@@ -11,12 +11,13 @@ const HomePage: React.FC = () => {
           Outdoor Team – Healthy Habits Academy
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-          Transform your lifestyle with personalized training plans, nutrition guidance, 
-          and habit tracking. Join our community and build lasting healthy habits.
+          Transforma tu estilo de vida con planes de entrenamiento personalizados, 
+          orientación nutricional y seguimiento de hábitos. Únete a nuestra comunidad 
+          y construye hábitos saludables duraderos.
         </p>
         <Link to="/register">
           <Button size="lg" className="text-lg px-8 py-3">
-            Start Your Journey Today
+            Comienza Tu Viaje Hoy
           </Button>
         </Link>
       </div>
@@ -24,36 +25,36 @@ const HomePage: React.FC = () => {
       <div className="grid md:grid-cols-3 gap-8 mt-16">
         <Card>
           <CardHeader>
-            <CardTitle>Personalized Training</CardTitle>
+            <CardTitle>Entrenamiento Personalizado</CardTitle>
             <CardDescription>
-              Get customized workout plans designed for your fitness level and goals
+              Obtén planes de entrenamiento personalizados diseñados para tu nivel de condición física y objetivos
             </CardDescription>
           </CardHeader>
         </Card>
         
         <Card>
           <CardHeader>
-            <CardTitle>Nutrition Guidance</CardTitle>
+            <CardTitle>Orientación Nutricional</CardTitle>
             <CardDescription>
-              Professional nutrition plans by licensed nutritionist Ana Saloco
+              Planes de nutrición profesionales por la nutricionista licenciada Ana Saloco
             </CardDescription>
           </CardHeader>
         </Card>
         
         <Card>
           <CardHeader>
-            <CardTitle>Habit Tracking</CardTitle>
+            <CardTitle>Seguimiento de Hábitos</CardTitle>
             <CardDescription>
-              Build lasting healthy habits with our comprehensive tracking system
+              Construye hábitos saludables duraderos con nuestro sistema integral de seguimiento
             </CardDescription>
           </CardHeader>
         </Card>
       </div>
 
       <div className="text-center mt-16">
-        <Link to="/plans">
+        <Link to="/planes">
           <Button variant="outline" size="lg">
-            View Our Plans
+            Ver Nuestros Planes
           </Button>
         </Link>
       </div>

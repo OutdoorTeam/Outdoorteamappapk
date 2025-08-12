@@ -1,61 +1,110 @@
 import * as React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  
+  const { login, loginWithGoogle, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const from = (location.state as any)?.from?.pathname || '/';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (user) {
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate(from === '/login' ? '/dashboard' : from);
+      }
+    }
+  }, [user, navigate, from]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', { email, password });
-    // TODO: Implement login logic
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await login(email, password);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Error al iniciar sesión');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleGoogleLogin = () => {
-    console.log('Google login clicked');
-    // TODO: Implement Google login
+  const handleGoogleLogin = async () => {
+    setError('');
+    try {
+      await loginWithGoogle();
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      setError(error.message || 'Error con el login de Google');
+    }
   };
+
+  if (user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Redirigiendo...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-md mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
+            <CardTitle className="text-2xl text-center">Bienvenido de Vuelta</CardTitle>
             <CardDescription className="text-center">
-              Sign in to your Outdoor Team account
+              Inicia sesión en tu cuenta de Outdoor Team
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md text-sm">
+                {error}
+              </div>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Correo Electrónico</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="Ingresa tu correo electrónico"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Contraseña</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="Ingresa tu contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Sign In
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>
 
@@ -66,7 +115,7 @@ const LoginPage: React.FC = () => {
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
+                    O continúa con
                   </span>
                 </div>
               </div>
@@ -75,21 +124,22 @@ const LoginPage: React.FC = () => {
                 variant="outline"
                 className="w-full mt-4"
                 onClick={handleGoogleLogin}
+                disabled={isLoading}
               >
-                Continue with Google
+                Continuar con Google
               </Button>
             </div>
 
             <div className="mt-4 text-center text-sm">
               <Link to="#" className="text-primary hover:underline">
-                Forgot your password?
+                ¿Olvidaste tu contraseña?
               </Link>
             </div>
 
             <div className="mt-4 text-center text-sm">
-              Don't have an account?{' '}
+              ¿No tienes una cuenta?{' '}
               <Link to="/register" className="text-primary hover:underline">
-                Sign up
+                Regístrate
               </Link>
             </div>
           </CardContent>

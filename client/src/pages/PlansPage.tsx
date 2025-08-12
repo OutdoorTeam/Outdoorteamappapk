@@ -8,39 +8,39 @@ const PlansPage: React.FC = () => {
   const plans = [
     {
       name: "Healthy Habits Academy",
-      type: "Standard",
-      description: "Perfect for starting your healthy journey",
+      type: "Estándar",
+      description: "Perfecto para comenzar tu viaje saludable",
       features: [
-        "Weekly training routine",
-        "Habit tracking system", 
-        "Step counter (manual input)",
-        "Daily notes",
-        "Progress tracking",
-        "Active breaks videos"
+        "Rutina de entrenamiento semanal",
+        "Sistema de seguimiento de hábitos", 
+        "Contador de pasos (entrada manual)",
+        "Notas diarias",
+        "Seguimiento de progreso",
+        "Videos de pausas activas"
       ]
     },
     {
-      name: "Personalized Training + Academy",
-      type: "Advanced",
-      description: "Tailored training with personal support",
+      name: "Entrenamiento Personalizado + Academy",
+      type: "Avanzado",
+      description: "Entrenamiento personalizado con apoyo personal",
       features: [
-        "Everything in Healthy Habits Academy",
-        "Personalized training plan",
-        "Training for gym, home, or any activity",
-        "Weekly WhatsApp follow-up",
-        "Daily questions via WhatsApp",
-        "Access to 150+ exercise videos"
+        "Todo lo incluido en Healthy Habits Academy",
+        "Plan de entrenamiento personalizado",
+        "Entrenamiento para gimnasio, hogar o cualquier actividad",
+        "Seguimiento semanal por WhatsApp",
+        "Preguntas diarias permitidas vía WhatsApp",
+        "Acceso a más de 150 videos de ejercicios"
       ]
     },
     {
-      name: "Program 'Totum'",
+      name: "Programa 'Totum'",
       type: "Premium",
-      description: "Complete wellness transformation",
+      description: "Transformación completa del bienestar",
       features: [
-        "Everything in Personalized Training + Academy",
-        "Personalized nutrition plan by Lic. Ana Saloco",
-        "Active breaks with guidance",
-        "Complete health transformation program"
+        "Todo lo incluido en Entrenamiento Personalizado + Academy",
+        "Plan de nutrición personalizado por Lic. Ana Saloco",
+        "Pausas activas con orientación",
+        "Programa completo de transformación de la salud"
       ]
     }
   ];
@@ -48,9 +48,9 @@ const PlansPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+        <h1 className="text-4xl font-bold mb-4">Elige Tu Plan</h1>
         <p className="text-xl text-muted-foreground">
-          Select the perfect plan to start your healthy lifestyle journey
+          Selecciona el plan perfecto para comenzar tu viaje hacia un estilo de vida saludable
         </p>
       </div>
 
@@ -60,7 +60,7 @@ const PlansPage: React.FC = () => {
             {index === 1 && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm">
-                  Most Popular
+                  Más Popular
                 </span>
               </div>
             )}
@@ -85,7 +85,7 @@ const PlansPage: React.FC = () => {
                   className="w-full" 
                   variant={index === 1 ? "default" : "outline"}
                 >
-                  Get Started
+                  Comenzar
                 </Button>
               </Link>
             </CardContent>
@@ -95,10 +95,10 @@ const PlansPage: React.FC = () => {
 
       <div className="text-center mt-12">
         <p className="text-muted-foreground mb-4">
-          Ready to transform your lifestyle?
+          ¿Listo para transformar tu estilo de vida?
         </p>
         <Link to="/register">
-          <Button size="lg">Start Your Journey</Button>
+          <Button size="lg">Comienza Tu Viaje</Button>
         </Link>
       </div>
     </div>

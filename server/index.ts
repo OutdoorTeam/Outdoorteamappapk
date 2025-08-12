@@ -1,32 +1,214 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
 
 dotenv.config();
 
 const app = express();
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
-app.get('/api/users', async (req: express.Request, res: express.Response) => {
+// Authentication middleware
+const authenticateToken = async (req: any, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(401).json({ error: 'Token de acceso requerido' });
+    return;
+  }
+
   try {
-    console.log('Fetching all users...');
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('id', '=', decoded.id)
+      .executeTakeFirst();
+
+    if (!user) {
+      res.status(403).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(403).json({ error: 'Token inválido' });
+    return;
+  }
+};
+
+// Admin middleware
+const requireAdmin = (req: any, res: express.Response, next: express.NextFunction) => {
+  if (req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador.' });
+    return;
+  }
+  next();
+};
+
+// Auth Routes
+app.post('/api/auth/register', async (req: express.Request, res: express.Response) => {
+  try {
+    const { full_name, email, password } = req.body;
+    console.log('Registration attempt for:', email);
+
+    // Check if user already exists
+    const existingUser = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('email', '=', email)
+      .executeTakeFirst();
+
+    if (existingUser) {
+      console.log('User already exists:', email);
+      res.status(400).json({ error: 'El usuario ya existe' });
+      return;
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Determine role - make franciscodanielechs@gmail.com admin
+    const role = email === 'franciscodanielechs@gmail.com' ? 'admin' : 'user';
+
+    // Create user
+    const newUser = await db
+      .insertInto('users')
+      .values({
+        full_name,
+        email,
+        password_hash: passwordHash,
+        role,
+        is_active: 1,
+        features_json: '{}',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type'])
+      .executeTakeFirst();
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: newUser!.id, email: newUser!.email, role: newUser!.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log('User registered successfully:', newUser!.email, 'Role:', newUser!.role);
+    res.status(201).json({ user: newUser, token });
+  } catch (error) {
+    console.error('Error registering user:', error);
+    res.status(500).json({ error: 'Error al registrar usuario' });
+  }
+});
+
+app.post('/api/auth/login', async (req: express.Request, res: express.Response) => {
+  try {
+    const { email, password } = req.body;
+    console.log('Login attempt for:', email);
+
+    // Find user
+    const user = await db
+      .selectFrom('users')
+      .selectAll()
+      .where('email', '=', email)
+      .executeTakeFirst();
+
+    if (!user) {
+      console.log('User not found:', email);
+      res.status(401).json({ error: 'Credenciales inválidas' });
+      return;
+    }
+
+    if (!user.is_active) {
+      console.log('User account is inactive:', email);
+      res.status(401).json({ error: 'Cuenta desactivada' });
+      return;
+    }
+
+    // Check password
+    if (!user.password_hash) {
+      console.log('User has no password set:', email);
+      res.status(401).json({ error: 'Credenciales inválidas' });
+      return;
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    if (!isValidPassword) {
+      console.log('Invalid password for user:', email);
+      res.status(401).json({ error: 'Credenciales inválidas' });
+      return;
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role,
+      plan_type: user.plan_type
+    };
+
+    console.log('Login successful for user:', user.email, 'Role:', user.role);
+    res.json({ user: userResponse, token });
+  } catch (error) {
+    console.error('Error logging in user:', error);
+    res.status(500).json({ error: 'Error al iniciar sesión' });
+  }
+});
+
+app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => {
+  const userResponse = {
+    id: req.user.id,
+    email: req.user.email,
+    full_name: req.user.full_name,
+    role: req.user.role,
+    plan_type: req.user.plan_type
+  };
+  res.json(userResponse);
+});
+
+// Protected API Routes
+app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all users');
     const users = await db.selectFrom('users').selectAll().execute();
     console.log('Users fetched:', users.length);
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    res.status(500).json({ error: 'Error al obtener usuarios' });
   }
 });
 
-app.get('/api/users/:id', async (req: express.Request, res: express.Response) => {
+app.get('/api/users/:id', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const { id } = req.params;
+    const requestingUserId = req.user.id;
+    const requestingUserRole = req.user.role;
+
+    // Users can only access their own data unless they're admin
+    if (requestingUserRole !== 'admin' && parseInt(id) !== requestingUserId) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
     console.log('Fetching user by ID:', id);
     const user = await db
       .selectFrom('users')
@@ -36,7 +218,7 @@ app.get('/api/users/:id', async (req: express.Request, res: express.Response) =>
     
     if (!user) {
       console.log('User not found:', id);
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'Usuario no encontrado' });
       return;
     }
     
@@ -44,47 +226,49 @@ app.get('/api/users/:id', async (req: express.Request, res: express.Response) =>
     res.json(user);
   } catch (error) {
     console.error('Error fetching user:', error);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    res.status(500).json({ error: 'Error al obtener usuario' });
   }
 });
 
-app.post('/api/register', async (req: express.Request, res: express.Response) => {
+app.put('/api/users/:id/toggle-status', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
   try {
-    const { email, full_name, password_hash } = req.body;
-    console.log('Registering new user:', email);
+    const { id } = req.params;
+    const { is_active } = req.body;
+    console.log('Admin toggling user status:', id, 'to:', is_active);
     
-    const newUser = await db
-      .insertInto('users')
-      .values({
-        email,
-        full_name,
-        password_hash,
-        role: 'user',
-        is_active: 1,
-        features_json: '{}',
-        created_at: new Date().toISOString(),
+    const user = await db
+      .updateTable('users')
+      .set({ 
+        is_active: is_active ? 1 : 0,
         updated_at: new Date().toISOString()
       })
-      .returning(['id', 'email', 'full_name', 'role'])
+      .where('id', '=', parseInt(id))
+      .returning(['id', 'email', 'is_active'])
       .executeTakeFirst();
     
-    console.log('User registered successfully:', newUser?.email);
-    res.status(201).json(newUser);
+    if (!user) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+    
+    console.log('User status updated:', user.email, 'Active:', user.is_active);
+    res.json(user);
   } catch (error) {
-    console.error('Error registering user:', error);
-    res.status(500).json({ error: 'Failed to register user' });
+    console.error('Error updating user status:', error);
+    res.status(500).json({ error: 'Error al actualizar estado del usuario' });
   }
 });
 
-app.post('/api/habits', async (req: express.Request, res: express.Response) => {
+app.post('/api/habits', authenticateToken, async (req: any, res: express.Response) => {
   try {
-    const { user_id, name, date } = req.body;
-    console.log('Creating habit for user:', user_id);
+    const { name, date } = req.body;
+    const userId = req.user.id;
+    console.log('Creating habit for user:', userId);
     
     const habit = await db
       .insertInto('habits')
       .values({
-        user_id,
+        user_id: userId,
         name,
         date,
         is_completed: 0,
@@ -97,15 +281,28 @@ app.post('/api/habits', async (req: express.Request, res: express.Response) => {
     res.status(201).json(habit);
   } catch (error) {
     console.error('Error creating habit:', error);
-    res.status(500).json({ error: 'Failed to create habit' });
+    res.status(500).json({ error: 'Error al crear hábito' });
   }
 });
 
-app.put('/api/habits/:id', async (req: express.Request, res: express.Response) => {
+app.put('/api/habits/:id', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const { id } = req.params;
     const { is_completed } = req.body;
+    const userId = req.user.id;
     console.log('Updating habit:', id, 'completed:', is_completed);
+    
+    // Verify the habit belongs to the requesting user
+    const existingHabit = await db
+      .selectFrom('habits')
+      .select(['user_id'])
+      .where('id', '=', parseInt(id))
+      .executeTakeFirst();
+
+    if (!existingHabit || existingHabit.user_id !== userId) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
     
     const habit = await db
       .updateTable('habits')
@@ -118,19 +315,20 @@ app.put('/api/habits/:id', async (req: express.Request, res: express.Response) =
     res.json(habit);
   } catch (error) {
     console.error('Error updating habit:', error);
-    res.status(500).json({ error: 'Failed to update habit' });
+    res.status(500).json({ error: 'Error al actualizar hábito' });
   }
 });
 
-app.post('/api/steps', async (req: express.Request, res: express.Response) => {
+app.post('/api/steps', authenticateToken, async (req: any, res: express.Response) => {
   try {
-    const { user_id, steps, date } = req.body;
-    console.log('Recording steps for user:', user_id, 'steps:', steps);
+    const { steps, date } = req.body;
+    const userId = req.user.id;
+    console.log('Recording steps for user:', userId, 'steps:', steps);
     
     const stepRecord = await db
       .insertInto('step_counts')
       .values({
-        user_id,
+        user_id: userId,
         steps,
         date,
         created_at: new Date().toISOString()
@@ -143,19 +341,20 @@ app.post('/api/steps', async (req: express.Request, res: express.Response) => {
     res.json(stepRecord);
   } catch (error) {
     console.error('Error recording steps:', error);
-    res.status(500).json({ error: 'Failed to record steps' });
+    res.status(500).json({ error: 'Error al registrar pasos' });
   }
 });
 
-app.post('/api/notes', async (req: express.Request, res: express.Response) => {
+app.post('/api/notes', authenticateToken, async (req: any, res: express.Response) => {
   try {
-    const { user_id, content, date } = req.body;
-    console.log('Creating note for user:', user_id);
+    const { content, date } = req.body;
+    const userId = req.user.id;
+    console.log('Creating note for user:', userId);
     
     const note = await db
       .insertInto('user_notes')
       .values({
-        user_id,
+        user_id: userId,
         content,
         date,
         created_at: new Date().toISOString()
@@ -167,19 +366,20 @@ app.post('/api/notes', async (req: express.Request, res: express.Response) => {
     res.status(201).json(note);
   } catch (error) {
     console.error('Error creating note:', error);
-    res.status(500).json({ error: 'Failed to create note' });
+    res.status(500).json({ error: 'Error al crear nota' });
   }
 });
 
-app.post('/api/broadcast', async (req: express.Request, res: express.Response) => {
+app.post('/api/broadcast', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
   try {
-    const { sender_id, message } = req.body;
-    console.log('Broadcasting message from user:', sender_id);
+    const { message } = req.body;
+    const senderId = req.user.id;
+    console.log('Broadcasting message from admin:', senderId);
     
     const broadcastMessage = await db
       .insertInto('broadcast_messages')
       .values({
-        sender_id,
+        sender_id: senderId,
         message,
         created_at: new Date().toISOString()
       })
@@ -190,12 +390,12 @@ app.post('/api/broadcast', async (req: express.Request, res: express.Response) =
     res.status(201).json(broadcastMessage);
   } catch (error) {
     console.error('Error sending broadcast message:', error);
-    res.status(500).json({ error: 'Failed to send broadcast message' });
+    res.status(500).json({ error: 'Error al enviar mensaje masivo' });
   }
 });
 
 // Export a function to start the server
-export async function startServer(port) {
+export async function startServer(port: number) {
   try {
     if (process.env.NODE_ENV === 'production') {
       setupStaticServing(app);
@@ -203,6 +403,7 @@ export async function startServer(port) {
     app.listen(port, () => {
       console.log(`API Server running on port ${port}`);
       console.log('Database connection established');
+      console.log('Authentication system initialized');
     });
   } catch (err) {
     console.error('Failed to start server:', err);
@@ -213,5 +414,5 @@ export async function startServer(port) {
 // Start the server directly if this is the main module
 if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('Starting server...');
-  startServer(process.env.PORT || 3001);
+  startServer(parseInt(process.env.PORT || '3001'));
 }

@@ -5,15 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DashboardPage: React.FC = () => {
+  const { user } = useAuth();
   const [steps, setSteps] = React.useState('');
   const [todayNote, setTodayNote] = React.useState('');
   const [habits, setHabits] = React.useState([
-    { id: 1, name: 'Drink 8 glasses of water', completed: false },
-    { id: 2, name: 'Exercise for 30 minutes', completed: true },
-    { id: 3, name: 'Eat 5 servings of fruits/vegetables', completed: false },
-    { id: 4, name: 'Get 7-8 hours of sleep', completed: false },
+    { id: 1, name: 'Beber 8 vasos de agua', completed: false },
+    { id: 2, name: 'Ejercitarse por 30 minutos', completed: true },
+    { id: 3, name: 'Comer 5 porciones de frutas/vegetales', completed: false },
+    { id: 4, name: 'Dormir 7-8 horas', completed: false },
   ]);
 
   const completedHabits = habits.filter(h => h.completed).length;
@@ -39,17 +41,19 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Your Dashboard</h1>
-        <p className="text-muted-foreground">Track your daily habits and progress</p>
+        <h1 className="text-3xl font-bold mb-2">
+          Hola, {user?.full_name.split(' ')[0]}
+        </h1>
+        <p className="text-muted-foreground">Sigue tus hábitos diarios y progreso</p>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Today's Habits */}
         <Card>
           <CardHeader>
-            <CardTitle>Today's Habits</CardTitle>
+            <CardTitle>Hábitos de Hoy</CardTitle>
             <CardDescription>
-              {completedHabits} of {habits.length} completed
+              {completedHabits} de {habits.length} completados
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -77,23 +81,23 @@ const DashboardPage: React.FC = () => {
         {/* Step Counter */}
         <Card>
           <CardHeader>
-            <CardTitle>Step Counter</CardTitle>
-            <CardDescription>Record your daily steps</CardDescription>
+            <CardTitle>Contador de Pasos</CardTitle>
+            <CardDescription>Registra tus pasos diarios</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleStepsSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="steps">Steps Today</Label>
+                <Label htmlFor="steps">Pasos de Hoy</Label>
                 <Input
                   id="steps"
                   type="number"
-                  placeholder="Enter step count"
+                  placeholder="Ingresa el conteo de pasos"
                   value={steps}
                   onChange={(e) => setSteps(e.target.value)}
                 />
               </div>
               <Button type="submit" className="w-full">
-                Record Steps
+                Registrar Pasos
               </Button>
             </form>
           </CardContent>
@@ -102,22 +106,22 @@ const DashboardPage: React.FC = () => {
         {/* Daily Notes */}
         <Card>
           <CardHeader>
-            <CardTitle>Daily Notes</CardTitle>
-            <CardDescription>How are you feeling today?</CardDescription>
+            <CardTitle>Notas Diarias</CardTitle>
+            <CardDescription>¿Cómo te sientes hoy?</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="note">Today's Note</Label>
+                <Label htmlFor="note">Nota de Hoy</Label>
                 <Input
                   id="note"
-                  placeholder="Write about your day..."
+                  placeholder="Escribe sobre tu día..."
                   value={todayNote}
                   onChange={(e) => setTodayNote(e.target.value)}
                 />
               </div>
               <Button onClick={handleNoteSave} className="w-full">
-                Save Note
+                Guardar Nota
               </Button>
             </div>
           </CardContent>
@@ -126,15 +130,15 @@ const DashboardPage: React.FC = () => {
         {/* Training Plan */}
         <Card>
           <CardHeader>
-            <CardTitle>Training Plan</CardTitle>
-            <CardDescription>Your personalized workout</CardDescription>
+            <CardTitle>Plan de Entrenamiento</CardTitle>
+            <CardDescription>Tu entrenamiento personalizado</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              No training plan assigned yet. Contact your trainer to get started.
+              Aún no tienes un plan de entrenamiento asignado. Contacta a tu entrenador para comenzar.
             </p>
             <Button variant="outline" className="w-full">
-              View Training Videos
+              Ver Videos de Entrenamiento
             </Button>
           </CardContent>
         </Card>
@@ -142,15 +146,15 @@ const DashboardPage: React.FC = () => {
         {/* Nutrition Plan */}
         <Card>
           <CardHeader>
-            <CardTitle>Nutrition Plan</CardTitle>
-            <CardDescription>Your personalized meal plan</CardDescription>
+            <CardTitle>Plan Nutricional</CardTitle>
+            <CardDescription>Tu plan de alimentación personalizado</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              No nutrition plan assigned yet. Upgrade to Premium for personalized nutrition.
+              Aún no tienes un plan nutricional asignado. Mejora a Premium para nutrición personalizada.
             </p>
             <Button variant="outline" className="w-full">
-              View Plans
+              Ver Planes
             </Button>
           </CardContent>
         </Card>
@@ -158,21 +162,21 @@ const DashboardPage: React.FC = () => {
         {/* Progress Overview */}
         <Card>
           <CardHeader>
-            <CardTitle>Progress Overview</CardTitle>
-            <CardDescription>Your weekly summary</CardDescription>
+            <CardTitle>Resumen de Progreso</CardTitle>
+            <CardDescription>Tu resumen semanal</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span>Habits completed this week</span>
+                <span>Hábitos completados esta semana</span>
                 <span className="font-medium">18/28</span>
               </div>
               <div className="flex justify-between">
-                <span>Average daily steps</span>
+                <span>Promedio de pasos diarios</span>
                 <span className="font-medium">7,842</span>
               </div>
               <div className="flex justify-between">
-                <span>Active days</span>
+                <span>Días activos</span>
                 <span className="font-medium">5/7</span>
               </div>
             </div>
