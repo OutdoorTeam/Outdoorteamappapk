@@ -136,11 +136,28 @@ const LoginPage: React.FC = () => {
               </Link>
             </div>
 
-            <div className="mt-4 text-center text-sm">
+            <div className="mt-6 text-center text-sm">
               ¿No tienes una cuenta?{' '}
               <Link to="/register" className="text-primary hover:underline">
                 Regístrate
               </Link>
+            </div>
+
+            <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs text-blue-600 mb-2">Credenciales de administrador:</p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEmail('franciscodanielechs@gmail.com');
+                    setPassword('admin123');
+                  }}
+                >
+                  Usar credenciales admin
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

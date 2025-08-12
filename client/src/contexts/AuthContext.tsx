@@ -47,6 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
+      console.log('Checking auth status with stored token');
       const response = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -55,8 +56,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         const userData = await response.json();
+        console.log('Auth check successful for:', userData.email);
         setUser(userData);
       } else {
+        console.log('Auth check failed, removing token');
         localStorage.removeItem('auth_token');
       }
     } catch (error) {
@@ -69,35 +72,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     console.log('Attempting login for:', email);
+    
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Error al iniciar sesión');
-    }
-
-    localStorage.setItem('auth_token', data.token);
-    setUser(data.user);
-    console.log('Login successful for user:', data.user.email);
-  };
-
-  const register = async (fullName: string, email: string, password: string) => {
-    console.log('Attempting registration for:', email);
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ 
-        full_name: fullName, 
-        email, 
+        email: email.trim(), 
         password 
       }),
     });
@@ -105,23 +87,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const data = await response.json();
 
     if (!response.ok) {
+      console.error('Login failed:', data.error);
+      throw new Error(data.error || 'Error al iniciar sesión');
+    }
+
+    localStorage.setItem('auth_token', data.token);
+    setUser(data.user);
+    console.log('Login successful for user:', data.user.email, 'Role:', data.user.role);
+  };
+
+  const register = async (fullName: string, email: string, password: string) => {
+    console.log('Attempting registration for:', email);
+    
+    if (!fullName.trim()) {
+      throw new Error('El nombre completo es requerido');
+    }
+
+    if (!email.trim()) {
+      throw new Error('El correo electrónico es requerido');
+    }
+
+    if (password.length < 6) {
+      throw new Error('La contraseña debe tener al menos 6 caracteres');
+    }
+
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        full_name: fullName.trim(), 
+        email: email.trim(), 
+        password 
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Registration failed:', data.error);
       throw new Error(data.error || 'Error al registrarse');
     }
 
     localStorage.setItem('auth_token', data.token);
     setUser(data.user);
-    console.log('Registration successful for user:', data.user.email);
+    console.log('Registration successful for user:', data.user.email, 'Role:', data.user.role);
   };
 
   const logout = () => {
-    console.log('Logging out user');
+    console.log('Logging out user:', user?.email);
     localStorage.removeItem('auth_token');
     setUser(null);
   };
 
   const loginWithGoogle = async () => {
     console.log('Google login clicked - to be implemented');
-    throw new Error('Login con Google aún no está implementado');
+    throw new Error('Login con Google aún no está implementado. Por favor usa email y contraseña.');
   };
 
   const value = {

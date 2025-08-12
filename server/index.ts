@@ -8,7 +8,7 @@ import { db } from './database.js';
 dotenv.config();
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Body parsing middleware
 app.use(express.json());
@@ -37,6 +37,11 @@ const authenticateToken = async (req: any, res: express.Response, next: express.
       return;
     }
 
+    if (!user.is_active) {
+      res.status(403).json({ error: 'Cuenta desactivada' });
+      return;
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -59,18 +64,30 @@ const requireAdmin = (req: any, res: express.Response, next: express.NextFunctio
 app.post('/api/auth/register', async (req: express.Request, res: express.Response) => {
   try {
     const { full_name, email, password } = req.body;
+    
+    // Validate input
+    if (!full_name || !email || !password) {
+      res.status(400).json({ error: 'Todos los campos son requeridos' });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+      return;
+    }
+
     console.log('Registration attempt for:', email);
 
     // Check if user already exists
     const existingUser = await db
       .selectFrom('users')
       .selectAll()
-      .where('email', '=', email)
+      .where('email', '=', email.toLowerCase())
       .executeTakeFirst();
 
     if (existingUser) {
       console.log('User already exists:', email);
-      res.status(400).json({ error: 'El usuario ya existe' });
+      res.status(400).json({ error: 'Ya existe un usuario con este correo electrónico' });
       return;
     }
 
@@ -79,14 +96,14 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Determine role - make franciscodanielechs@gmail.com admin
-    const role = email === 'franciscodanielechs@gmail.com' ? 'admin' : 'user';
+    const role = email.toLowerCase() === 'franciscodanielechs@gmail.com' ? 'admin' : 'user';
 
     // Create user
     const newUser = await db
       .insertInto('users')
       .values({
-        full_name,
-        email,
+        full_name: full_name.trim(),
+        email: email.toLowerCase().trim(),
         password_hash: passwordHash,
         role,
         is_active: 1,
@@ -97,31 +114,56 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
       .returning(['id', 'email', 'full_name', 'role', 'plan_type'])
       .executeTakeFirst();
 
+    if (!newUser) {
+      res.status(500).json({ error: 'Error al crear el usuario' });
+      return;
+    }
+
     // Generate JWT
     const token = jwt.sign(
-      { id: newUser!.id, email: newUser!.email, role: newUser!.role },
+      { 
+        id: newUser.id, 
+        email: newUser.email, 
+        role: newUser.role 
+      },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log('User registered successfully:', newUser!.email, 'Role:', newUser!.role);
-    res.status(201).json({ user: newUser, token });
+    console.log('User registered successfully:', newUser.email, 'Role:', newUser.role);
+    res.status(201).json({ 
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        full_name: newUser.full_name,
+        role: newUser.role,
+        plan_type: newUser.plan_type
+      }, 
+      token 
+    });
   } catch (error) {
     console.error('Error registering user:', error);
-    res.status(500).json({ error: 'Error al registrar usuario' });
+    res.status(500).json({ error: 'Error interno del servidor al registrar usuario' });
   }
 });
 
 app.post('/api/auth/login', async (req: express.Request, res: express.Response) => {
   try {
     const { email, password } = req.body;
+    
+    // Validate input
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email y contraseña son requeridos' });
+      return;
+    }
+
     console.log('Login attempt for:', email);
 
     // Find user
     const user = await db
       .selectFrom('users')
       .selectAll()
-      .where('email', '=', email)
+      .where('email', '=', email.toLowerCase().trim())
       .executeTakeFirst();
 
     if (!user) {
@@ -132,7 +174,7 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
 
     if (!user.is_active) {
       console.log('User account is inactive:', email);
-      res.status(401).json({ error: 'Cuenta desactivada' });
+      res.status(401).json({ error: 'Tu cuenta ha sido desactivada. Contacta al administrador.' });
       return;
     }
 
@@ -152,10 +194,21 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
 
     // Generate JWT
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Update last login timestamp
+    await db
+      .updateTable('users')
+      .set({ updated_at: new Date().toISOString() })
+      .where('id', '=', user.id)
+      .execute();
 
     const userResponse = {
       id: user.id,
@@ -169,7 +222,7 @@ app.post('/api/auth/login', async (req: express.Request, res: express.Response) 
     res.json({ user: userResponse, token });
   } catch (error) {
     console.error('Error logging in user:', error);
-    res.status(500).json({ error: 'Error al iniciar sesión' });
+    res.status(500).json({ error: 'Error interno del servidor al iniciar sesión' });
   }
 });
 
@@ -187,7 +240,7 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
 // Plans Routes
 app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
   try {
-    console.log('Fetching all plans');
+    console.log('Fetching all plans for user:', req.user.email);
     const plans = await db.selectFrom('plans').selectAll().execute();
     console.log('Plans fetched:', plans.length);
     res.json(plans);
@@ -225,14 +278,14 @@ app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res:
   try {
     const { id } = req.params;
     const { name, description, price, services_included, is_active } = req.body;
-    console.log('Admin updating plan:', id);
+    console.log('Admin updating plan:', id, 'by user:', req.user.email);
     
     const plan = await db
       .updateTable('plans')
       .set({ 
         name,
         description,
-        price,
+        price: parseFloat(price) || 0,
         services_included: JSON.stringify(services_included),
         is_active: is_active ? 1 : 0,
         updated_at: new Date().toISOString()
@@ -246,7 +299,7 @@ app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res:
       return;
     }
     
-    console.log('Plan updated:', plan.name);
+    console.log('Plan updated successfully:', plan.name);
     res.json(plan);
   } catch (error) {
     console.error('Error updating plan:', error);
@@ -257,8 +310,11 @@ app.put('/api/plans/:id', authenticateToken, requireAdmin, async (req: any, res:
 // Protected API Routes
 app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
   try {
-    console.log('Admin fetching all users');
-    const users = await db.selectFrom('users').selectAll().execute();
+    console.log('Admin fetching all users - requested by:', req.user.email);
+    const users = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'created_at'])
+      .execute();
     console.log('Users fetched:', users.length);
     res.json(users);
   } catch (error) {
@@ -282,7 +338,7 @@ app.get('/api/users/:id', authenticateToken, async (req: any, res: express.Respo
     console.log('Fetching user by ID:', id);
     const user = await db
       .selectFrom('users')
-      .selectAll()
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'created_at'])
       .where('id', '=', parseInt(id))
       .executeTakeFirst();
     
@@ -304,7 +360,13 @@ app.put('/api/users/:id/toggle-status', authenticateToken, requireAdmin, async (
   try {
     const { id } = req.params;
     const { is_active } = req.body;
-    console.log('Admin toggling user status:', id, 'to:', is_active);
+    console.log('Admin toggling user status:', id, 'to:', is_active, 'by:', req.user.email);
+    
+    // Prevent admin from deactivating themselves
+    if (parseInt(id) === req.user.id) {
+      res.status(400).json({ error: 'No puedes desactivar tu propia cuenta' });
+      return;
+    }
     
     const user = await db
       .updateTable('users')
@@ -340,7 +402,7 @@ app.post('/api/habits', authenticateToken, async (req: any, res: express.Respons
       .values({
         user_id: userId,
         name,
-        date,
+        date: date || new Date().toISOString().split('T')[0],
         is_completed: 0,
         created_at: new Date().toISOString()
       })
@@ -399,11 +461,13 @@ app.post('/api/steps', authenticateToken, async (req: any, res: express.Response
       .insertInto('step_counts')
       .values({
         user_id: userId,
-        steps,
-        date,
+        steps: parseInt(steps) || 0,
+        date: date || new Date().toISOString().split('T')[0],
         created_at: new Date().toISOString()
       })
-      .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({ steps }))
+      .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({ 
+        steps: parseInt(steps) || 0 
+      }))
       .returning(['id', 'steps', 'date'])
       .executeTakeFirst();
     
@@ -426,7 +490,7 @@ app.post('/api/notes', authenticateToken, async (req: any, res: express.Response
       .values({
         user_id: userId,
         content,
-        date,
+        date: date || new Date().toISOString().split('T')[0],
         created_at: new Date().toISOString()
       })
       .returning(['id', 'content', 'date'])
@@ -444,7 +508,7 @@ app.post('/api/broadcast', authenticateToken, requireAdmin, async (req: any, res
   try {
     const { message } = req.body;
     const senderId = req.user.id;
-    console.log('Broadcasting message from admin:', senderId);
+    console.log('Broadcasting message from admin:', req.user.email);
     
     const broadcastMessage = await db
       .insertInto('broadcast_messages')
@@ -474,6 +538,7 @@ export async function startServer(port: number) {
       console.log(`API Server running on port ${port}`);
       console.log('Database connection established');
       console.log('Authentication system initialized');
+      console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
     });
   } catch (err) {
     console.error('Failed to start server:', err);
