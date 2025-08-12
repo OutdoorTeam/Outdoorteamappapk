@@ -241,6 +241,211 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(userResponse);
 });
 
+// Daily Habits Routes
+app.get('/api/daily-habits/today', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+    
+    console.log('Fetching daily habits for user:', userId, 'date:', today);
+    
+    const todayHabits = await db
+      .selectFrom('daily_habits')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', today)
+      .executeTakeFirst();
+    
+    if (todayHabits) {
+      res.json(todayHabits);
+    } else {
+      // Return default values if no record exists
+      res.json({
+        training_completed: 0,
+        nutrition_completed: 0,
+        movement_completed: 0,
+        meditation_completed: 0,
+        daily_points: 0,
+        steps: 0
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching daily habits:', error);
+    res.status(500).json({ error: 'Error al obtener hábitos diarios' });
+  }
+});
+
+app.get('/api/daily-habits/weekly-points', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay()); // Sunday
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    
+    console.log('Fetching weekly points for user:', userId, 'from:', weekStartStr);
+    
+    const weeklyData = await db
+      .selectFrom('daily_habits')
+      .select((eb) => [eb.fn.sum('daily_points').as('total_points')])
+      .where('user_id', '=', userId)
+      .where('date', '>=', weekStartStr)
+      .executeTakeFirst();
+    
+    res.json({ total_points: weeklyData?.total_points || 0 });
+  } catch (error) {
+    console.error('Error fetching weekly points:', error);
+    res.status(500).json({ error: 'Error al obtener puntos semanales' });
+  }
+});
+
+app.get('/api/daily-habits/calendar', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+    
+    console.log('Fetching calendar data for user:', userId, 'from:', startDate);
+    
+    const calendarData = await db
+      .selectFrom('daily_habits')
+      .select(['date', 'daily_points'])
+      .where('user_id', '=', userId)
+      .where('date', '>=', startDate)
+      .execute();
+    
+    res.json(calendarData);
+  } catch (error) {
+    console.error('Error fetching calendar data:', error);
+    res.status(500).json({ error: 'Error al obtener datos del calendario' });
+  }
+});
+
+app.put('/api/daily-habits/update', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const { date, training_completed, nutrition_completed, movement_completed, meditation_completed, steps } = req.body;
+    
+    console.log('Updating daily habits for user:', userId, 'date:', date, 'data:', req.body);
+    
+    // Get current record or create default
+    let currentRecord = await db
+      .selectFrom('daily_habits')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', date)
+      .executeTakeFirst();
+    
+    // Prepare update data
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+    
+    if (training_completed !== undefined) {
+      updateData.training_completed = training_completed ? 1 : 0;
+    }
+    if (nutrition_completed !== undefined) {
+      updateData.nutrition_completed = nutrition_completed ? 1 : 0;
+    }
+    if (movement_completed !== undefined) {
+      updateData.movement_completed = movement_completed ? 1 : 0;
+    }
+    if (meditation_completed !== undefined) {
+      updateData.meditation_completed = meditation_completed ? 1 : 0;
+    }
+    if (steps !== undefined) {
+      updateData.steps = steps;
+    }
+    
+    // Merge with current record for point calculation
+    const mergedData = {
+      training_completed: updateData.training_completed ?? currentRecord?.training_completed ?? 0,
+      nutrition_completed: updateData.nutrition_completed ?? currentRecord?.nutrition_completed ?? 0,
+      movement_completed: updateData.movement_completed ?? currentRecord?.movement_completed ?? 0,
+      meditation_completed: updateData.meditation_completed ?? currentRecord?.meditation_completed ?? 0
+    };
+    
+    // Calculate daily points
+    const dailyPoints = Object.values(mergedData).reduce((sum, completed) => sum + (completed ? 1 : 0), 0);
+    updateData.daily_points = dailyPoints;
+    
+    let result;
+    if (currentRecord) {
+      // Update existing record
+      result = await db
+        .updateTable('daily_habits')
+        .set(updateData)
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .returning(['daily_points'])
+        .executeTakeFirst();
+    } else {
+      // Create new record
+      result = await db
+        .insertInto('daily_habits')
+        .values({
+          user_id: userId,
+          date,
+          training_completed: updateData.training_completed ?? 0,
+          nutrition_completed: updateData.nutrition_completed ?? 0,
+          movement_completed: updateData.movement_completed ?? 0,
+          meditation_completed: updateData.meditation_completed ?? 0,
+          steps: updateData.steps ?? 0,
+          daily_points: dailyPoints,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .returning(['daily_points'])
+        .executeTakeFirst();
+    }
+    
+    console.log('Daily habits updated, points:', dailyPoints);
+    res.json({ daily_points: dailyPoints });
+  } catch (error) {
+    console.error('Error updating daily habits:', error);
+    res.status(500).json({ error: 'Error al actualizar hábitos diarios' });
+  }
+});
+
+// Content Library Routes
+app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching content library for user:', req.user.email);
+    const content = await db
+      .selectFrom('content_library')
+      .selectAll()
+      .where('is_active', '=', 1)
+      .execute();
+    
+    console.log('Content library items fetched:', content.length);
+    res.json(content);
+  } catch (error) {
+    console.error('Error fetching content library:', error);
+    res.status(500).json({ error: 'Error al obtener biblioteca de contenido' });
+  }
+});
+
+// User Files Routes
+app.get('/api/user-files', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    console.log('Fetching user files for:', userId);
+    
+    const files = await db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .execute();
+    
+    console.log('User files fetched:', files.length);
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching user files:', error);
+    res.status(500).json({ error: 'Error al obtener archivos del usuario' });
+  }
+});
+
 // Test endpoint to verify admin user setup
 app.get('/api/test/admin-user', async (req: express.Request, res: express.Response) => {
   try {
@@ -424,119 +629,6 @@ app.put('/api/users/:id/toggle-status', authenticateToken, requireAdmin, async (
   } catch (error) {
     console.error('Error updating user status:', error);
     res.status(500).json({ error: 'Error al actualizar estado del usuario' });
-  }
-});
-
-app.post('/api/habits', authenticateToken, async (req: any, res: express.Response) => {
-  try {
-    const { name, date } = req.body;
-    const userId = req.user.id;
-    console.log('Creating habit for user:', userId);
-    
-    const habit = await db
-      .insertInto('habits')
-      .values({
-        user_id: userId,
-        name,
-        date: date || new Date().toISOString().split('T')[0],
-        is_completed: 0,
-        created_at: new Date().toISOString()
-      })
-      .returning(['id', 'name', 'is_completed', 'date'])
-      .executeTakeFirst();
-    
-    console.log('Habit created:', habit?.name);
-    res.status(201).json(habit);
-  } catch (error) {
-    console.error('Error creating habit:', error);
-    res.status(500).json({ error: 'Error al crear hábito' });
-  }
-});
-
-app.put('/api/habits/:id', authenticateToken, async (req: any, res: express.Response) => {
-  try {
-    const { id } = req.params;
-    const { is_completed } = req.body;
-    const userId = req.user.id;
-    console.log('Updating habit:', id, 'completed:', is_completed);
-    
-    // Verify the habit belongs to the requesting user
-    const existingHabit = await db
-      .selectFrom('habits')
-      .select(['user_id'])
-      .where('id', '=', parseInt(id))
-      .executeTakeFirst();
-
-    if (!existingHabit || existingHabit.user_id !== userId) {
-      res.status(403).json({ error: 'Acceso denegado' });
-      return;
-    }
-    
-    const habit = await db
-      .updateTable('habits')
-      .set({ is_completed: is_completed ? 1 : 0 })
-      .where('id', '=', parseInt(id))
-      .returning(['id', 'name', 'is_completed'])
-      .executeTakeFirst();
-    
-    console.log('Habit updated:', habit?.name);
-    res.json(habit);
-  } catch (error) {
-    console.error('Error updating habit:', error);
-    res.status(500).json({ error: 'Error al actualizar hábito' });
-  }
-});
-
-app.post('/api/steps', authenticateToken, async (req: any, res: express.Response) => {
-  try {
-    const { steps, date } = req.body;
-    const userId = req.user.id;
-    console.log('Recording steps for user:', userId, 'steps:', steps);
-    
-    const stepRecord = await db
-      .insertInto('step_counts')
-      .values({
-        user_id: userId,
-        steps: parseInt(steps) || 0,
-        date: date || new Date().toISOString().split('T')[0],
-        created_at: new Date().toISOString()
-      })
-      .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({ 
-        steps: parseInt(steps) || 0 
-      }))
-      .returning(['id', 'steps', 'date'])
-      .executeTakeFirst();
-    
-    console.log('Steps recorded:', stepRecord?.steps);
-    res.json(stepRecord);
-  } catch (error) {
-    console.error('Error recording steps:', error);
-    res.status(500).json({ error: 'Error al registrar pasos' });
-  }
-});
-
-app.post('/api/notes', authenticateToken, async (req: any, res: express.Response) => {
-  try {
-    const { content, date } = req.body;
-    const userId = req.user.id;
-    console.log('Creating note for user:', userId);
-    
-    const note = await db
-      .insertInto('user_notes')
-      .values({
-        user_id: userId,
-        content,
-        date: date || new Date().toISOString().split('T')[0],
-        created_at: new Date().toISOString()
-      })
-      .returning(['id', 'content', 'date'])
-      .executeTakeFirst();
-    
-    console.log('Note created for date:', note?.date);
-    res.status(201).json(note);
-  } catch (error) {
-    console.error('Error creating note:', error);
-    res.status(500).json({ error: 'Error al crear nota' });
   }
 });
 

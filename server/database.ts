@@ -23,6 +23,19 @@ export interface DatabaseSchema {
     date: string;
     created_at: string;
   };
+  daily_habits: {
+    id: number;
+    user_id: number;
+    date: string;
+    training_completed: number;
+    nutrition_completed: number;
+    movement_completed: number;
+    meditation_completed: number;
+    daily_points: number;
+    steps: number;
+    created_at: string;
+    updated_at: string;
+  };
   user_notes: {
     id: number;
     user_id: number;
@@ -61,6 +74,16 @@ export interface DatabaseSchema {
     is_active: number;
     created_at: string;
     updated_at: string;
+  };
+  content_library: {
+    id: number;
+    title: string;
+    description: string | null;
+    video_url: string | null;
+    category: string;
+    subcategory: string | null;
+    is_active: number;
+    created_at: string;
   };
 }
 
