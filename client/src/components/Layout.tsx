@@ -41,6 +41,112 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isActive = (path: string) => location.pathname === path;
   
+  // Check if user can access a specific feature
+  const canAccessFeature = (feature: string) => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    
+    switch (feature) {
+      case 'training':
+        return user.features?.training || false;
+      case 'nutrition':
+        return user.features?.nutrition || false;
+      case 'meditation':
+        return user.features?.meditation || false;
+      case 'active_breaks':
+        return user.features?.active_breaks || false;
+      default:
+        return true;
+    }
+  };
+
+  // Navigation items configuration
+  const getNavigationItems = () => {
+    const items = [];
+    
+    // Dashboard - always available for logged-in users
+    if (user) {
+      items.push({
+        path: '/dashboard',
+        label: 'Dashboard',
+        icon: Home,
+        available: true
+      });
+    }
+
+    // Training - show if user has training features or is admin
+    if (user && (canAccessFeature('training') || user.role === 'admin')) {
+      items.push({
+        path: '/training',
+        label: 'Training',
+        icon: Dumbbell,
+        available: canAccessFeature('training')
+      });
+    }
+
+    // Nutrition - show if user has nutrition features or is admin
+    if (user && (canAccessFeature('nutrition') || user.role === 'admin')) {
+      items.push({
+        path: '/nutrition',
+        label: 'Nutrition',
+        icon: Apple,
+        available: canAccessFeature('nutrition')
+      });
+    }
+
+    // Meditation - show if user has meditation features or is admin
+    if (user && (canAccessFeature('meditation') || user.role === 'admin')) {
+      items.push({
+        path: '/meditation',
+        label: 'Meditation',
+        icon: Brain,
+        available: canAccessFeature('meditation')
+      });
+    }
+
+    // Active Breaks - show if user has active_breaks features or is admin
+    if (user && (canAccessFeature('active_breaks') || user.role === 'admin')) {
+      items.push({
+        path: '/active-breaks',
+        label: 'Active Breaks',
+        icon: Coffee,
+        available: canAccessFeature('active_breaks')
+      });
+    }
+
+    // Plans - always available
+    items.push({
+      path: '/plans',
+      label: 'Plans',
+      icon: CreditCard,
+      available: true
+    });
+
+    // Profile - always available for logged-in users
+    if (user && user.role !== 'admin') {
+      items.push({
+        path: '/profile',
+        label: 'My Profile',
+        icon: User,
+        available: true
+      });
+    }
+
+    // Admin Panel - only for admins
+    if (user && user.role === 'admin') {
+      items.push({
+        path: '/admin',
+        label: 'Admin Panel',
+        icon: Settings,
+        available: true
+      });
+    }
+
+    return items;
+  };
+
+  const navigationItems = getNavigationItems();
+  
   // Don't show navigation on dashboard for users
   const showFullNav = !user || user.role === 'admin' || !location.pathname.startsWith('/dashboard');
   
@@ -73,97 +179,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </main>
         
         {/* Bottom Navigation for logged-in users */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 px-4 py-2 z-50">
-          <div className="flex justify-around max-w-md mx-auto">
-            <Link 
-              to="/dashboard" 
-              className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                isActive('/dashboard') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-              }`}
-            >
-              <Home size={20} />
-              <span className="text-xs">Dashboard</span>
-            </Link>
-
-            {user.features?.training && (
+        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 px-2 py-2 z-50">
+          <div className="grid grid-cols-4 gap-1 max-w-md mx-auto">
+            {navigationItems.slice(0, 8).map((item) => (
               <Link 
-                to="/training" 
+                key={item.path}
+                to={item.available ? item.path : '#'} 
                 className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                  isActive('/training') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
+                  isActive(item.path) 
+                    ? 'text-[#D3B869]' 
+                    : item.available 
+                      ? 'text-gray-400 hover:text-[#D3B869]' 
+                      : 'text-gray-600 cursor-not-allowed'
                 }`}
+                onClick={(e) => {
+                  if (!item.available) {
+                    e.preventDefault();
+                  }
+                }}
               >
-                <Dumbbell size={20} />
-                <span className="text-xs">Training</span>
+                <item.icon size={18} />
+                <span className="text-xs">{item.label}</span>
+                {!item.available && (
+                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
+                )}
               </Link>
-            )}
-
-            {user.features?.nutrition && (
-              <Link 
-                to="/nutrition" 
-                className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                  isActive('/nutrition') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-                }`}
-              >
-                <Apple size={20} />
-                <span className="text-xs">Nutrition</span>
-              </Link>
-            )}
-
-            {user.features?.meditation && (
-              <Link 
-                to="/meditation" 
-                className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                  isActive('/meditation') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-                }`}
-              >
-                <Brain size={20} />
-                <span className="text-xs">Meditation</span>
-              </Link>
-            )}
-
-            {user.features?.active_breaks && (
-              <Link 
-                to="/active-breaks" 
-                className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                  isActive('/active-breaks') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-                }`}
-              >
-                <Coffee size={20} />
-                <span className="text-xs">Breaks</span>
-              </Link>
-            )}
-
-            {user.features?.meditation && (
-              <Link 
-                to="/exercises" 
-                className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                  isActive('/exercises') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-                }`}
-              >
-                <Activity size={20} />
-                <span className="text-xs">Exercises</span>
-              </Link>
-            )}
-
-            <Link 
-              to="/plans" 
-              className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                isActive('/plans') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-              }`}
-            >
-              <CreditCard size={20} />
-              <span className="text-xs">Plans</span>
-            </Link>
-
-            <Link 
-              to="/profile" 
-              className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
-                isActive('/profile') ? 'text-[#D3B869]' : 'text-gray-400 hover:text-[#D3B869]'
-              }`}
-            >
-              <User size={20} />
-              <span className="text-xs">Profile</span>
-            </Link>
+            ))}
           </div>
         </div>
       </div>
@@ -183,87 +224,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               
               {/* Desktop Navigation */}
               <div className="hidden md:flex items-center space-x-6">
-                <Link 
-                  to="/dashboard" 
-                  className={`hover:text-brand-gold transition-colors ${
-                    isActive('/dashboard') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                  }`}
-                >
-                  Dashboard
-                </Link>
-
-                {user.features?.training && (
+                {navigationItems.map((item) => (
                   <Link 
-                    to="/training" 
+                    key={item.path}
+                    to={item.available ? item.path : '#'} 
                     className={`hover:text-brand-gold transition-colors ${
-                      isActive('/training') ? 'text-brand-gold font-medium' : 'text-brand-black'
+                      isActive(item.path) 
+                        ? 'text-brand-gold font-medium' 
+                        : item.available 
+                          ? 'text-brand-black' 
+                          : 'text-gray-400 cursor-not-allowed'
                     }`}
+                    onClick={(e) => {
+                      if (!item.available) {
+                        e.preventDefault();
+                        alert('Esta funcionalidad no está disponible en tu plan actual');
+                      }
+                    }}
                   >
-                    Training
+                    {item.label}
+                    {!item.available && <span className="text-red-500 ml-1">🔒</span>}
                   </Link>
-                )}
-
-                {user.features?.nutrition && (
-                  <Link 
-                    to="/nutrition" 
-                    className={`hover:text-brand-gold transition-colors ${
-                      isActive('/nutrition') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                    }`}
-                  >
-                    Nutrition
-                  </Link>
-                )}
-
-                {user.features?.meditation && (
-                  <Link 
-                    to="/meditation" 
-                    className={`hover:text-brand-gold transition-colors ${
-                      isActive('/meditation') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                    }`}
-                  >
-                    Meditation
-                  </Link>
-                )}
-
-                {user.features?.active_breaks && (
-                  <Link 
-                    to="/active-breaks" 
-                    className={`hover:text-brand-gold transition-colors ${
-                      isActive('/active-breaks') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                    }`}
-                  >
-                    Active Breaks
-                  </Link>
-                )}
-
-                {user.features?.meditation && (
-                  <Link 
-                    to="/exercises" 
-                    className={`hover:text-brand-gold transition-colors ${
-                      isActive('/exercises') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                    }`}
-                  >
-                    Exercises
-                  </Link>
-                )}
-                
-                <Link 
-                  to="/plans" 
-                  className={`hover:text-brand-gold transition-colors ${
-                    isActive('/plans') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                  }`}
-                >
-                  Plans
-                </Link>
-
-                <Link 
-                  to="/profile" 
-                  className={`hover:text-brand-gold transition-colors ${
-                    isActive('/profile') ? 'text-brand-gold font-medium' : 'text-brand-black'
-                  }`}
-                >
-                  Profile
-                </Link>
+                ))}
                 
                 <div className="flex items-center space-x-4">
                   <span className="text-sm text-muted-foreground">
@@ -307,95 +289,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Bottom Navigation for Mobile */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-2 py-2 z-50">
           <div className="grid grid-cols-4 gap-1">
-            <Link 
-              to="/dashboard" 
-              className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                isActive('/dashboard') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-              }`}
-            >
-              <Home size={18} />
-              <span className="text-xs">Dashboard</span>
-            </Link>
-
-            {user.features?.training && (
+            {navigationItems.slice(0, 8).map((item) => (
               <Link 
-                to="/training" 
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                  isActive('/training') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
+                key={item.path}
+                to={item.available ? item.path : '#'} 
+                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
+                  isActive(item.path) 
+                    ? 'text-brand-gold bg-brand-gold/10' 
+                    : item.available 
+                      ? 'text-brand-black hover:text-brand-gold' 
+                      : 'text-gray-400 cursor-not-allowed'
                 }`}
+                onClick={(e) => {
+                  if (!item.available) {
+                    e.preventDefault();
+                    alert('Esta funcionalidad no está disponible en tu plan actual');
+                  }
+                }}
               >
-                <Dumbbell size={18} />
-                <span className="text-xs">Training</span>
+                <item.icon size={18} />
+                <span className="text-xs">{item.label}</span>
+                {!item.available && (
+                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
+                )}
               </Link>
-            )}
-
-            {user.features?.nutrition && (
-              <Link 
-                to="/nutrition" 
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                  isActive('/nutrition') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-                }`}
-              >
-                <Apple size={18} />
-                <span className="text-xs">Nutrition</span>
-              </Link>
-            )}
-
-            {user.features?.meditation && (
-              <Link 
-                to="/meditation" 
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                  isActive('/meditation') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-                }`}
-              >
-                <Brain size={18} />
-                <span className="text-xs">Meditation</span>
-              </Link>
-            )}
-
-            {user.features?.active_breaks && (
-              <Link 
-                to="/active-breaks" 
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                  isActive('/active-breaks') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-                }`}
-              >
-                <Coffee size={18} />
-                <span className="text-xs">Breaks</span>
-              </Link>
-            )}
-
-            {user.features?.meditation && (
-              <Link 
-                to="/exercises" 
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                  isActive('/exercises') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-                }`}
-              >
-                <Activity size={18} />
-                <span className="text-xs">Exercises</span>
-              </Link>
-            )}
-
-            <Link 
-              to="/plans" 
-              className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                isActive('/plans') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-              }`}
-            >
-              <CreditCard size={18} />
-              <span className="text-xs">Plans</span>
-            </Link>
-
-            <Link 
-              to="/profile" 
-              className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors ${
-                isActive('/profile') ? 'text-brand-gold bg-brand-gold/10' : 'text-brand-black hover:text-brand-gold'
-              }`}
-            >
-              <User size={18} />
-              <span className="text-xs">Profile</span>
-            </Link>
+            ))}
           </div>
         </div>
       </div>

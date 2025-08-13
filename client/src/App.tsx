@@ -14,9 +14,52 @@ import AdminPage from '@/pages/AdminPage';
 import TrainingPage from '@/pages/TrainingPage';
 import NutritionPage from '@/pages/NutritionPage';
 import ActiveBreaksPage from '@/pages/ActiveBreaksPage';
-import ExercisesPage from '@/pages/ExercisesPage';
 import MeditationPage from '@/pages/MeditationPage';
 import ProfilePage from '@/pages/ProfilePage';
+
+// Protected Route Wrapper with feature checking
+interface FeatureProtectedRouteProps {
+  children: React.ReactNode;
+  feature?: string;
+}
+
+const FeatureProtectedRoute: React.FC<FeatureProtectedRouteProps> = ({ children, feature }) => {
+  const { user } = useAuth();
+  
+  // Allow access if no feature specified, user is admin, or user has the required feature
+  if (!feature || user?.role === 'admin' || (user?.features as any)?.[feature]) {
+    return <>{children}</>;
+  }
+  
+  // Redirect to dashboard with error message
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-4">Acceso Restringido</h1>
+        <p className="text-muted-foreground mb-4">
+          Esta funcionalidad no está disponible en tu plan actual.
+        </p>
+        <p className="text-sm text-muted-foreground mb-6">
+          Contacta al administrador para habilitar esta característica o considera actualizar tu plan.
+        </p>
+        <div className="space-x-4">
+          <button 
+            onClick={() => window.history.back()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Volver
+          </button>
+          <a 
+            href="/plans" 
+            className="px-4 py-2 border border-primary text-primary rounded-md"
+          >
+            Ver Planes
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AppRoutes: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -58,52 +101,50 @@ const AppRoutes: React.FC = () => {
         } 
       />
 
-      {/* Training Page - accessible to all logged-in users */}
+      {/* Training Page - requires training feature */}
       <Route 
         path="/training" 
         element={
           <ProtectedRoute>
-            <TrainingPage />
+            <FeatureProtectedRoute feature="training">
+              <TrainingPage />
+            </FeatureProtectedRoute>
           </ProtectedRoute>
         } 
       />
 
-      {/* Nutrition Page - accessible to all logged-in users */}
+      {/* Nutrition Page - requires nutrition feature */}
       <Route 
         path="/nutrition" 
         element={
           <ProtectedRoute>
-            <NutritionPage />
+            <FeatureProtectedRoute feature="nutrition">
+              <NutritionPage />
+            </FeatureProtectedRoute>
           </ProtectedRoute>
         } 
       />
 
-      {/* Meditation Page - accessible to all logged-in users */}
+      {/* Meditation Page - requires meditation feature */}
       <Route 
         path="/meditation" 
         element={
           <ProtectedRoute>
-            <MeditationPage />
+            <FeatureProtectedRoute feature="meditation">
+              <MeditationPage />
+            </FeatureProtectedRoute>
           </ProtectedRoute>
         } 
       />
 
-      {/* Active Breaks Page - accessible to all logged-in users */}
+      {/* Active Breaks Page - requires active_breaks feature */}
       <Route 
         path="/active-breaks" 
         element={
           <ProtectedRoute>
-            <ActiveBreaksPage />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Exercises Page - accessible to all logged-in users */}
-      <Route 
-        path="/exercises" 
-        element={
-          <ProtectedRoute>
-            <ExercisesPage />
+            <FeatureProtectedRoute feature="active_breaks">
+              <ActiveBreaksPage />
+            </FeatureProtectedRoute>
           </ProtectedRoute>
         } 
       />

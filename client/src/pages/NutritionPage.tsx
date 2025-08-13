@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { FileText, Download, User, Apple, Clock, Utensils } from 'lucide-react';
 
 const NutritionPage: React.FC = () => {
   const { user } = useAuth();
@@ -46,123 +47,252 @@ const NutritionPage: React.FC = () => {
       </div>
 
       <div className="space-y-8">
-        {/* Personalized Nutrition Plan */}
-        <Card>
+        {/* Personalized Nutrition Plan - Main Section */}
+        <Card className="border-l-4 border-l-green-500">
           <CardHeader>
-            <CardTitle className="text-primary">Tu Plan de Nutrición Personalizado</CardTitle>
-            <CardDescription>Plan nutricional diseñado específicamente para tus objetivos y necesidades</CardDescription>
+            <div className="flex items-center gap-2">
+              <Apple className="w-6 h-6 text-green-500" />
+              <CardTitle className="text-green-600">Tu Plan de Nutrición Personalizado</CardTitle>
+            </div>
+            <CardDescription>
+              Plan nutricional diseñado específicamente para tus objetivos y necesidades por la Lic. Ana Saloco
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {userFiles.length > 0 ? (
-              <div className="space-y-4">
-                <p className="text-muted-foreground">
-                  Tu plan de nutrición ha sido creado por la Licenciada Ana Saloco, especialista en nutrición deportiva y hábitos saludables.
-                </p>
-                {userFiles.map((file: any) => (
-                  <Card key={file.id} className="border border-primary/20">
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div>
-                        <h4 className="font-medium">{file.filename}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Plan nutricional personalizado por Lic. Ana Saloco
-                        </p>
-                      </div>
-                      <Button 
-                        onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
-                        className="ml-4"
-                      >
-                        Ver Plan
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="space-y-6">
+                {/* Professional Info */}
+                <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                      <User className="w-8 h-8 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-green-800 text-lg">Lic. Ana Saloco</h3>
+                      <p className="text-green-700 mb-2">Nutricionista Especializada</p>
+                      <p className="text-sm text-green-600">
+                        Especialista en nutrición deportiva, hábitos saludables y planes alimentarios personalizados. 
+                        Con años de experiencia ayudando a personas a alcanzar sus objetivos de salud y bienestar.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Files */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-lg">Tu Plan Nutricional</h4>
+                  {userFiles.map((file: any) => (
+                    <Card key={file.id} className="border-2 border-green-200 hover:border-green-300 transition-colors">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-green-100 rounded-lg flex items-center justify-center">
+                              <FileText className="w-7 h-7 text-green-600" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-lg">{file.filename}</h4>
+                              <p className="text-sm text-muted-foreground mb-1">
+                                Plan nutricional personalizado por Lic. Ana Saloco
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Creado: {new Date(file.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Button 
+                              onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <FileText size={16} className="mr-2" />
+                              Ver Plan
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `/api/files/${file.id}`;
+                                link.download = file.filename;
+                                link.click();
+                              }}
+                              className="border-green-600 text-green-600 hover:bg-green-50"
+                            >
+                              <Download size={16} className="mr-2" />
+                              Descargar
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Implementation Tips */}
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 mb-3">📋 Consejos para Seguir tu Plan</h4>
+                  <ul className="text-blue-700 text-sm space-y-2">
+                    <li>• Lee completamente tu plan antes de comenzar</li>
+                    <li>• Planifica tus comidas con anticipación</li>
+                    <li>• Haz una lista de compras basada en tu plan</li>
+                    <li>• Mantén un registro de lo que comes diariamente</li>
+                    <li>• No dudes en consultar dudas con la Lic. Ana Saloco</li>
+                  </ul>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">
-                  Aún no tienes un plan de nutrición personalizado asignado.
+              <div className="text-center py-12">
+                <Apple className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-600 mb-2">Plan Personalizado en Preparación</h3>
+                <p className="text-muted-foreground mb-6">
+                  La Lic. Ana Saloco está trabajando en crear un plan nutricional específico para tus objetivos y necesidades.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  La Lic. Ana Saloco trabajará contigo para crear un plan nutricional adaptado a tus objetivos.
-                </p>
+                
+                <div className="bg-gray-50 p-6 rounded-lg text-left max-w-2xl mx-auto">
+                  <h4 className="font-medium mb-4">¿Qué incluirá tu plan personalizado?</h4>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+                    <ul className="space-y-2">
+                      <li className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Plan alimentario semanal detallado
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Recetas fáciles y nutritivas
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Lista de compras organizada
+                      </li>
+                    </ul>
+                    <ul className="space-y-2">
+                      <li className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Porciones adaptadas a tus necesidades
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Suplementación si es necesaria
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Consejos de preparación y almacenamiento
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Nutrition Tips */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Consejos Nutricionales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">Fundamentos Básicos</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• Mantén una hidratación adecuada (8-10 vasos de agua al día)</li>
-                  <li>• Incluye proteínas en cada comida principal</li>
-                  <li>• Consume 5 porciones de frutas y verduras diarias</li>
-                  <li>• Elige carbohidratos complejos sobre simples</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">Timing de Comidas</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• Desayuna dentro de 1 hora después de despertar</li>
-                  <li>• Come cada 3-4 horas para mantener el metabolismo</li>
-                  <li>• Consume proteínas post-entrenamiento</li>
-                  <li>• Evita comidas pesadas 3 horas antes de dormir</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Nutrition Guidelines */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Utensils className="w-5 h-5" />
+                Fundamentos Nutricionales
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="text-sm space-y-3">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">💧</span>
+                  <span><strong>Hidratación:</strong> Consume 8-10 vasos de agua al día</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">🥩</span>
+                  <span><strong>Proteínas:</strong> Incluye proteínas en cada comida principal</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">🥬</span>
+                  <span><strong>Verduras:</strong> 5 porciones de frutas y verduras diarias</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">🌾</span>
+                  <span><strong>Carbohidratos:</strong> Prefiere opciones integrales y complejas</span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
 
-        {/* Healthy Recipes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Timing de Comidas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="text-sm space-y-3">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">🌅</span>
+                  <span><strong>Desayuno:</strong> Dentro de 1 hora después de despertar</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">⏰</span>
+                  <span><strong>Frecuencia:</strong> Come cada 3-4 horas</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">💪</span>
+                  <span><strong>Post-entreno:</strong> Proteínas dentro de 30 min</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">🌙</span>
+                  <span><strong>Cena:</strong> 3 horas antes de dormir como máximo</span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Healthy Recipe Ideas */}
         <Card>
           <CardHeader>
-            <CardTitle>Recetas Saludables</CardTitle>
-            <CardDescription>Ideas rápidas y nutritivas para tu día a día</CardDescription>
+            <CardTitle>Ideas de Comidas Saludables</CardTitle>
+            <CardDescription>Opciones rápidas y nutritivas para tu día a día</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-semibold mb-2">Desayuno Energético</h4>
-                <p className="text-sm text-muted-foreground mb-2">
+              <div className="p-4 border rounded-lg bg-orange-50">
+                <h4 className="font-semibold mb-2 text-orange-800">🌅 Desayuno Energético</h4>
+                <p className="text-sm text-orange-700 mb-3">
                   Avena con frutas y frutos secos
                 </p>
-                <ul className="text-xs text-muted-foreground">
-                  <li>• 1/2 taza avena</li>
-                  <li>• 1 plátano</li>
-                  <li>• Almendras</li>
-                  <li>• Canela</li>
+                <ul className="text-xs text-orange-600 space-y-1">
+                  <li>• 1/2 taza avena integral</li>
+                  <li>• 1 plátano mediano</li>
+                  <li>• 1 puñado de almendras</li>
+                  <li>• Canela al gusto</li>
+                  <li>• 1 cucharada de miel</li>
                 </ul>
               </div>
               
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-semibold mb-2">Almuerzo Balanceado</h4>
-                <p className="text-sm text-muted-foreground mb-2">
+              <div className="p-4 border rounded-lg bg-green-50">
+                <h4 className="font-semibold mb-2 text-green-800">🥗 Almuerzo Balanceado</h4>
+                <p className="text-sm text-green-700 mb-3">
                   Ensalada completa con proteína
                 </p>
-                <ul className="text-xs text-muted-foreground">
-                  <li>• Vegetales verdes</li>
-                  <li>• Pollo o pescado</li>
-                  <li>• Quinoa</li>
-                  <li>• Aceite de oliva</li>
+                <ul className="text-xs text-green-600 space-y-1">
+                  <li>• Mix de vegetales verdes</li>
+                  <li>• 150g pollo o pescado</li>
+                  <li>• 1/2 taza quinoa cocida</li>
+                  <li>• 1 cucharada aceite de oliva</li>
+                  <li>• Semillas de chía</li>
                 </ul>
               </div>
               
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-semibold mb-2">Snack Saludable</h4>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Yogurt con semillas
+              <div className="p-4 border rounded-lg bg-purple-50">
+                <h4 className="font-semibold mb-2 text-purple-800">🥤 Snack Saludable</h4>
+                <p className="text-sm text-purple-700 mb-3">
+                  Yogurt con semillas y frutas
                 </p>
-                <ul className="text-xs text-muted-foreground">
-                  <li>• Yogurt griego</li>
-                  <li>• Chía o lino</li>
-                  <li>• Berries</li>
-                  <li>• Miel natural</li>
+                <ul className="text-xs text-purple-600 space-y-1">
+                  <li>• 1 yogurt griego natural</li>
+                  <li>• 1 cucharadita semillas chía</li>
+                  <li>• 1/2 taza berries mixtos</li>
+                  <li>• 1 cucharadita miel natural</li>
+                  <li>• Nueces picadas</li>
                 </ul>
               </div>
             </div>
