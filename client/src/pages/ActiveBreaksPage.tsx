@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Play, Clock, Target, Zap, Coffee, Stretch, ChevronRight } from 'lucide-react';
+import { Play, Clock, Target, Zap, Coffee, Activity, ChevronRight } from 'lucide-react';
 
 // Predefined exercises list
 const ACTIVE_BREAKS_EXERCISES = [
@@ -191,7 +191,7 @@ const ActiveBreaksPage: React.FC = () => {
               
               <div className="text-center p-4">
                 <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Stretch className="w-6 h-6 text-purple-600" />
+                  <Activity className="w-6 h-6 text-purple-600" />
                 </div>
                 <h4 className="font-semibold mb-2 text-purple-800">Previene Lesiones</h4>
                 <p className="text-sm text-purple-700">
