@@ -26,21 +26,35 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Generate filename with user_id and category for better organization
+    const { user_id, file_type } = req.body;
+    const timestamp = Date.now();
+    const extension = path.extname(file.originalname);
+    const baseName = path.basename(file.originalname, extension);
+    const filename = `user${user_id}_${file_type}_${timestamp}_${baseName}${extension}`;
+    cb(null, filename);
   }
 });
 
 const upload = multer({ 
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    // Allow PDFs and potentially other file types in the future
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'video/mp4',
+      'text/csv'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF files are allowed'));
+      cb(new Error('Only PDF, image, video, and CSV files are allowed'));
     }
   },
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for future video support
 });
 
 // Body parsing middleware
@@ -669,16 +683,25 @@ app.get('/api/workout-of-day', authenticateToken, async (req: any, res: express.
   }
 });
 
-// User Files Routes
+// User Files Routes - Enhanced for better file management
 app.get('/api/user-files', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
-    console.log('Fetching user files for:', userId);
+    const { file_type } = req.query;
     
-    const files = await db
+    console.log('Fetching user files for:', userId, 'type:', file_type || 'all');
+    
+    let query = db
       .selectFrom('user_files')
       .selectAll()
-      .where('user_id', '=', userId)
+      .where('user_id', '=', userId);
+    
+    if (file_type) {
+      query = query.where('file_type', '=', file_type as string);
+    }
+    
+    const files = await query
+      .orderBy('created_at', 'desc')
       .execute();
     
     console.log('User files fetched:', files.length);
@@ -689,7 +712,36 @@ app.get('/api/user-files', authenticateToken, async (req: any, res: express.Resp
   }
 });
 
-// File upload route
+// Get user files by admin
+app.get('/api/admin/user-files/:userId', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { userId } = req.params;
+    const { file_type } = req.query;
+    
+    console.log('Admin fetching user files for user:', userId, 'type:', file_type || 'all');
+    
+    let query = db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('user_id', '=', parseInt(userId));
+    
+    if (file_type) {
+      query = query.where('file_type', '=', file_type as string);
+    }
+    
+    const files = await query
+      .orderBy('created_at', 'desc')
+      .execute();
+    
+    console.log('User files fetched by admin:', files.length);
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching user files for admin:', error);
+    res.status(500).json({ error: 'Error al obtener archivos del usuario' });
+  }
+});
+
+// File upload route - Enhanced
 app.post('/api/upload-user-file', authenticateToken, requireAdmin, upload.single('file'), async (req: any, res: express.Response) => {
   try {
     if (!req.file) {
@@ -697,14 +749,40 @@ app.post('/api/upload-user-file', authenticateToken, requireAdmin, upload.single
       return;
     }
 
-    const { user_id, file_type } = req.body;
+    const { user_id, file_type, replace_existing } = req.body;
     
     if (!user_id || !file_type) {
       res.status(400).json({ error: 'user_id y file_type son requeridos' });
       return;
     }
 
-    console.log('Uploading file for user:', user_id, 'type:', file_type);
+    console.log('Uploading file for user:', user_id, 'type:', file_type, 'replace:', replace_existing);
+
+    // If replace_existing is true, remove old files of the same type
+    if (replace_existing === 'true') {
+      const existingFiles = await db
+        .selectFrom('user_files')
+        .selectAll()
+        .where('user_id', '=', parseInt(user_id))
+        .where('file_type', '=', file_type)
+        .execute();
+
+      // Delete physical files and database records
+      for (const existingFile of existingFiles) {
+        try {
+          if (fs.existsSync(existingFile.file_path)) {
+            fs.unlinkSync(existingFile.file_path);
+          }
+          await db
+            .deleteFrom('user_files')
+            .where('id', '=', existingFile.id)
+            .execute();
+          console.log('Replaced existing file:', existingFile.filename);
+        } catch (error) {
+          console.error('Error removing existing file:', error);
+        }
+      }
+    }
 
     const userFile = await db
       .insertInto('user_files')
@@ -716,7 +794,7 @@ app.post('/api/upload-user-file', authenticateToken, requireAdmin, upload.single
         uploaded_by: req.user.id,
         created_at: new Date().toISOString()
       })
-      .returning(['id', 'filename', 'file_type'])
+      .returning(['id', 'filename', 'file_type', 'created_at'])
       .executeTakeFirst();
 
     console.log('File uploaded successfully:', userFile?.filename);
@@ -727,7 +805,43 @@ app.post('/api/upload-user-file', authenticateToken, requireAdmin, upload.single
   }
 });
 
-// File download route
+// Delete user file
+app.delete('/api/user-files/:id', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    console.log('Admin deleting file:', id);
+
+    const file = await db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('id', '=', parseInt(id))
+      .executeTakeFirst();
+
+    if (!file) {
+      res.status(404).json({ error: 'Archivo no encontrado' });
+      return;
+    }
+
+    // Delete physical file
+    if (fs.existsSync(file.file_path)) {
+      fs.unlinkSync(file.file_path);
+    }
+
+    // Delete database record
+    await db
+      .deleteFrom('user_files')
+      .where('id', '=', parseInt(id))
+      .execute();
+
+    console.log('File deleted successfully:', file.filename);
+    res.json({ message: 'Archivo eliminado exitosamente' });
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    res.status(500).json({ error: 'Error al eliminar archivo' });
+  }
+});
+
+// File download route - Enhanced with better security
 app.get('/api/files/:id', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const { id } = req.params;
@@ -756,7 +870,30 @@ app.get('/api/files/:id', authenticateToken, async (req: any, res: express.Respo
       return;
     }
 
-    res.setHeader('Content-Type', 'application/pdf');
+    // Set appropriate content type based on file extension
+    const extension = path.extname(file.filename).toLowerCase();
+    let contentType = 'application/octet-stream';
+    
+    switch (extension) {
+      case '.pdf':
+        contentType = 'application/pdf';
+        break;
+      case '.jpg':
+      case '.jpeg':
+        contentType = 'image/jpeg';
+        break;
+      case '.png':
+        contentType = 'image/png';
+        break;
+      case '.mp4':
+        contentType = 'video/mp4';
+        break;
+      case '.csv':
+        contentType = 'text/csv';
+        break;
+    }
+
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
     res.sendFile(path.resolve(file.file_path));
   } catch (error) {
@@ -1074,7 +1211,8 @@ export async function startServer(port: number) {
       console.log('Database connection established');
       console.log('Authentication system initialized');
       console.log('Role-based access control enabled');
-      console.log('File upload system enabled');
+      console.log('Enhanced file upload system enabled');
+      console.log('User file management system ready');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
     });
   } catch (err) {

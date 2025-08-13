@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { Edit, Upload, Plus, Trash2 } from 'lucide-react';
+import { Edit, Upload, Plus, Trash2, FileText, User } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
   const { user } = useAuth();
@@ -26,12 +26,11 @@ const AdminPage: React.FC = () => {
   // Edit dialogs state
   const [editingUser, setEditingUser] = React.useState<any>(null);
   const [editingPlan, setEditingPlan] = React.useState<any>(null);
-  const [editingContent, setEditingContent] = React.useState<any>(null);
-  const [editingWorkout, setEditingWorkout] = React.useState<any>(null);
-  const [isUserDialogOpen, setIsUserDialogOpen] = React.useState(false);
-  const [isPlanDialogOpen, setIsPlanDialogOpen] = React.useState(false);
-  const [isContentDialogOpen, setIsContentDialogOpen] = React.useState(false);
-  const [isWorkoutDialogOpen, setIsWorkoutDialogOpen] = React.useState(false);
+  
+  // User Plans Management
+  const [selectedUserForPlans, setSelectedUserForPlans] = React.useState<any>(null);
+  const [userFiles, setUserFiles] = React.useState<{[key: number]: any[]}>({});
+  const [isUserPlansDialogOpen, setIsUserPlansDialogOpen] = React.useState(false);
 
   React.useEffect(() => {
     fetchUsers();
@@ -60,6 +59,26 @@ const AdminPage: React.FC = () => {
     } catch (error) {
       console.error('Error fetching users:', error);
     }
+  };
+
+  const fetchUserFiles = async (userId: number) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/admin/user-files/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const files = await response.json();
+        setUserFiles(prev => ({ ...prev, [userId]: files }));
+        return files;
+      }
+    } catch (error) {
+      console.error('Error fetching user files:', error);
+    }
+    return [];
   };
 
   const fetchPlans = async () => {
@@ -214,6 +233,7 @@ const AdminPage: React.FC = () => {
     formData.append('file', file);
     formData.append('file_type', fileType);
     formData.append('user_id', userId.toString());
+    formData.append('replace_existing', 'true'); // Replace existing files of same type
 
     try {
       const token = localStorage.getItem('auth_token');
@@ -228,14 +248,55 @@ const AdminPage: React.FC = () => {
       if (response.ok) {
         console.log('File uploaded successfully');
         alert('Archivo subido exitosamente');
+        
+        // Refresh user files if dialog is open
+        if (selectedUserForPlans && selectedUserForPlans.id === userId) {
+          fetchUserFiles(userId);
+        }
       } else {
-        console.error('Failed to upload file');
-        alert('Error al subir el archivo');
+        const errorData = await response.json();
+        console.error('Failed to upload file:', errorData);
+        alert(`Error al subir el archivo: ${errorData.error}`);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Error al subir el archivo');
     }
+  };
+
+  const handleDeleteFile = async (fileId: number) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este archivo?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/user-files/${fileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        alert('Archivo eliminado exitosamente');
+        // Refresh user files
+        if (selectedUserForPlans) {
+          fetchUserFiles(selectedUserForPlans.id);
+        }
+      } else {
+        alert('Error al eliminar el archivo');
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      alert('Error al eliminar el archivo');
+    }
+  };
+
+  const openUserPlansDialog = async (user: any) => {
+    setSelectedUserForPlans(user);
+    setIsUserPlansDialogOpen(true);
+    await fetchUserFiles(user.id);
   };
 
   if (isLoading) {
@@ -247,7 +308,7 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 admin-panel">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Panel Administrativo</h1>
         <p className="text-muted-foreground">Gestiona usuarios, planes y contenido</p>
@@ -310,7 +371,7 @@ const AdminPage: React.FC = () => {
                   <TableBody>
                     {filteredUsers.map((user: any) => (
                       <TableRow key={user.id}>
-                        <TableCell>
+                        <TableCell className="admin-table-cell">
                           <div>
                             <div className="font-medium">{user.full_name}</div>
                             <div className="text-sm text-muted-foreground">{user.email}</div>
@@ -321,7 +382,7 @@ const AdminPage: React.FC = () => {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="admin-table-cell">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             user.plan_type === 'Programa Totum' ? 'bg-purple-100 text-purple-800' :
                             user.plan_type === 'Entrenamiento Personalizado + Academy' ? 'bg-blue-100 text-blue-800' :
@@ -331,7 +392,7 @@ const AdminPage: React.FC = () => {
                             {user.plan_type || 'Sin Plan'}
                           </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="admin-table-cell">
                           <div className="flex flex-wrap gap-1">
                             {user.features?.training && <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Entrenamiento</span>}
                             {user.features?.nutrition && <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Nutrición</span>}
@@ -339,7 +400,7 @@ const AdminPage: React.FC = () => {
                             {user.features?.active_breaks && <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs">Pausas</span>}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="admin-table-cell">
                           <div className="flex items-center space-x-2">
                             <Switch
                               checked={Boolean(user.is_active)}
@@ -350,8 +411,9 @@ const AdminPage: React.FC = () => {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="admin-table-cell">
                           <div className="flex space-x-2">
+                            {/* Edit User Features */}
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button size="sm" variant="outline" onClick={() => setEditingUser(user)}>
@@ -464,44 +526,17 @@ const AdminPage: React.FC = () => {
                               </DialogContent>
                             </Dialog>
                             
-                            <div className="flex space-x-1">
-                              <div>
-                                <input
-                                  type="file"
-                                  id={`training-${user.id}`}
-                                  className="hidden"
-                                  accept=".pdf"
-                                  onChange={(e) => handleFileUpload(user.id, 'training', e)}
-                                />
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => document.getElementById(`training-${user.id}`)?.click()}
-                                  title="Subir Plan de Entrenamiento"
-                                >
-                                  <Upload className="h-4 w-4" />
-                                  Ent
-                                </Button>
-                              </div>
-                              <div>
-                                <input
-                                  type="file"
-                                  id={`nutrition-${user.id}`}
-                                  className="hidden"
-                                  accept=".pdf"
-                                  onChange={(e) => handleFileUpload(user.id, 'nutrition', e)}
-                                />
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => document.getElementById(`nutrition-${user.id}`)?.click()}
-                                  title="Subir Plan de Nutrición"
-                                >
-                                  <Upload className="h-4 w-4" />
-                                  Nut
-                                </Button>
-                              </div>
-                            </div>
+                            {/* User Plans Management Button */}
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => openUserPlansDialog(user)}
+                              title="Gestionar Planes del Usuario"
+                              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                            >
+                              <User className="h-4 w-4 mr-1" />
+                              Planes
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -696,47 +731,8 @@ const AdminPage: React.FC = () => {
         <TabsContent value="workout" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Entrenamiento del Día</CardTitle>
-                  <CardDescription>Configura el entrenamiento diario para todos los usuarios</CardDescription>
-                </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button onClick={() => setEditingWorkout(workoutOfDay || { title: '', description: '', exercises: [] })}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      {workoutOfDay ? 'Editar' : 'Crear'} Entrenamiento
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Entrenamiento del Día</DialogTitle>
-                    </DialogHeader>
-                    {editingWorkout && (
-                      <div className="space-y-6">
-                        <div className="space-y-2">
-                          <Label>Título</Label>
-                          <Input
-                            value={editingWorkout.title}
-                            onChange={(e) => setEditingWorkout({...editingWorkout, title: e.target.value})}
-                            placeholder="Ej: Entrenamiento Full Body"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Descripción</Label>
-                          <Textarea
-                            value={editingWorkout.description}
-                            onChange={(e) => setEditingWorkout({...editingWorkout, description: e.target.value})}
-                            placeholder="Descripción del entrenamiento"
-                            rows={3}
-                          />
-                        </div>
-                        <Button className="w-full">Guardar Entrenamiento</Button>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
-              </div>
+              <CardTitle>Entrenamiento del Día</CardTitle>
+              <CardDescription>Configura el entrenamiento diario para todos los usuarios</CardDescription>
             </CardHeader>
             <CardContent>
               {workoutOfDay ? (
@@ -839,6 +835,189 @@ const AdminPage: React.FC = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* User Plans Management Dialog */}
+      <Dialog open={isUserPlansDialogOpen} onOpenChange={setIsUserPlansDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gestión de Planes - {selectedUserForPlans?.full_name}</DialogTitle>
+            <DialogDescription>
+              Sube y gestiona los planes de entrenamiento y nutrición para este usuario
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedUserForPlans && (
+            <div className="space-y-6">
+              {/* User Info */}
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Información del Usuario</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><strong>Nombre:</strong> {selectedUserForPlans.full_name}</div>
+                  <div><strong>Email:</strong> {selectedUserForPlans.email}</div>
+                  <div><strong>Plan:</strong> {selectedUserForPlans.plan_type || 'Sin plan'}</div>
+                  <div><strong>Estado:</strong> {selectedUserForPlans.is_active ? 'Activo' : 'Inactivo'}</div>
+                </div>
+              </div>
+
+              {/* Training Plans Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-blue-600">Plan de Entrenamiento</CardTitle>
+                      <CardDescription>Gestiona los archivos PDF del plan de entrenamiento</CardDescription>
+                    </div>
+                    <div>
+                      <input
+                        type="file"
+                        id={`training-upload-${selectedUserForPlans.id}`}
+                        className="hidden"
+                        accept=".pdf"
+                        onChange={(e) => handleFileUpload(selectedUserForPlans.id, 'training', e)}
+                      />
+                      <Button 
+                        onClick={() => document.getElementById(`training-upload-${selectedUserForPlans.id}`)?.click()}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Subir Plan
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {userFiles[selectedUserForPlans.id]?.filter(f => f.file_type === 'training').length > 0 ? (
+                    <div className="space-y-3">
+                      {userFiles[selectedUserForPlans.id]
+                        .filter(f => f.file_type === 'training')
+                        .map((file: any) => (
+                          <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-blue-600" />
+                              <div>
+                                <div className="font-medium">{file.filename}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Subido: {new Date(file.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                Ver
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleDeleteFile(file.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                      <p>No hay planes de entrenamiento subidos</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Nutrition Plans Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-green-600">Plan de Nutrición</CardTitle>
+                      <CardDescription>Gestiona los archivos PDF del plan nutricional por Lic. Ana Saloco</CardDescription>
+                    </div>
+                    <div>
+                      <input
+                        type="file"
+                        id={`nutrition-upload-${selectedUserForPlans.id}`}
+                        className="hidden"
+                        accept=".pdf"
+                        onChange={(e) => handleFileUpload(selectedUserForPlans.id, 'nutrition', e)}
+                      />
+                      <Button 
+                        onClick={() => document.getElementById(`nutrition-upload-${selectedUserForPlans.id}`)?.click()}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Subir Plan
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {userFiles[selectedUserForPlans.id]?.filter(f => f.file_type === 'nutrition').length > 0 ? (
+                    <div className="space-y-3">
+                      {userFiles[selectedUserForPlans.id]
+                        .filter(f => f.file_type === 'nutrition')
+                        .map((file: any) => (
+                          <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-green-600" />
+                              <div>
+                                <div className="font-medium">{file.filename}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Subido: {new Date(file.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                Ver
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleDeleteFile(file.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                      <p>No hay planes nutricionales subidos</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* File Upload Instructions */}
+              <Card className="bg-muted border-primary">
+                <CardContent className="p-4">
+                  <h4 className="font-semibold text-primary mb-2">📋 Instrucciones de Carga</h4>
+                  <ul className="text-sm space-y-1 text-muted-foreground">
+                    <li>• Solo se permiten archivos PDF</li>
+                    <li>• Tamaño máximo: 50MB por archivo</li>
+                    <li>• Al subir un nuevo archivo, se reemplazará el anterior automáticamente</li>
+                    <li>• Los archivos se almacenan de forma segura con nombres únicos</li>
+                    <li>• Los usuarios podrán ver y descargar sus planes desde sus pestañas correspondientes</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
