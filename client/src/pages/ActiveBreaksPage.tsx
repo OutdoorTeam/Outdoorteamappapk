@@ -250,12 +250,12 @@ const ActiveBreaksPage: React.FC = () => {
           {filteredExercises.map((exercise, index) => (
             <Card 
               key={index} 
-              className="hover:shadow-lg transition-all hover:scale-105 border-2 hover:border-primary"
+              className="hover:shadow-lg transition-all hover:scale-105 border-2 hover:border-primary group"
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg leading-tight">{exercise.title}</CardTitle>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(exercise.difficulty)}`}>
+                  <CardTitle className="text-lg leading-tight pr-2">{exercise.title}</CardTitle>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium border shrink-0 ${getDifficultyColor(exercise.difficulty)}`}>
                     {exercise.difficulty}
                   </span>
                 </div>
@@ -276,7 +276,7 @@ const ActiveBreaksPage: React.FC = () => {
                 
                 <Button 
                   onClick={() => openVideo(exercise.videoUrl, exercise.title)}
-                  className="w-full"
+                  className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
                   size="sm"
                 >
                   <Play size={16} className="mr-2" />
@@ -356,6 +356,40 @@ const ActiveBreaksPage: React.FC = () => {
                   <li>• Tracción de rodillas</li>
                   <li>• Estiramiento de isquiotibiales</li>
                   <li>• Respiración relajante</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* When to Do Active Breaks */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              Cuándo Realizar Pausas Activas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold mb-3 text-primary">Señales del Cuerpo</h4>
+                <ul className="text-sm space-y-2 text-muted-foreground">
+                  <li>• Sensación de rigidez en cuello o espalda</li>
+                  <li>• Fatiga mental o pérdida de concentración</li>
+                  <li>• Tensión en hombros o mandíbula</li>
+                  <li>• Sensación de pesadez en las piernas</li>
+                  <li>• Disminución de la productividad</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-3 text-primary">Horarios Recomendados</h4>
+                <ul className="text-sm space-y-2 text-muted-foreground">
+                  <li>• 9:00 AM - Energizante matutino</li>
+                  <li>• 11:30 AM - Pausa pre-almuerzo</li>
+                  <li>• 2:30 PM - Reactivación post-almuerzo</li>
+                  <li>• 4:30 PM - Estiramiento vespertino</li>
+                  <li>• 6:00 PM - Relajación de fin de jornada</li>
                 </ul>
               </div>
             </div>

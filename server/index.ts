@@ -112,6 +112,7 @@ const formatUserResponse = (user: any) => {
     full_name: user.full_name,
     role: user.role,
     plan_type: user.plan_type,
+    created_at: user.created_at,
     features: {
       habits: features.habits || false,
       training: features.training || false,
@@ -177,7 +178,7 @@ app.post('/api/auth/register', async (req: express.Request, res: express.Respons
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json'])
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at'])
       .executeTakeFirst();
 
     if (!newUser) {
@@ -327,7 +328,7 @@ app.post('/api/users/:id/assign-plan', authenticateToken, async (req: any, res: 
         updated_at: new Date().toISOString()
       })
       .where('id', '=', parseInt(id))
-      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json'])
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at'])
       .executeTakeFirst();
 
     if (!updatedUser) {
@@ -583,6 +584,27 @@ app.post('/api/daily-notes', authenticateToken, async (req: any, res: express.Re
 });
 
 // Meditation Sessions Routes
+app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    console.log('Fetching meditation sessions for user:', userId);
+    
+    const sessions = await db
+      .selectFrom('meditation_sessions')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .orderBy('completed_at', 'desc')
+      .limit(50)
+      .execute();
+    
+    console.log('Meditation sessions fetched:', sessions.length);
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching meditation sessions:', error);
+    res.status(500).json({ error: 'Error al obtener sesiones de meditación' });
+  }
+});
+
 app.post('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const { duration_minutes, meditation_type, comment, breathing_cycle_json } = req.body;
@@ -597,7 +619,7 @@ app.post('/api/meditation-sessions', authenticateToken, async (req: any, res: ex
         duration_minutes: duration_minutes || 0,
         meditation_type: meditation_type || 'free',
         comment: comment || null,
-        breathing_cycle_json: breathing_cycle_json ? JSON.stringify(breathing_cycle_json) : null,
+        breathing_cycle_json: breathing_cycle_json || null,
         completed_at: new Date().toISOString()
       })
       .returning(['id', 'duration_minutes', 'meditation_type'])
@@ -1001,7 +1023,7 @@ app.put('/api/users/:id/features', authenticateToken, requireAdmin, async (req: 
       .updateTable('users')
       .set(updateData)
       .where('id', '=', userId)
-      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json'])
+      .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at'])
       .executeTakeFirst();
     
     if (!updatedUser) {
