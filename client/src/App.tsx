@@ -15,6 +15,8 @@ import TrainingPage from '@/pages/TrainingPage';
 import NutritionPage from '@/pages/NutritionPage';
 import ActiveBreaksPage from '@/pages/ActiveBreaksPage';
 import ExercisesPage from '@/pages/ExercisesPage';
+import MeditationPage from '@/pages/MeditationPage';
+import ProfilePage from '@/pages/ProfilePage';
 
 const AppRoutes: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -42,58 +44,76 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       
-      {/* Training Page - only accessible with training features */}
+      {/* Dashboard */}
       <Route 
-        path="/entrenamiento" 
+        path="/dashboard" 
         element={
           <ProtectedRoute>
-            {user && user.features?.training ? (
-              <TrainingPage />
+            {user && user.role === 'user' && (!user.plan_type || Object.values(user.features).every(f => !f)) ? (
+              <Navigate to="/plan-selection" replace />
             ) : (
-              <Navigate to="/dashboard" replace />
+              <DashboardPage />
             )}
           </ProtectedRoute>
         } 
       />
 
-      {/* Nutrition Page - only accessible with nutrition features */}
+      {/* Training Page - accessible to all logged-in users */}
       <Route 
-        path="/nutricion" 
+        path="/training" 
         element={
           <ProtectedRoute>
-            {user && user.features?.nutrition ? (
-              <NutritionPage />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )}
+            <TrainingPage />
           </ProtectedRoute>
         } 
       />
 
-      {/* Active Breaks Page - only accessible with active_breaks features */}
+      {/* Nutrition Page - accessible to all logged-in users */}
       <Route 
-        path="/pausas-activas" 
+        path="/nutrition" 
         element={
           <ProtectedRoute>
-            {user && user.features?.active_breaks ? (
-              <ActiveBreaksPage />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )}
+            <NutritionPage />
           </ProtectedRoute>
         } 
       />
 
-      {/* Exercises (Meditation) Page - only accessible with meditation features */}
+      {/* Meditation Page - accessible to all logged-in users */}
       <Route 
-        path="/ejercicios" 
+        path="/meditation" 
         element={
           <ProtectedRoute>
-            {user && user.features?.meditation ? (
-              <ExercisesPage />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )}
+            <MeditationPage />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Active Breaks Page - accessible to all logged-in users */}
+      <Route 
+        path="/active-breaks" 
+        element={
+          <ProtectedRoute>
+            <ActiveBreaksPage />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Exercises Page - accessible to all logged-in users */}
+      <Route 
+        path="/exercises" 
+        element={
+          <ProtectedRoute>
+            <ExercisesPage />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Profile Page - accessible to all logged-in users */}
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         } 
       />
@@ -112,20 +132,7 @@ const AppRoutes: React.FC = () => {
         } 
       />
       
-      {/* Dashboard - redirect to plan selection if no plan */}
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute>
-            {user && user.role === 'user' && (!user.plan_type || Object.values(user.features).every(f => !f)) ? (
-              <Navigate to="/plan-selection" replace />
-            ) : (
-              <DashboardPage />
-            )}
-          </ProtectedRoute>
-        } 
-      />
-      
+      {/* Admin Panel - only for admins */}
       <Route 
         path="/admin" 
         element={
