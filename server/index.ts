@@ -649,18 +649,101 @@ app.post('/api/meditation-sessions', authenticateToken, async (req: any, res: ex
 // Content Library Routes
 app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
   try {
-    console.log('Fetching content library for user:', req.user.email);
-    const content = await db
+    const { category } = req.query;
+    console.log('Fetching content library for user:', req.user.email, 'category:', category);
+    
+    let query = db
       .selectFrom('content_library')
       .selectAll()
-      .where('is_active', '=', 1)
-      .execute();
+      .where('is_active', '=', 1);
+    
+    if (category) {
+      query = query.where('category', '=', category as string);
+    }
+    
+    const content = await query.execute();
     
     console.log('Content library items fetched:', content.length);
     res.json(content);
   } catch (error) {
     console.error('Error fetching content library:', error);
     res.status(500).json({ error: 'Error al obtener biblioteca de contenido' });
+  }
+});
+
+// Admin content management
+app.post('/api/content-library', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { title, description, video_url, category, subcategory } = req.body;
+    console.log('Admin creating content:', title, 'category:', category);
+    
+    const content = await db
+      .insertInto('content_library')
+      .values({
+        title,
+        description: description || null,
+        video_url: video_url || null,
+        category,
+        subcategory: subcategory || null,
+        is_active: 1,
+        created_at: new Date().toISOString()
+      })
+      .returning(['id', 'title', 'category'])
+      .executeTakeFirst();
+    
+    res.status(201).json(content);
+  } catch (error) {
+    console.error('Error creating content:', error);
+    res.status(500).json({ error: 'Error al crear contenido' });
+  }
+});
+
+app.put('/api/content-library/:id', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const { title, description, video_url, category, subcategory, is_active } = req.body;
+    console.log('Admin updating content:', id);
+    
+    const content = await db
+      .updateTable('content_library')
+      .set({
+        title,
+        description: description || null,
+        video_url: video_url || null,
+        category,
+        subcategory: subcategory || null,
+        is_active: is_active ? 1 : 0
+      })
+      .where('id', '=', parseInt(id))
+      .returning(['id', 'title', 'category'])
+      .executeTakeFirst();
+    
+    if (!content) {
+      res.status(404).json({ error: 'Contenido no encontrado' });
+      return;
+    }
+    
+    res.json(content);
+  } catch (error) {
+    console.error('Error updating content:', error);
+    res.status(500).json({ error: 'Error al actualizar contenido' });
+  }
+});
+
+app.delete('/api/content-library/:id', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    console.log('Admin deleting content:', id);
+    
+    await db
+      .deleteFrom('content_library')
+      .where('id', '=', parseInt(id))
+      .execute();
+    
+    res.json({ message: 'Contenido eliminado exitosamente' });
+  } catch (error) {
+    console.error('Error deleting content:', error);
+    res.status(500).json({ error: 'Error al eliminar contenido' });
   }
 });
 
@@ -1213,6 +1296,9 @@ export async function startServer(port: number) {
       console.log('Role-based access control enabled');
       console.log('Enhanced file upload system enabled');
       console.log('User file management system ready');
+      console.log('Content library system enabled');
+      console.log('Meditation session tracking enabled');
+      console.log('Daily habits tracking enabled');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
     });
   } catch (err) {

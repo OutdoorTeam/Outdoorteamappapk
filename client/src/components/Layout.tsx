@@ -108,9 +108,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && (canAccessFeature('active_breaks') || user.role === 'admin')) {
       items.push({
         path: '/active-breaks',
-        label: 'Active Breaks',
+        label: 'Breaks',
         icon: Coffee,
         available: canAccessFeature('active_breaks')
+      });
+    }
+
+    // Exercises - show if user has training features or is admin  
+    if (user && (canAccessFeature('training') || user.role === 'admin')) {
+      items.push({
+        path: '/exercises',
+        label: 'Exercises',
+        icon: Activity,
+        available: canAccessFeature('training')
       });
     }
 
@@ -126,7 +136,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && user.role !== 'admin') {
       items.push({
         path: '/profile',
-        label: 'My Profile',
+        label: 'Profile',
         icon: User,
         available: true
       });
@@ -136,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && user.role === 'admin') {
       items.push({
         path: '/admin',
-        label: 'Admin Panel',
+        label: 'Admin',
         icon: Settings,
         available: true
       });
@@ -179,13 +189,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </main>
         
         {/* Bottom Navigation for logged-in users */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 px-2 py-2 z-50">
-          <div className="grid grid-cols-4 gap-1 max-w-md mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 px-1 py-2 z-50">
+          <div className="grid grid-cols-4 gap-0.5 max-w-md mx-auto">
             {navigationItems.slice(0, 8).map((item) => (
               <Link 
                 key={item.path}
                 to={item.available ? item.path : '#'} 
-                className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg transition-colors ${
+                className={`flex flex-col items-center space-y-1 px-1 py-1 rounded-lg transition-colors ${
                   isActive(item.path) 
                     ? 'text-[#D3B869]' 
                     : item.available 
@@ -198,7 +208,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   }
                 }}
               >
-                <item.icon size={18} />
+                <item.icon size={16} />
                 <span className="text-xs">{item.label}</span>
                 {!item.available && (
                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
@@ -287,8 +297,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </main>
 
         {/* Bottom Navigation for Mobile */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-2 py-2 z-50">
-          <div className="grid grid-cols-4 gap-1">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-1 py-2 z-50">
+          <div className="grid grid-cols-4 gap-0.5">
             {navigationItems.slice(0, 8).map((item) => (
               <Link 
                 key={item.path}
@@ -307,7 +317,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   }
                 }}
               >
-                <item.icon size={18} />
+                <item.icon size={16} />
                 <span className="text-xs">{item.label}</span>
                 {!item.available && (
                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>

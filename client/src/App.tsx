@@ -14,6 +14,7 @@ import AdminPage from '@/pages/AdminPage';
 import TrainingPage from '@/pages/TrainingPage';
 import NutritionPage from '@/pages/NutritionPage';
 import ActiveBreaksPage from '@/pages/ActiveBreaksPage';
+import ExercisesPage from '@/pages/ExercisesPage';
 import MeditationPage from '@/pages/MeditationPage';
 import ProfilePage from '@/pages/ProfilePage';
 
@@ -144,6 +145,18 @@ const AppRoutes: React.FC = () => {
           <ProtectedRoute>
             <FeatureProtectedRoute feature="active_breaks">
               <ActiveBreaksPage />
+            </FeatureProtectedRoute>
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Exercises Page - requires training feature */}
+      <Route 
+        path="/exercises" 
+        element={
+          <ProtectedRoute>
+            <FeatureProtectedRoute feature="training">
+              <ExercisesPage />
             </FeatureProtectedRoute>
           </ProtectedRoute>
         } 
