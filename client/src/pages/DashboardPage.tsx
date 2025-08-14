@@ -1,10 +1,10 @@
-import * as React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useAuth } from '@/contexts/AuthContext';
-import { ChevronLeft, ChevronRight, Check, Plus, Minus } from 'lucide-react';
-import MeditationSession from '@/components/MeditationSession';
+import * as React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
+import { ChevronLeft, ChevronRight, Check, Plus, Minus } from "lucide-react";
+import MeditationSession from "@/components/MeditationSession";
 
 interface DailyHabit {
   training_completed: boolean;
@@ -23,19 +23,21 @@ const DashboardPage: React.FC = () => {
     movement_completed: false,
     meditation_completed: false,
     steps: 0,
-    daily_points: 0
+    daily_points: 0,
   });
   const [weeklyPoints, setWeeklyPoints] = React.useState(0);
-  const [dailyNote, setDailyNote] = React.useState('');
+  const [dailyNote, setDailyNote] = React.useState("");
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
-  const [calendarData, setCalendarData] = React.useState<{[key: string]: number}>({});
+  const [calendarData, setCalendarData] = React.useState<{
+    [key: string]: number;
+  }>({});
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const stepGoal = 8000;
 
   React.useEffect(() => {
-    if (user?.role === 'user') {
+    if (user?.role === "user") {
       fetchDashboardData();
       fetchDailyNote();
     }
@@ -43,13 +45,13 @@ const DashboardPage: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      
+      const token = localStorage.getItem("auth_token");
+
       // Fetch today's habits
       const todayResponse = await fetch(`/api/daily-habits/today`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (todayResponse.ok) {
         const todayData = await todayResponse.json();
         setTodayHabits({
@@ -58,15 +60,15 @@ const DashboardPage: React.FC = () => {
           movement_completed: Boolean(todayData.movement_completed),
           meditation_completed: Boolean(todayData.meditation_completed),
           steps: todayData.steps || 0,
-          daily_points: todayData.daily_points || 0
+          daily_points: todayData.daily_points || 0,
         });
       }
 
       // Fetch weekly points
       const weeklyResponse = await fetch(`/api/daily-habits/weekly-points`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (weeklyResponse.ok) {
         const weeklyData = await weeklyResponse.json();
         setWeeklyPoints(weeklyData.total_points || 0);
@@ -74,20 +76,19 @@ const DashboardPage: React.FC = () => {
 
       // Fetch calendar data
       const calendarResponse = await fetch(`/api/daily-habits/calendar`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (calendarResponse.ok) {
         const calendarData = await calendarResponse.json();
-        const calendarMap: {[key: string]: number} = {};
+        const calendarMap: { [key: string]: number } = {};
         calendarData.forEach((day: any) => {
           calendarMap[day.date] = day.daily_points;
         });
         setCalendarData(calendarMap);
       }
-      
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error("Error fetching dashboard data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -95,143 +96,147 @@ const DashboardPage: React.FC = () => {
 
   const fetchDailyNote = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       const response = await fetch(`/api/daily-notes/today`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
         const noteData = await response.json();
-        setDailyNote(noteData.content || '');
+        setDailyNote(noteData.content || "");
       }
     } catch (error) {
-      console.error('Error fetching daily note:', error);
+      console.error("Error fetching daily note:", error);
     }
   };
 
   const updateHabit = async (habitType: string, completed: boolean) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/daily-habits/update', {
-        method: 'PUT',
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch("/api/daily-habits/update", {
+        method: "PUT",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           date: today,
-          [habitType]: completed
-        })
+          [habitType]: completed,
+        }),
       });
 
       if (response.ok) {
         const updatedData = await response.json();
-        setTodayHabits(prev => ({
+        setTodayHabits((prev) => ({
           ...prev,
           [habitType]: completed,
-          daily_points: updatedData.daily_points
+          daily_points: updatedData.daily_points,
         }));
-        
-        setCalendarData(prev => ({
+
+        setCalendarData((prev) => ({
           ...prev,
-          [today]: updatedData.daily_points
+          [today]: updatedData.daily_points,
         }));
 
         // Refresh weekly points
         fetchDashboardData();
       }
     } catch (error) {
-      console.error('Error updating habit:', error);
+      console.error("Error updating habit:", error);
     }
   };
 
   const adjustSteps = async (adjustment: number) => {
     const newSteps = Math.max(0, todayHabits.steps + adjustment);
-    
+
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/daily-habits/update', {
-        method: 'PUT',
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch("/api/daily-habits/update", {
+        method: "PUT",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           date: today,
           steps: newSteps,
-          movement_completed: newSteps >= stepGoal
-        })
+          movement_completed: newSteps >= stepGoal,
+        }),
       });
 
       if (response.ok) {
         const updatedData = await response.json();
-        setTodayHabits(prev => ({
+        setTodayHabits((prev) => ({
           ...prev,
           steps: newSteps,
           movement_completed: newSteps >= stepGoal,
-          daily_points: updatedData.daily_points
+          daily_points: updatedData.daily_points,
         }));
-        
-        setCalendarData(prev => ({
+
+        setCalendarData((prev) => ({
           ...prev,
-          [today]: updatedData.daily_points
+          [today]: updatedData.daily_points,
         }));
 
         // Refresh weekly points
         fetchDashboardData();
       }
     } catch (error) {
-      console.error('Error updating steps:', error);
+      console.error("Error updating steps:", error);
     }
   };
 
   const saveNote = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/daily-notes', {
-        method: 'POST',
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch("/api/daily-notes", {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           content: dailyNote,
-          date: today
-        })
+          date: today,
+        }),
       });
 
       if (response.ok) {
-        console.log('Note saved successfully');
+        console.log("Note saved successfully");
       }
     } catch (error) {
-      console.error('Error saving note:', error);
+      console.error("Error saving note:", error);
     }
   };
 
-  const handleMeditationComplete = async (duration: number, type: string, comment: string) => {
+  const handleMeditationComplete = async (
+    duration: number,
+    type: string,
+    comment: string,
+  ) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      
+      const token = localStorage.getItem("auth_token");
+
       // Save meditation session
-      await fetch('/api/meditation-sessions', {
-        method: 'POST',
+      await fetch("/api/meditation-sessions", {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           duration_minutes: duration,
           meditation_type: type,
-          comment: comment
-        })
+          comment: comment,
+        }),
       });
 
       // Update meditation habit
-      await updateHabit('meditation_completed', true);
-      
-      alert('¡Meditación completada! Se agregó 1 punto a tu progreso diario.');
+      await updateHabit("meditation_completed", true);
+
+      alert("¡Meditación completada! Se agregó 1 punto a tu progreso diario.");
     } catch (error) {
-      console.error('Error completing meditation:', error);
+      console.error("Error completing meditation:", error);
     }
   };
 
@@ -239,44 +244,44 @@ const DashboardPage: React.FC = () => {
     const habits = [];
 
     // Always show Exercise if user has training feature or is admin
-    if (user?.features.training || user?.role === 'admin') {
+    if (user?.features.training || user?.role === "admin") {
       habits.push({
-        key: 'training_completed' as const,
-        name: 'Ejercicio',
-        description: 'Realizar la rutina de ejercicios del día',
+        key: "training_completed" as const,
+        name: "Ejercicio",
+        description: "Realizar la rutina de ejercicios del día",
         completed: todayHabits.training_completed,
-        icon: '💪'
+        icon: "💪",
       });
     }
 
     // Always show Nutrition if user has nutrition feature or is admin
-    if (user?.features.nutrition || user?.role === 'admin') {
+    if (user?.features.nutrition || user?.role === "admin") {
       habits.push({
-        key: 'nutrition_completed' as const,
-        name: 'Alimentación',
-        description: 'Seguir el plan nutricional del día',
+        key: "nutrition_completed" as const,
+        name: "Alimentación",
+        description: "Seguir el plan nutricional del día",
         completed: todayHabits.nutrition_completed,
-        icon: '🥗'
+        icon: "🥗",
       });
     }
 
     // Always show Steps - this is available to all users
     habits.push({
-      key: 'movement_completed' as const,
-      name: 'Pasos diarios',
+      key: "movement_completed" as const,
+      name: "Pasos diarios",
       description: `Completar ${stepGoal.toLocaleString()} pasos`,
       completed: todayHabits.movement_completed,
-      icon: '👟'
+      icon: "👟",
     });
 
     // Always show Meditation if user has meditation feature or is admin
-    if (user?.features.meditation || user?.role === 'admin') {
+    if (user?.features.meditation || user?.role === "admin") {
       habits.push({
-        key: 'meditation_completed' as const,
-        name: 'Respiración',
-        description: 'Practicar ejercicios de respiración y relajación',
+        key: "meditation_completed" as const,
+        name: "Respiración",
+        description: "Practicar ejercicios de respiración y relajación",
         completed: todayHabits.meditation_completed,
-        icon: '🧘'
+        icon: "🧘",
       });
     }
 
@@ -285,31 +290,39 @@ const DashboardPage: React.FC = () => {
 
   // Calendar helpers
   const generateCalendarDays = () => {
-    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    const firstDay = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      1,
+    );
+    const lastDay = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() + 1,
+      0,
+    );
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
+
     const days = [];
     const currentDate = new Date(startDate);
-    
+
     for (let i = 0; i < 42; i++) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = currentDate.toISOString().split("T")[0];
       const points = calendarData[dateStr] || 0;
       const isCurrentMonth = currentDate.getMonth() === currentMonth.getMonth();
       const isToday = dateStr === today;
-      
+
       days.push({
         date: new Date(currentDate),
         dateStr,
         points,
         isCurrentMonth,
-        isToday
+        isToday,
       });
-      
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return days;
   };
 
@@ -320,15 +333,25 @@ const DashboardPage: React.FC = () => {
   };
 
   const monthNames = [
-    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
   ];
 
   const habits = getAllHabits();
-  const completedHabitsCount = habits.filter(h => h.completed).length;
+  const completedHabitsCount = habits.filter((h) => h.completed).length;
   const stepsProgress = Math.min((todayHabits.steps / stepGoal) * 100, 100);
 
-  if (isLoading && user?.role === 'user') {
+  if (isLoading && user?.role === "user") {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-lg text-white">Cargando tu panel...</div>
@@ -337,13 +360,16 @@ const DashboardPage: React.FC = () => {
   }
 
   // Check if user needs to select a plan
-  if (user?.role === 'user' && (!user?.plan_type || Object.values(user.features).every(f => !f))) {
+  if (
+    user?.role === "user" &&
+    (!user?.plan_type || Object.values(user.features).every((f) => !f))
+  ) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-center text-white p-8">
           <h1 className="text-2xl font-bold mb-4">¡Bienvenido!</h1>
           <p className="mb-4">Necesitas seleccionar un plan para continuar.</p>
-          <Button onClick={() => window.location.href = '/plan-selection'}>
+          <Button onClick={() => (window.location.href = "/plan-selection")}>
             Seleccionar Plan
           </Button>
         </div>
@@ -356,7 +382,9 @@ const DashboardPage: React.FC = () => {
       <div className="container mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#D3B869] mb-2">Programa Totum</h1>
+          <h1 className="text-3xl font-bold text-[#D3B869] mb-2">
+            Academia de Hábitos Saludables
+          </h1>
         </div>
 
         {/* Top Section - Stats Cards */}
@@ -367,7 +395,9 @@ const DashboardPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-gray-400 mb-1">Puntos Hoy</div>
-                  <div className="text-2xl font-bold text-[#D3B869]">{todayHabits.daily_points}</div>
+                  <div className="text-2xl font-bold text-[#D3B869]">
+                    {todayHabits.daily_points}
+                  </div>
                 </div>
                 <div className="text-3xl">🏆</div>
               </div>
@@ -379,8 +409,12 @@ const DashboardPage: React.FC = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-gray-400 mb-1">Hábitos Completados</div>
-                  <div className="text-2xl font-bold text-[#D3B869]">{completedHabitsCount}/{habits.length}</div>
+                  <div className="text-sm text-gray-400 mb-1">
+                    Hábitos Completados
+                  </div>
+                  <div className="text-2xl font-bold text-[#D3B869]">
+                    {completedHabitsCount}/{habits.length}
+                  </div>
                 </div>
                 <div className="text-3xl">⭐</div>
               </div>
@@ -393,7 +427,9 @@ const DashboardPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-gray-400 mb-1">Esta Semana</div>
-                  <div className="text-2xl font-bold text-[#D3B869]">{weeklyPoints}</div>
+                  <div className="text-2xl font-bold text-[#D3B869]">
+                    {weeklyPoints}
+                  </div>
                 </div>
                 <div className="text-3xl">🎯</div>
               </div>
@@ -410,7 +446,9 @@ const DashboardPage: React.FC = () => {
               <CardHeader>
                 <CardTitle className="text-[#D3B869] flex items-center gap-2">
                   👟 Contador de Pasos
-                  <span className="text-sm text-gray-400">Meta diaria: {stepGoal.toLocaleString()} pasos</span>
+                  <span className="text-sm text-gray-400">
+                    Meta diaria: {stepGoal.toLocaleString()} pasos
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -418,13 +456,18 @@ const DashboardPage: React.FC = () => {
                   <div className="text-5xl font-bold text-white mb-2">
                     {todayHabits.steps.toLocaleString()}
                   </div>
-                  <div className="text-gray-400 text-sm mb-4">{stepsProgress.toFixed(1)}% de la meta</div>
-                  
+                  <div className="text-gray-400 text-sm mb-4">
+                    {stepsProgress.toFixed(1)}% de la meta
+                  </div>
+
                   {/* Progress bar */}
                   <div className="progress-bar mb-6 max-w-md mx-auto">
-                    <div className="progress-fill" style={{ width: `${stepsProgress}%` }}></div>
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${stepsProgress}%` }}
+                    ></div>
                   </div>
-                  
+
                   {/* Step adjustment buttons */}
                   <div className="flex justify-center items-center gap-4 mb-6">
                     <Button
@@ -470,28 +513,39 @@ const DashboardPage: React.FC = () => {
             {/* ¿Cómo te fue hoy? - All 4 habits */}
             <Card className="bg-gray-800 border-gray-700">
               <CardHeader>
-                <CardTitle className="text-[#D3B869]">¿Cómo te fue hoy?</CardTitle>
+                <CardTitle className="text-[#D3B869]">
+                  ¿Cómo te fue hoy?
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {habits.map((habit) => (
-                    <div key={habit.key} className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                    <div
+                      key={habit.key}
+                      className="flex items-center justify-between p-4 bg-gray-700 rounded-lg"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">{habit.icon}</div>
                         <div>
-                          <div className="font-medium text-white">{habit.name}</div>
-                          <div className="text-sm text-gray-400">{habit.description}</div>
+                          <div className="font-medium text-white">
+                            {habit.name}
+                          </div>
+                          <div className="text-sm text-gray-400">
+                            {habit.description}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[#D3B869] font-bold">+1</span>
                         <button
                           className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
-                            habit.completed 
-                              ? 'bg-[#D3B869] border-[#D3B869] text-black' 
-                              : 'border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869]/20'
+                            habit.completed
+                              ? "bg-[#D3B869] border-[#D3B869] text-black"
+                              : "border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869]/20"
                           }`}
-                          onClick={() => updateHabit(habit.key, !habit.completed)}
+                          onClick={() =>
+                            updateHabit(habit.key, !habit.completed)
+                          }
                         >
                           {habit.completed && <Check size={18} />}
                         </button>
@@ -515,8 +569,8 @@ const DashboardPage: React.FC = () => {
                   onBlur={saveNote}
                   className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 min-h-[100px]"
                 />
-                <Button 
-                  onClick={saveNote} 
+                <Button
+                  onClick={saveNote}
                   className="bg-[#D3B869] text-black hover:bg-[#D3B869]/90 mt-4"
                 >
                   Guardar Nota
@@ -534,16 +588,17 @@ const DashboardPage: React.FC = () => {
                     📅 Calendario de Hábitos
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       onClick={() => navigateMonth(-1)}
                       className="text-[#D3B869] hover:text-white"
                     >
                       <ChevronLeft size={20} />
                     </button>
                     <span className="text-white font-medium min-w-[120px] text-center">
-                      {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                      {monthNames[currentMonth.getMonth()]}{" "}
+                      {currentMonth.getFullYear()}
                     </span>
-                    <button 
+                    <button
                       onClick={() => navigateMonth(1)}
                       className="text-[#D3B869] hover:text-white"
                     >
@@ -555,8 +610,11 @@ const DashboardPage: React.FC = () => {
               <CardContent>
                 {/* Calendar Grid */}
                 <div className="grid grid-cols-7 gap-1 mb-4">
-                  {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(day => (
-                    <div key={day} className="text-center text-gray-400 text-sm p-2 font-medium">
+                  {["L", "M", "X", "J", "V", "S", "D"].map((day) => (
+                    <div
+                      key={day}
+                      className="text-center text-gray-400 text-sm p-2 font-medium"
+                    >
                       {day}
                     </div>
                   ))}
@@ -565,12 +623,18 @@ const DashboardPage: React.FC = () => {
                       key={index}
                       className={`
                         text-center p-2 text-sm rounded cursor-pointer transition-colors
-                        ${day.isCurrentMonth ? 'text-white' : 'text-gray-600'}
-                        ${day.isToday ? 'bg-[#D3B869] text-black font-bold' : ''}
-                        ${day.points === 4 ? 'bg-green-600' : 
-                          day.points >= 2 ? 'bg-orange-500' : 
-                          day.points > 0 ? 'bg-yellow-600' : ''}
-                        ${!day.isToday && day.points === 0 ? 'hover:bg-gray-700' : ''}
+                        ${day.isCurrentMonth ? "text-white" : "text-gray-600"}
+                        ${day.isToday ? "bg-[#D3B869] text-black font-bold" : ""}
+                        ${
+                          day.points === 4
+                            ? "bg-green-600"
+                            : day.points >= 2
+                              ? "bg-orange-500"
+                              : day.points > 0
+                                ? "bg-yellow-600"
+                                : ""
+                        }
+                        ${!day.isToday && day.points === 0 ? "hover:bg-gray-700" : ""}
                       `}
                       title={`${day.points} puntos`}
                     >
