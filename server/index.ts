@@ -9,7 +9,9 @@ import { z } from 'zod';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
 import DailyResetScheduler from './scheduler.js';
+import NotificationScheduler from './services/notification-scheduler.js';
 import statsRoutes from './routes/stats-routes.js';
+import notificationRoutes from './routes/notification-routes.js';
 import { 
   validateRequest, 
   validateFile, 
@@ -53,8 +55,9 @@ const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 // Enable trust proxy to get real client IPs
 app.set('trust proxy', true);
 
-// Initialize daily reset scheduler
+// Initialize schedulers
 let resetScheduler: DailyResetScheduler;
+let notificationScheduler: NotificationScheduler;
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
@@ -196,8 +199,9 @@ const formatUserResponse = (user: any) => {
   };
 };
 
-// Mount stats routes
+// Mount routes
 app.use('/api/', statsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Auth Routes with Rate Limiting
 app.post('/api/auth/register', 
@@ -996,6 +1000,9 @@ export async function startServer(port: number) {
     // Initialize the daily reset scheduler
     resetScheduler = new DailyResetScheduler();
     
+    // Initialize the notification scheduler
+    notificationScheduler = new NotificationScheduler();
+    
     // Log CORS configuration in development
     logCorsConfig();
     
@@ -1016,7 +1023,9 @@ export async function startServer(port: number) {
       console.log('Meditation session tracking enabled');
       console.log('Daily habits tracking enabled');
       console.log('User statistics API enabled');
+      console.log('Push notification system enabled');
       console.log('Daily reset scheduler initialized (00:05 AM Argentina time)');
+      console.log('Notification scheduler initialized (checking every minute)');
       console.log('System logging enabled with 90-day retention');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
       console.log('Trust proxy enabled for rate limiting');

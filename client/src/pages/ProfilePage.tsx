@@ -10,7 +10,8 @@ import WeeklyPointsChart from '@/components/profile/WeeklyPointsChart';
 import MonthlyHabitsChart from '@/components/profile/MonthlyHabitsChart';
 import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
 import StatsSummary from '@/components/profile/StatsSummary';
-import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, TrendingUp } from 'lucide-react';
+import NotificationSettings from '@/components/profile/NotificationSettings';
+import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, TrendingUp, Bell } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -50,11 +51,11 @@ const ProfilePage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Mi Perfil</h1>
-        <p className="text-muted-foreground">Información de tu cuenta y estadísticas</p>
+        <p className="text-muted-foreground">Información de tu cuenta, estadísticas y configuración</p>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Información Personal
@@ -62,6 +63,10 @@ const ProfilePage: React.FC = () => {
           <TabsTrigger value="statistics" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             Estadísticas
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Notificaciones
           </TabsTrigger>
         </TabsList>
 
@@ -408,6 +413,10 @@ const ProfilePage: React.FC = () => {
               </div>
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6">
+          <NotificationSettings />
         </TabsContent>
       </Tabs>
     </div>

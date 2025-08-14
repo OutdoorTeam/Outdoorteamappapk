@@ -1,0 +1,56 @@
+{
+  "name": "Outdoor Team - Hábitos Saludables",
+  "short_name": "Outdoor Team",
+  "description": "Academia de Hábitos Saludables",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#D3B869",
+  "orientation": "portrait-primary",
+  "categories": ["health", "fitness", "lifestyle"],
+  "lang": "es",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/assets/logo-gold.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo-gold.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Ver tu progreso diario",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "/assets/logo-gold.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Meditación",
+      "short_name": "Meditar",
+      "description": "Sesión de meditación",
+      "url": "/meditation",
+      "icons": [
+        {
+          "src": "/assets/logo-gold.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
+}

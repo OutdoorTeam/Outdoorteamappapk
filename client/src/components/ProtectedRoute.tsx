@@ -5,9 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: string;
+  adminOnly?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole, adminOnly }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -21,6 +22,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (adminOnly && user.role !== 'admin') {
+    return <Navigate to="/" replace />;
   }
 
   if (requiredRole && user.role !== requiredRole) {
