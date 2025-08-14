@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
 import DailyResetScheduler from './scheduler.js';
+import statsRoutes from './routes/stats-routes.js';
 import { 
   validateRequest, 
   validateFile, 
@@ -194,6 +195,9 @@ const formatUserResponse = (user: any) => {
     }
   };
 };
+
+// Mount stats routes
+app.use('/api/', statsRoutes);
 
 // Auth Routes with Rate Limiting
 app.post('/api/auth/register', 
@@ -1011,6 +1015,7 @@ export async function startServer(port: number) {
       console.log('Content library system enabled');
       console.log('Meditation session tracking enabled');
       console.log('Daily habits tracking enabled');
+      console.log('User statistics API enabled');
       console.log('Daily reset scheduler initialized (00:05 AM Argentina time)');
       console.log('System logging enabled with 90-day retention');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
