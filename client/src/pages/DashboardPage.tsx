@@ -3,209 +3,102 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight, Check, Plus, Minus } from "lucide-react";
-import MeditationSession from "@/components/MeditationSession";
-
-interface DailyHabit {
-  training_completed: boolean;
-  nutrition_completed: boolean;
-  movement_completed: boolean;
-  meditation_completed: boolean;
-  steps: number;
-  daily_points: number;
-}
+import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  useTodayHabits, 
+  useWeeklyPoints, 
+  useCalendarData, 
+  useUpdateHabit 
+} from "@/hooks/api/use-daily-habits";
+import { useTodayNote, useSaveNote } from "@/hooks/api/use-daily-notes";
+import { useSaveMeditationSession } from "@/hooks/api/use-meditation";
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const [todayHabits, setTodayHabits] = React.useState<DailyHabit>({
-    training_completed: false,
-    nutrition_completed: false,
-    movement_completed: false,
-    meditation_completed: false,
-    steps: 0,
-    daily_points: 0,
-  });
-  const [weeklyPoints, setWeeklyPoints] = React.useState(0);
+  const { toast } = useToast();
   const [dailyNote, setDailyNote] = React.useState("");
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
-  const [calendarData, setCalendarData] = React.useState<{
-    [key: string]: number;
-  }>({});
-  const [isLoading, setIsLoading] = React.useState(true);
 
   const today = new Date().toISOString().split("T")[0];
   const stepGoal = 8000;
 
+  // React Query hooks
+  const { data: todayHabits, isLoading: habitsLoading } = useTodayHabits();
+  const { data: weeklyPointsData, isLoading: weeklyLoading } = useWeeklyPoints();
+  const { data: calendarData, isLoading: calendarLoading } = useCalendarData();
+  const { data: todayNoteData, isLoading: noteLoading } = useTodayNote();
+  
+  // Mutations
+  const updateHabitMutation = useUpdateHabit();
+  const saveNoteMutation = useSaveNote();
+  const saveMeditationMutation = useSaveMeditationSession();
+
+  // Initialize note from query data
   React.useEffect(() => {
-    if (user?.role === "user") {
-      fetchDashboardData();
-      fetchDailyNote();
+    if (todayNoteData && typeof todayNoteData.content === 'string') {
+      setDailyNote(todayNoteData.content);
     }
-  }, [user]);
+  }, [todayNoteData]);
 
-  const fetchDashboardData = async () => {
+  const handleUpdateHabit = async (habitType: string, completed: boolean) => {
     try {
-      const token = localStorage.getItem("auth_token");
-
-      // Fetch today's habits
-      const todayResponse = await fetch(`/api/daily-habits/today`, {
-        headers: { Authorization: `Bearer ${token}` },
+      await updateHabitMutation.mutateAsync({
+        date: today,
+        [habitType]: completed,
       });
-
-      if (todayResponse.ok) {
-        const todayData = await todayResponse.json();
-        setTodayHabits({
-          training_completed: Boolean(todayData.training_completed),
-          nutrition_completed: Boolean(todayData.nutrition_completed),
-          movement_completed: Boolean(todayData.movement_completed),
-          meditation_completed: Boolean(todayData.meditation_completed),
-          steps: todayData.steps || 0,
-          daily_points: todayData.daily_points || 0,
-        });
-      }
-
-      // Fetch weekly points
-      const weeklyResponse = await fetch(`/api/daily-habits/weekly-points`, {
-        headers: { Authorization: `Bearer ${token}` },
+      
+      toast({
+        title: completed ? "Hábito completado" : "Hábito desmarcado",
+        description: `${habitType.replace('_completed', '')} ${completed ? 'marcado como completado' : 'desmarcado'}`,
+        variant: "success",
       });
-
-      if (weeklyResponse.ok) {
-        const weeklyData = await weeklyResponse.json();
-        setWeeklyPoints(weeklyData.total_points || 0);
-      }
-
-      // Fetch calendar data
-      const calendarResponse = await fetch(`/api/daily-habits/calendar`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (calendarResponse.ok) {
-        const calendarData = await calendarResponse.json();
-        const calendarMap: { [key: string]: number } = {};
-        calendarData.forEach((day: any) => {
-          calendarMap[day.date] = day.daily_points;
-        });
-        setCalendarData(calendarMap);
-      }
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-    } finally {
-      setIsLoading(false);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el hábito",
+        variant: "destructive",
+      });
     }
   };
 
-  const fetchDailyNote = async () => {
-    try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch(`/api/daily-notes/today`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  const handleAdjustSteps = async (adjustment: number) => {
+    const currentSteps = todayHabits?.steps || 0;
+    const newSteps = Math.max(0, currentSteps + adjustment);
 
-      if (response.ok) {
-        const noteData = await response.json();
-        setDailyNote(noteData.content || "");
-      }
+    try {
+      await updateHabitMutation.mutateAsync({
+        date: today,
+        steps: newSteps,
+        movement_completed: newSteps >= stepGoal,
+      });
     } catch (error) {
-      console.error("Error fetching daily note:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el contador de pasos",
+        variant: "destructive",
+      });
     }
   };
 
-  const updateHabit = async (habitType: string, completed: boolean) => {
+  const handleSaveNote = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/daily-habits/update", {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          date: today,
-          [habitType]: completed,
-        }),
+      await saveNoteMutation.mutateAsync({
+        content: dailyNote,
+        date: today,
       });
-
-      if (response.ok) {
-        const updatedData = await response.json();
-        setTodayHabits((prev) => ({
-          ...prev,
-          [habitType]: completed,
-          daily_points: updatedData.daily_points,
-        }));
-
-        setCalendarData((prev) => ({
-          ...prev,
-          [today]: updatedData.daily_points,
-        }));
-
-        // Refresh weekly points
-        fetchDashboardData();
-      }
-    } catch (error) {
-      console.error("Error updating habit:", error);
-    }
-  };
-
-  const adjustSteps = async (adjustment: number) => {
-    const newSteps = Math.max(0, todayHabits.steps + adjustment);
-
-    try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/daily-habits/update", {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          date: today,
-          steps: newSteps,
-          movement_completed: newSteps >= stepGoal,
-        }),
+      
+      toast({
+        title: "Nota guardada",
+        description: "Tu nota del día ha sido guardada exitosamente",
+        variant: "success",
       });
-
-      if (response.ok) {
-        const updatedData = await response.json();
-        setTodayHabits((prev) => ({
-          ...prev,
-          steps: newSteps,
-          movement_completed: newSteps >= stepGoal,
-          daily_points: updatedData.daily_points,
-        }));
-
-        setCalendarData((prev) => ({
-          ...prev,
-          [today]: updatedData.daily_points,
-        }));
-
-        // Refresh weekly points
-        fetchDashboardData();
-      }
     } catch (error) {
-      console.error("Error updating steps:", error);
-    }
-  };
-
-  const saveNote = async () => {
-    try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/daily-notes", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: dailyNote,
-          date: today,
-        }),
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la nota",
+        variant: "destructive",
       });
-
-      if (response.ok) {
-        console.log("Note saved successfully");
-      }
-    } catch (error) {
-      console.error("Error saving note:", error);
     }
   };
 
@@ -215,28 +108,26 @@ const DashboardPage: React.FC = () => {
     comment: string,
   ) => {
     try {
-      const token = localStorage.getItem("auth_token");
-
-      // Save meditation session
-      await fetch("/api/meditation-sessions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          duration_minutes: duration,
-          meditation_type: type,
-          comment: comment,
-        }),
+      await saveMeditationMutation.mutateAsync({
+        duration_minutes: duration,
+        meditation_type: type,
+        comment: comment,
       });
 
       // Update meditation habit
-      await updateHabit("meditation_completed", true);
+      await handleUpdateHabit("meditation_completed", true);
 
-      alert("¡Meditación completada! Se agregó 1 punto a tu progreso diario.");
+      toast({
+        title: "¡Meditación completada!",
+        description: "Se agregó 1 punto a tu progreso diario",
+        variant: "success",
+      });
     } catch (error) {
-      console.error("Error completing meditation:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo completar la meditación",
+        variant: "destructive",
+      });
     }
   };
 
@@ -249,7 +140,7 @@ const DashboardPage: React.FC = () => {
         key: "training_completed" as const,
         name: "Ejercicio",
         description: "Realizar la rutina de ejercicios del día",
-        completed: todayHabits.training_completed,
+        completed: Boolean(todayHabits?.training_completed),
         icon: "💪",
       });
     }
@@ -260,7 +151,7 @@ const DashboardPage: React.FC = () => {
         key: "nutrition_completed" as const,
         name: "Alimentación",
         description: "Seguir el plan nutricional del día",
-        completed: todayHabits.nutrition_completed,
+        completed: Boolean(todayHabits?.nutrition_completed),
         icon: "🥗",
       });
     }
@@ -270,7 +161,7 @@ const DashboardPage: React.FC = () => {
       key: "movement_completed" as const,
       name: "Pasos diarios",
       description: `Completar ${stepGoal.toLocaleString()} pasos`,
-      completed: todayHabits.movement_completed,
+      completed: Boolean(todayHabits?.movement_completed),
       icon: "👟",
     });
 
@@ -280,7 +171,7 @@ const DashboardPage: React.FC = () => {
         key: "meditation_completed" as const,
         name: "Respiración",
         description: "Practicar ejercicios de respiración y relajación",
-        completed: todayHabits.meditation_completed,
+        completed: Boolean(todayHabits?.meditation_completed),
         icon: "🧘",
       });
     }
@@ -295,11 +186,6 @@ const DashboardPage: React.FC = () => {
       currentMonth.getMonth(),
       1,
     );
-    const lastDay = new Date(
-      currentMonth.getFullYear(),
-      currentMonth.getMonth() + 1,
-      0,
-    );
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
@@ -308,7 +194,7 @@ const DashboardPage: React.FC = () => {
 
     for (let i = 0; i < 42; i++) {
       const dateStr = currentDate.toISOString().split("T")[0];
-      const points = calendarData[dateStr] || 0;
+      const points = calendarData?.find((day: any) => day.date === dateStr)?.daily_points || 0;
       const isCurrentMonth = currentDate.getMonth() === currentMonth.getMonth();
       const isToday = dateStr === today;
 
@@ -333,23 +219,17 @@ const DashboardPage: React.FC = () => {
   };
 
   const monthNames = [
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
   ];
 
   const habits = getAllHabits();
   const completedHabitsCount = habits.filter((h) => h.completed).length;
-  const stepsProgress = Math.min((todayHabits.steps / stepGoal) * 100, 100);
+  const currentSteps = todayHabits?.steps || 0;
+  const stepsProgress = Math.min((currentSteps / stepGoal) * 100, 100);
+  const weeklyPoints = weeklyPointsData?.total_points || 0;
+
+  const isLoading = habitsLoading || weeklyLoading || calendarLoading || noteLoading;
 
   if (isLoading && user?.role === "user") {
     return (
@@ -396,7 +276,7 @@ const DashboardPage: React.FC = () => {
                 <div>
                   <div className="text-sm text-gray-400 mb-1">Puntos Hoy</div>
                   <div className="text-2xl font-bold text-[#D3B869]">
-                    {todayHabits.daily_points}
+                    {todayHabits?.daily_points || 0}
                   </div>
                 </div>
                 <div className="text-3xl">🏆</div>
@@ -454,7 +334,7 @@ const DashboardPage: React.FC = () => {
               <CardContent>
                 <div className="text-center">
                   <div className="text-5xl font-bold text-white mb-2">
-                    {todayHabits.steps.toLocaleString()}
+                    {currentSteps.toLocaleString()}
                   </div>
                   <div className="text-gray-400 text-sm mb-4">
                     {stepsProgress.toFixed(1)}% de la meta
@@ -473,7 +353,8 @@ const DashboardPage: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => adjustSteps(-1000)}
+                      onClick={() => handleAdjustSteps(-1000)}
+                      disabled={updateHabitMutation.isPending}
                       className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                     >
                       -1000
@@ -481,18 +362,20 @@ const DashboardPage: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => adjustSteps(-100)}
+                      onClick={() => handleAdjustSteps(-100)}
+                      disabled={updateHabitMutation.isPending}
                       className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                     >
                       -100
                     </Button>
                     <div className="text-lg font-bold text-[#D3B869] px-4 min-w-[80px] text-center">
-                      {todayHabits.steps}
+                      {currentSteps}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => adjustSteps(100)}
+                      onClick={() => handleAdjustSteps(100)}
+                      disabled={updateHabitMutation.isPending}
                       className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                     >
                       +100
@@ -500,7 +383,8 @@ const DashboardPage: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => adjustSteps(1000)}
+                      onClick={() => handleAdjustSteps(1000)}
+                      disabled={updateHabitMutation.isPending}
                       className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                     >
                       +1000
@@ -542,10 +426,9 @@ const DashboardPage: React.FC = () => {
                             habit.completed
                               ? "bg-[#D3B869] border-[#D3B869] text-black"
                               : "border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869]/20"
-                          }`}
-                          onClick={() =>
-                            updateHabit(habit.key, !habit.completed)
-                          }
+                          } ${updateHabitMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          onClick={() => handleUpdateHabit(habit.key, !habit.completed)}
+                          disabled={updateHabitMutation.isPending}
                         >
                           {habit.completed && <Check size={18} />}
                         </button>
@@ -566,14 +449,16 @@ const DashboardPage: React.FC = () => {
                   placeholder="Escribe tus reflexiones del día, logros, retos, etc..."
                   value={dailyNote}
                   onChange={(e) => setDailyNote(e.target.value)}
-                  onBlur={saveNote}
+                  onBlur={handleSaveNote}
                   className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 min-h-[100px]"
+                  disabled={saveNoteMutation.isPending}
                 />
                 <Button
-                  onClick={saveNote}
+                  onClick={handleSaveNote}
+                  disabled={saveNoteMutation.isPending}
                   className="bg-[#D3B869] text-black hover:bg-[#D3B869]/90 mt-4"
                 >
-                  Guardar Nota
+                  {saveNoteMutation.isPending ? 'Guardando...' : 'Guardar Nota'}
                 </Button>
               </CardContent>
             </Card>

@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { Play, Filter, Clock, Target, Dumbbell, Heart, Zap } from 'lucide-react';
+import { useExercises } from '@/hooks/api/use-content-library';
 
 interface Exercise {
   id: number;
@@ -19,50 +20,29 @@ interface Exercise {
 
 const ExercisesPage: React.FC = () => {
   const { user } = useAuth();
-  const [exercises, setExercises] = React.useState<Exercise[]>([]);
-  const [filteredExercises, setFilteredExercises] = React.useState<Exercise[]>([]);
   const [selectedCategory, setSelectedCategory] = React.useState('all');
-  const [selectedSubcategory, setSelectedSubcategory] = React.useState('all');
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    fetchExercises();
-  }, []);
+  
+  // Use React Query hook
+  const { data: exercises = [], isLoading, error } = useExercises();
+  
+  const [filteredExercises, setFilteredExercises] = React.useState<Exercise[]>([]);
 
   React.useEffect(() => {
     filterExercises();
-  }, [exercises, selectedCategory, selectedSubcategory]);
-
-  const fetchExercises = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/content-library?category=exercise', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const content = await response.json();
-        setExercises(content.filter((item: any) => item.category === 'exercise'));
-      }
-    } catch (error) {
-      console.error('Error fetching exercises:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [exercises, selectedCategory]);
 
   const filterExercises = () => {
     let filtered = exercises;
 
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(ex => ex.subcategory === selectedCategory);
+      filtered = filtered.filter((ex: Exercise) => ex.subcategory === selectedCategory);
     }
 
     setFilteredExercises(filtered);
   };
 
   const getUniqueCategories = () => {
-    const categories = [...new Set(exercises.map(ex => ex.subcategory).filter(Boolean))];
+    const categories = [...new Set(exercises.map((ex: Exercise) => ex.subcategory).filter(Boolean))];
     return categories;
   };
 
@@ -89,7 +69,7 @@ const ExercisesPage: React.FC = () => {
     const grouped: {[key: string]: Exercise[]} = {};
     
     categories.forEach(category => {
-      grouped[category] = exercises.filter(ex => ex.subcategory === category);
+      grouped[category] = exercises.filter((ex: Exercise) => ex.subcategory === category);
     });
 
     return grouped;
@@ -107,6 +87,14 @@ const ExercisesPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">Cargando ejercicios...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg text-red-600">Error al cargar ejercicios</div>
       </div>
     );
   }
@@ -151,10 +139,7 @@ const ExercisesPage: React.FC = () => {
               <div className="flex items-end">
                 <Button 
                   variant="outline" 
-                  onClick={() => {
-                    setSelectedCategory('all');
-                    setSelectedSubcategory('all');
-                  }}
+                  onClick={() => setSelectedCategory('all')}
                 >
                   Limpiar Filtros
                 </Button>

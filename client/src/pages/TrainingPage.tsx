@@ -3,51 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { Play, Calendar, User, FileText, Clock } from 'lucide-react';
+import { useWorkoutOfDay } from '@/hooks/api/use-workout';
+import { useUserFiles } from '@/hooks/api/use-user-files';
 
 const TrainingPage: React.FC = () => {
   const { user } = useAuth();
-  const [workoutOfDay, setWorkoutOfDay] = React.useState<any>(null);
-  const [userFiles, setUserFiles] = React.useState([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  
+  // Use React Query hooks
+  const { data: workoutOfDay, isLoading: workoutLoading } = useWorkoutOfDay();
+  const { data: userFiles = [], isLoading: filesLoading } = useUserFiles('training');
 
-  React.useEffect(() => {
-    fetchWorkoutOfDay();
-    fetchUserFiles();
-  }, []);
-
-  const fetchWorkoutOfDay = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/workout-of-day', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const workout = await response.json();
-        setWorkoutOfDay(workout);
-      }
-    } catch (error) {
-      console.error('Error fetching workout of day:', error);
-    }
-  };
-
-  const fetchUserFiles = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/user-files', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const files = await response.json();
-        setUserFiles(files.filter((file: any) => file.file_type === 'training'));
-      }
-    } catch (error) {
-      console.error('Error fetching user files:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isLoading = workoutLoading || filesLoading;
 
   if (isLoading) {
     return (
@@ -149,7 +115,7 @@ const TrainingPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Section 2: Personalized Training Plan - Only if enabled by admin */}
+        {/* Section 2: Personalized Training Plan */}
         <Card className="border-l-4 border-l-blue-500">
           <CardHeader>
             <div className="flex items-center gap-2">

@@ -9,35 +9,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileText, Download, User, Apple, Clock, Utensils } from "lucide-react";
+import { useUserFiles } from "@/hooks/api/use-user-files";
 
 const NutritionPage: React.FC = () => {
   const { user } = useAuth();
-  const [userFiles, setUserFiles] = React.useState([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    fetchUserFiles();
-  }, []);
-
-  const fetchUserFiles = async () => {
-    try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/user-files", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const files = await response.json();
-        setUserFiles(
-          files.filter((file: any) => file.file_type === "nutrition"),
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching user files:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  
+  // Use React Query hook
+  const { data: userFiles = [], isLoading } = useUserFiles('nutrition');
 
   if (isLoading) {
     return (
@@ -177,7 +155,9 @@ const NutritionPage: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-600 mb-2">
                   Plan Personalizado en Preparación
                 </h3>
-                <p className="text-muted-foreground mb-6"></p>
+                <p className="text-muted-foreground mb-6">
+                  La Lic. Ana Saloco está trabajando en crear un plan específico para ti.
+                </p>
 
                 <div className="bg-gray-50 p-6 rounded-lg text-left max-w-2xl mx-auto">
                   <h4 className="font-medium mb-4">
@@ -293,7 +273,7 @@ const NutritionPage: React.FC = () => {
                 <li className="flex items-start gap-2">
                   <span className="text-blue-500 mt-1">🌙</span>
                   <span>
-                    <strong>Cena:</strong> 3 horas antes de dormir como máximo
+                    <strong>Cena:</strong> 3 horas antes de dormir
                   </span>
                 </li>
               </ul>
@@ -301,62 +281,76 @@ const NutritionPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Healthy Recipe Ideas */}
+        {/* Hydration Tips */}
         <Card>
           <CardHeader>
-            <CardTitle>Ideas de Comidas Saludables</CardTitle>
-            <CardDescription>
-              Opciones rápidas y nutritivas para tu día a día
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              💧 Hidratación Inteligente
+            </CardTitle>
+            <CardDescription>Consejos para mantener una hidratación óptima</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold mb-3 text-primary">📊 Cantidad Recomendada</h4>
+                <ul className="text-sm space-y-2 text-muted-foreground">
+                  <li>• 8-10 vasos de agua al día (2-2.5 litros)</li>
+                  <li>• Aumenta en días calurosos o de ejercicio intenso</li>
+                  <li>• Distribuye el consumo a lo largo del día</li>
+                  <li>• Bebe un vaso al despertar</li>
+                  <li>• Hidrata antes, durante y después del ejercicio</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-3 text-primary">🥤 Opciones Saludables</h4>
+                <ul className="text-sm space-y-2 text-muted-foreground">
+                  <li>• Agua natural como base principal</li>
+                  <li>• Infusiones de frutas naturales</li>
+                  <li>• Té verde o hierbas sin azúcar</li>
+                  <li>• Agua con limón para mejorar la digestión</li>
+                  <li>• Evita bebidas azucaradas y alcohol en exceso</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Meal Planning */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Planificación de Comidas</CardTitle>
+            <CardDescription>Organiza tu alimentación para obtener los mejores resultados</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="p-4 border rounded-lg bg-orange-50">
-                <h4 className="font-semibold mb-2 text-orange-800">
-                  🌅 Desayuno Energético
-                </h4>
-                <p className="text-sm text-orange-700 mb-3">
-                  Avena con frutas y frutos secos
+              <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-orange-50 to-yellow-50">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">🍳</span>
+                </div>
+                <h4 className="font-semibold mb-2 text-orange-800">Preparación</h4>
+                <p className="text-sm text-orange-700">
+                  Dedica tiempo los domingos para planificar y preparar comidas de la semana
                 </p>
-                <ul className="text-xs text-orange-600 space-y-1">
-                  <li>• 1/2 taza avena integral</li>
-                  <li>• 1 plátano mediano</li>
-                  <li>• 1 puñado de almendras</li>
-                  <li>• Canela al gusto</li>
-                  <li>• 1 cucharada de miel</li>
-                </ul>
               </div>
-
-              <div className="p-4 border rounded-lg bg-green-50">
-                <h4 className="font-semibold mb-2 text-green-800">
-                  🥗 Almuerzo Balanceado
-                </h4>
-                <p className="text-sm text-green-700 mb-3">
-                  Ensalada completa con proteína
+              
+              <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">🛒</span>
+                </div>
+                <h4 className="font-semibold mb-2 text-blue-800">Compras</h4>
+                <p className="text-sm text-blue-700">
+                  Haz una lista de compras basada en tu plan nutricional para evitar tentaciones
                 </p>
-                <ul className="text-xs text-green-600 space-y-1">
-                  <li>• Mix de vegetales verdes</li>
-                  <li>• 150g pollo o pescado</li>
-                  <li>• 1/2 taza quinoa cocida</li>
-                  <li>• 1 cucharada aceite de oliva</li>
-                  <li>• Semillas de chía</li>
-                </ul>
               </div>
-
-              <div className="p-4 border rounded-lg bg-purple-50">
-                <h4 className="font-semibold mb-2 text-purple-800">
-                  🥤 Snack Saludable
-                </h4>
-                <p className="text-sm text-purple-700 mb-3">
-                  Yogurt con semillas y frutas
+              
+              <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">📝</span>
+                </div>
+                <h4 className="font-semibold mb-2 text-green-800">Seguimiento</h4>
+                <p className="text-sm text-green-700">
+                  Registra lo que comes para identificar patrones y áreas de mejora
                 </p>
-                <ul className="text-xs text-purple-600 space-y-1">
-                  <li>• 1 yogurt griego natural</li>
-                  <li>• 1 cucharadita semillas chía</li>
-                  <li>• 1/2 taza berries mixtos</li>
-                  <li>• 1 cucharadita miel natural</li>
-                  <li>• Nueces picadas</li>
-                </ul>
               </div>
             </div>
           </CardContent>
