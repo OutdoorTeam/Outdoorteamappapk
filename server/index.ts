@@ -26,9 +26,10 @@ import {
   checkLoginBlock
 } from './middleware/rate-limiter.js';
 import {
-  corsMiddleware,
+  createCorsMiddleware,
   corsErrorHandler,
-  securityHeaders
+  securityHeaders,
+  logCorsConfig
 } from './config/cors.js';
 import {
   registerSchema,
@@ -101,7 +102,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Apply CORS only to API routes
-app.use('/api/*', corsMiddleware);
+app.use('/api/', createCorsMiddleware('/api'));
 
 // CORS error handler (must be after CORS middleware)
 app.use(corsErrorHandler);
@@ -485,4 +486,544 @@ app.get('/api/daily-habits/today', authenticateToken, async (req: any, res: expr
 app.get('/api/daily-habits/weekly-points', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
-    const today
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay()); // Sunday
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    
+    console.log('Fetching weekly points for user:', userId, 'from:', weekStartStr);
+    
+    const weeklyData = await db
+      .selectFrom('daily_habits')
+      .select((eb) => [eb.fn.sum('daily_points').as('total_points')])
+      .where('user_id', '=', userId)
+      .where('date', '>=', weekStartStr)
+      .executeTakeFirst();
+    
+    res.json({ total_points: weeklyData?.total_points || 0 });
+  } catch (error) {
+    console.error('Error fetching weekly points:', error);
+    await SystemLogger.logCriticalError('Weekly points fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener puntos semanales');
+  }
+});
+
+app.get('/api/daily-habits/calendar', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const startDate = threeMonthsAgo.toISOString().split('T')[0];
+    
+    console.log('Fetching calendar data for user:', userId, 'from:', startDate);
+    
+    const calendarData = await db
+      .selectFrom('daily_habits')
+      .select(['date', 'daily_points'])
+      .where('user_id', '=', userId)
+      .where('date', '>=', startDate)
+      .execute();
+    
+    res.json(calendarData);
+  } catch (error) {
+    console.error('Error fetching calendar data:', error);
+    await SystemLogger.logCriticalError('Calendar data fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener datos del calendario');
+  }
+});
+
+app.put('/api/daily-habits/update', 
+  authenticateToken, 
+  validateRequest(dailyHabitsUpdateSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const userId = req.user.id;
+      const { date, training_completed, nutrition_completed, movement_completed, meditation_completed, steps } = req.body;
+      
+      console.log('Updating daily habits for user:', userId, 'date:', date, 'data:', req.body);
+      
+      // Get current record or create default
+      let currentRecord = await db
+        .selectFrom('daily_habits')
+        .selectAll()
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .executeTakeFirst();
+      
+      // Prepare update data
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+      
+      if (training_completed !== undefined) {
+        updateData.training_completed = training_completed ? 1 : 0;
+      }
+      if (nutrition_completed !== undefined) {
+        updateData.nutrition_completed = nutrition_completed ? 1 : 0;
+      }
+      if (movement_completed !== undefined) {
+        updateData.movement_completed = movement_completed ? 1 : 0;
+      }
+      if (meditation_completed !== undefined) {
+        updateData.meditation_completed = meditation_completed ? 1 : 0;
+      }
+      if (steps !== undefined) {
+        updateData.steps = steps;
+      }
+      
+      // Merge with current record for point calculation
+      const mergedData = {
+        training_completed: updateData.training_completed ?? currentRecord?.training_completed ?? 0,
+        nutrition_completed: updateData.nutrition_completed ?? currentRecord?.nutrition_completed ?? 0,
+        movement_completed: updateData.movement_completed ?? currentRecord?.movement_completed ?? 0,
+        meditation_completed: updateData.meditation_completed ?? currentRecord?.meditation_completed ?? 0
+      };
+      
+      // Calculate daily points
+      const dailyPoints = Object.values(mergedData).reduce((sum, completed) => sum + (completed ? 1 : 0), 0);
+      updateData.daily_points = dailyPoints;
+      
+      let result;
+      if (currentRecord) {
+        // Update existing record
+        result = await db
+          .updateTable('daily_habits')
+          .set(updateData)
+          .where('user_id', '=', userId)
+          .where('date', '=', date)
+          .returning(['daily_points'])
+          .executeTakeFirst();
+      } else {
+        // Create new record
+        result = await db
+          .insertInto('daily_habits')
+          .values({
+            user_id: userId,
+            date,
+            training_completed: updateData.training_completed ?? 0,
+            nutrition_completed: updateData.nutrition_completed ?? 0,
+            movement_completed: updateData.movement_completed ?? 0,
+            meditation_completed: updateData.meditation_completed ?? 0,
+            steps: updateData.steps ?? 0,
+            daily_points: dailyPoints,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .returning(['daily_points'])
+          .executeTakeFirst();
+      }
+      
+      console.log('Daily habits updated, points:', dailyPoints);
+      res.json({ daily_points: dailyPoints });
+    } catch (error) {
+      console.error('Error updating daily habits:', error);
+      
+      // Check for unique constraint violation
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        sendErrorResponse(res, ERROR_CODES.DUPLICATE_ERROR, 'Ya existe un registro para esta fecha');
+        return;
+      }
+      
+      await SystemLogger.logCriticalError('Daily habits update error', error as Error, { userId: req.user?.id, req });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar hábitos diarios');
+    }
+  });
+
+// Daily Notes Routes with validation and sanitization
+app.get('/api/daily-notes/today', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+    
+    console.log('Fetching daily note for user:', userId, 'date:', today);
+    
+    const note = await db
+      .selectFrom('user_notes')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', today)
+      .executeTakeFirst();
+    
+    if (note) {
+      res.json(note);
+    } else {
+      res.json({ content: '' });
+    }
+  } catch (error) {
+    console.error('Error fetching daily note:', error);
+    await SystemLogger.logCriticalError('Daily note fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener nota diaria');
+  }
+});
+
+app.post('/api/daily-notes', 
+  authenticateToken, 
+  validateRequest(dailyNoteSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { content, date } = req.body;
+      const userId = req.user.id;
+      
+      // Sanitize content to prevent XSS
+      const sanitizedContent = sanitizeContent(content);
+      
+      console.log('Saving note for user:', userId, 'date:', date);
+      
+      // Check if note already exists for this date
+      const existingNote = await db
+        .selectFrom('user_notes')
+        .select(['id'])
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .executeTakeFirst();
+      
+      if (existingNote) {
+        // Update existing note
+        const updatedNote = await db
+          .updateTable('user_notes')
+          .set({ content: sanitizedContent })
+          .where('user_id', '=', userId)
+          .where('date', '=', date)
+          .returning(['id', 'content', 'date'])
+          .executeTakeFirst();
+        
+        res.json(updatedNote);
+      } else {
+        // Create new note
+        const note = await db
+          .insertInto('user_notes')
+          .values({
+            user_id: userId,
+            content: sanitizedContent,
+            date: date || new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString()
+          })
+          .returning(['id', 'content', 'date'])
+          .executeTakeFirst();
+        
+        res.status(201).json(note);
+      }
+    } catch (error) {
+      console.error('Error saving note:', error);
+      await SystemLogger.logCriticalError('Daily note save error', error as Error, { userId: req.user?.id, req });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar nota');
+    }
+  });
+
+// Meditation Sessions Routes with validation
+app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    console.log('Fetching meditation sessions for user:', userId);
+    
+    const sessions = await db
+      .selectFrom('meditation_sessions')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .orderBy('completed_at', 'desc')
+      .limit(50)
+      .execute();
+    
+    console.log('Meditation sessions fetched:', sessions.length);
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching meditation sessions:', error);
+    await SystemLogger.logCriticalError('Meditation sessions fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener sesiones de meditación');
+  }
+});
+
+app.post('/api/meditation-sessions', 
+  authenticateToken, 
+  validateRequest(meditationSessionSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { duration_minutes, meditation_type, comment, breathing_cycle_json } = req.body;
+      const userId = req.user.id;
+      
+      // Sanitize comment
+      const sanitizedComment = comment ? sanitizeContent(comment) : null;
+      
+      console.log('Saving meditation session for user:', userId);
+      
+      const session = await db
+        .insertInto('meditation_sessions')
+        .values({
+          user_id: userId,
+          duration_minutes: duration_minutes || 0,
+          meditation_type: meditation_type || 'free',
+          comment: sanitizedComment,
+          breathing_cycle_json: breathing_cycle_json || null,
+          completed_at: new Date().toISOString()
+        })
+        .returning(['id', 'duration_minutes', 'meditation_type'])
+        .executeTakeFirst();
+      
+      res.status(201).json(session);
+    } catch (error) {
+      console.error('Error saving meditation session:', error);
+      await SystemLogger.logCriticalError('Meditation session save error', error as Error, { userId: req.user?.id, req });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar sesión de meditación');
+    }
+  });
+
+// Content Library Routes
+app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { category } = req.query;
+    console.log('Fetching content library for user:', req.user.email, 'category:', category);
+    
+    let query = db
+      .selectFrom('content_library')
+      .selectAll()
+      .where('is_active', '=', 1);
+    
+    if (category) {
+      query = query.where('category', '=', category as string);
+    }
+    
+    const content = await query.execute();
+    
+    console.log('Content library items fetched:', content.length);
+    res.json(content);
+  } catch (error) {
+    console.error('Error fetching content library:', error);
+    await SystemLogger.logCriticalError('Content library fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener biblioteca de contenido');
+  }
+});
+
+// Admin content management
+app.post('/api/content-library', 
+  authenticateToken, 
+  requireAdmin, 
+  validateRequest(contentLibrarySchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { title, description, video_url, category, subcategory } = req.body;
+      console.log('Admin creating content:', title, 'category:', category);
+      
+      const content = await db
+        .insertInto('content_library')
+        .values({
+          title,
+          description: description || null,
+          video_url: video_url || null,
+          category,
+          subcategory: subcategory || null,
+          is_active: 1,
+          created_at: new Date().toISOString()
+        })
+        .returning(['id', 'title', 'category'])
+        .executeTakeFirst();
+      
+      await SystemLogger.log('info', 'Content created', {
+        userId: req.user.id,
+        req,
+        metadata: { content_id: content?.id, title, category }
+      });
+      
+      res.status(201).json(content);
+    } catch (error) {
+      console.error('Error creating content:', error);
+      await SystemLogger.logCriticalError('Content creation error', error as Error, { userId: req.user?.id, req });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear contenido');
+    }
+  });
+
+// Workout of Day Routes
+app.get('/api/workout-of-day', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching workout of day for user:', req.user.email);
+    const workout = await db
+      .selectFrom('workout_of_day')
+      .selectAll()
+      .where('is_active', '=', 1)
+      .orderBy('created_at', 'desc')
+      .executeTakeFirst();
+    
+    console.log('Workout of day fetched:', workout?.title || 'None');
+    res.json(workout);
+  } catch (error) {
+    console.error('Error fetching workout of day:', error);
+    await SystemLogger.logCriticalError('Workout of day fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener entrenamiento del día');
+  }
+});
+
+// User Files Routes
+app.get('/api/user-files', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const { file_type } = req.query;
+    
+    console.log('Fetching user files for:', userId, 'type:', file_type || 'all');
+    
+    let query = db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('user_id', '=', userId);
+    
+    if (file_type) {
+      query = query.where('file_type', '=', file_type as string);
+    }
+    
+    const files = await query
+      .orderBy('created_at', 'desc')
+      .execute();
+    
+    console.log('User files fetched:', files.length);
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching user files:', error);
+    await SystemLogger.logCriticalError('User files fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener archivos del usuario');
+  }
+});
+
+// Plans Routes
+app.get('/api/plans', async (req: express.Request, res: express.Response) => {
+  try {
+    console.log('Fetching all plans');
+    const plans = await db.selectFrom('plans').selectAll().execute();
+    console.log('Plans fetched:', plans.length);
+    
+    const formattedPlans = plans.map(plan => ({
+      ...plan,
+      services_included: JSON.parse(plan.services_included),
+      features: getUserFeatures(plan.features_json)
+    }));
+    
+    res.json(formattedPlans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
+  }
+});
+
+// Users Routes (Admin only)
+app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all users - requested by:', req.user.email);
+    const users = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'features_json', 'created_at'])
+      .execute();
+    console.log('Users fetched:', users.length);
+    
+    const formattedUsers = users.map(user => ({
+      ...user,
+      features: getUserFeatures(user.features_json)
+    }));
+    
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
+  }
+});
+
+// Test endpoint to verify admin user setup
+app.get('/api/test/admin-user', async (req: express.Request, res: express.Response) => {
+  try {
+    const adminUser = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'is_active', 'password_hash', 'plan_type', 'features_json'])
+      .where('email', '=', 'franciscodanielechs@gmail.com')
+      .executeTakeFirst();
+    
+    if (adminUser) {
+      console.log('Admin user found:', { ...adminUser, password_hash: adminUser.password_hash ? '[HIDDEN]' : 'NULL' });
+      res.json({ 
+        message: 'Admin user exists',
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          full_name: adminUser.full_name,
+          role: adminUser.role,
+          is_active: adminUser.is_active,
+          plan_type: adminUser.plan_type,
+          features: getUserFeatures(adminUser.features_json)
+        },
+        password_hash_exists: adminUser.password_hash ? 'Yes' : 'No'
+      });
+    } else {
+      console.log('Admin user not found');
+      res.status(404).json({ message: 'Admin user not found' });
+    }
+  } catch (error) {
+    console.error('Error checking admin user:', error);
+    await SystemLogger.logCriticalError('Admin user check error', error as Error, { req });
+    res.status(500).json({ error: 'Error checking admin user' });
+  }
+});
+
+// Daily Reset API Routes for Admin
+app.get('/api/admin/reset-history', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const history = await resetScheduler.getResetHistory(50);
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching reset history:', error);
+    await SystemLogger.logCriticalError('Reset history fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener historial de reset');
+  }
+});
+
+app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { date } = req.body;
+    console.log('Admin forcing reset for date:', date || 'today');
+    
+    await resetScheduler.forceReset(date);
+    res.json({ message: 'Reset ejecutado exitosamente' });
+  } catch (error) {
+    console.error('Error forcing reset:', error);
+    await SystemLogger.logCriticalError('Force reset error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al ejecutar reset forzado');
+  }
+});
+
+// Export a function to start the server
+export async function startServer(port: number) {
+  try {
+    // Initialize the daily reset scheduler
+    resetScheduler = new DailyResetScheduler();
+    
+    // Log CORS configuration in development
+    logCorsConfig();
+    
+    if (process.env.NODE_ENV === 'production') {
+      setupStaticServing(app);
+    }
+    
+    app.listen(port, () => {
+      console.log(`API Server running on port ${port}`);
+      console.log('Database connection established');
+      console.log('Authentication system initialized');
+      console.log('CORS system enabled with strict origin validation');
+      console.log('Rate limiting system enabled');
+      console.log('Role-based access control enabled');
+      console.log('Enhanced file upload system enabled');
+      console.log('User file management system ready');
+      console.log('Content library system enabled');
+      console.log('Meditation session tracking enabled');
+      console.log('Daily habits tracking enabled');
+      console.log('Daily reset scheduler initialized (00:05 AM Argentina time)');
+      console.log('System logging enabled with 90-day retention');
+      console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
+      console.log('Trust proxy enabled for rate limiting');
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
+}
+
+// Start the server directly if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  console.log('Starting server...');
+  startServer(parseInt(process.env.PORT || '3001'));
+}
