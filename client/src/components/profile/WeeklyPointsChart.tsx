@@ -1,18 +1,11 @@
 import * as React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useUserStats } from '@/hooks/api/use-user-stats';
 
-interface WeeklyPointsChartProps {
-  data: Array<{
-    date: string;
-    points: number;
-    steps: number;
-    meditationSessions: number;
-    meditationMinutes: number;
-  }>;
-}
+const WeeklyPointsChart: React.FC = () => {
+  const { data: userStats, isLoading } = useUserStats();
 
-const WeeklyPointsChart: React.FC<WeeklyPointsChartProps> = ({ data }) => {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const today = new Date();
@@ -49,6 +42,24 @@ const WeeklyPointsChart: React.FC<WeeklyPointsChartProps> = ({ data }) => {
     return null;
   };
 
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Puntos Diarios - Última Semana</CardTitle>
+          <CardDescription>Progreso de hábitos completados por día</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-sm text-muted-foreground">Cargando datos...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const weeklyData = userStats?.weekly?.dailyData || [];
+
   return (
     <Card>
       <CardHeader>
@@ -56,26 +67,35 @@ const WeeklyPointsChart: React.FC<WeeklyPointsChartProps> = ({ data }) => {
         <CardDescription>Progreso de hábitos completados por día</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                tickFormatter={formatDate}
-                fontSize={12}
-                stroke="#666"
-              />
-              <YAxis fontSize={12} stroke="#666" />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar 
-                dataKey="points" 
-                fill="#2563eb"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {weeklyData.length === 0 ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-muted-foreground">No hay datos disponibles</p>
+              <p className="text-sm text-muted-foreground mt-1">Completa hábitos para ver tu progreso</p>
+            </div>
+          </div>
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weeklyData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={formatDate}
+                  fontSize={12}
+                  stroke="#666"
+                />
+                <YAxis fontSize={12} stroke="#666" />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar 
+                  dataKey="points" 
+                  fill="#2563eb"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

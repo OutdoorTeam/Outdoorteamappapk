@@ -14,7 +14,7 @@ export interface HealthKitStepData {
 // Check if Google Fit is available (web)
 export const isGoogleFitAvailable = (): boolean => {
   return typeof window !== 'undefined' && 
-         typeof window.gapi !== 'undefined';
+         typeof (window as any).gapi !== 'undefined';
 };
 
 // Check if Apple HealthKit is available (iOS WebView or PWA)
@@ -29,24 +29,44 @@ export const isAppleHealthKitAvailable = (): boolean => {
 export const initializeGoogleFit = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (!isGoogleFitAvailable()) {
-      reject(new Error('Google API not available'));
+      reject(new Error('Google API no está disponible'));
       return;
     }
 
-    // @ts-ignore
-    window.gapi.load('auth2:client', async () => {
-      try {
-        // @ts-ignore
-        await window.gapi.client.init({
-          clientId: process.env.VITE_GOOGLE_CLIENT_ID || '',
-          scope: GOOGLE_FIT_CONFIG.scope,
-          discoveryDocs: GOOGLE_FIT_CONFIG.discoveryDocs,
-        });
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    });
+    // Load Google APIs if not already loaded
+    if (!(window as any).gapi?.load) {
+      const script = document.createElement('script');
+      script.src = 'https://apis.google.com/js/api.js';
+      script.onload = () => {
+        initializeAfterLoad();
+      };
+      script.onerror = () => {
+        reject(new Error('No se pudo cargar Google APIs'));
+      };
+      document.head.appendChild(script);
+    } else {
+      initializeAfterLoad();
+    }
+
+    function initializeAfterLoad() {
+      // @ts-ignore
+      window.gapi.load('auth2:client', async () => {
+        try {
+          // Get client ID from environment or use a placeholder
+          const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id';
+          
+          // @ts-ignore
+          await window.gapi.client.init({
+            clientId: clientId,
+            scope: GOOGLE_FIT_CONFIG.scope,
+            discoveryDocs: GOOGLE_FIT_CONFIG.discoveryDocs,
+          });
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
   });
 };
 
@@ -63,6 +83,11 @@ export const authenticateGoogleFit = async (): Promise<{
   try {
     // @ts-ignore
     const authInstance = window.gapi.auth2.getAuthInstance();
+    
+    if (!authInstance) {
+      throw new Error('Google Auth no está inicializado');
+    }
+
     const user = await authInstance.signIn();
     const authResponse = user.getAuthResponse();
 

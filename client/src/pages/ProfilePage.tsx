@@ -236,44 +236,14 @@ const ProfilePage: React.FC = () => {
               
               <div className="grid gap-6 md:grid-cols-2">
                 {/* Weekly Points Chart */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Puntos Semanales</CardTitle>
-                    <CardDescription>
-                      Tu progreso en los últimos 7 días
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <WeeklyPointsChart />
-                  </CardContent>
-                </Card>
+                <WeeklyPointsChart />
 
                 {/* Habit Completion Donut */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Distribución de Hábitos</CardTitle>
-                    <CardDescription>
-                      Porcentaje de completitud por categoría
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <HabitCompletionDonut />
-                  </CardContent>
-                </Card>
+                <HabitCompletionDonut />
               </div>
 
               {/* Monthly Habits Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Progreso Mensual</CardTitle>
-                  <CardDescription>
-                    Tendencia de tus hábitos en los últimos 30 días
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <MonthlyHabitsChart />
-                </CardContent>
-              </Card>
+              <MonthlyHabitsChart />
 
               {/* Full Achievements Grid */}
               <Card>

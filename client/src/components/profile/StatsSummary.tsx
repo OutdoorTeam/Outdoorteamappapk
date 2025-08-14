@@ -1,26 +1,42 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useUserStats } from '@/hooks/api/use-user-stats';
 import { Footprints, Brain, Target, TrendingUp } from 'lucide-react';
 
-interface StatsSummaryProps {
-  weeklyStats: {
-    totalPoints: number;
-    totalSteps: number;
-    totalMeditationSessions: number;
-    totalMeditationMinutes: number;
-    averageDailyPoints: number;
-  };
-  monthlyStats: {
-    totalPoints: number;
-    totalSteps: number;
-    totalMeditationSessions: number;
-    totalMeditationMinutes: number;
-  };
-}
+const StatsSummary: React.FC = () => {
+  const { data: userStats, isLoading } = useUserStats();
 
-const StatsSummary: React.FC<StatsSummaryProps> = ({ weeklyStats, monthlyStats }) => {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-1/2 mb-1"></div>
+                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (!userStats) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">No hay estadísticas disponibles</p>
+      </div>
+    );
+  }
+
+  const weeklyStats = userStats.weekly || {};
+  const monthlyStats = userStats.monthly || {};
+
   const stepsGoal = 10000 * 7; // 10k steps per day for a week
-  const stepsProgress = Math.min((weeklyStats.totalSteps / stepsGoal) * 100, 100);
+  const stepsProgress = Math.min(((weeklyStats.totalSteps || 0) / stepsGoal) * 100, 100);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
@@ -35,7 +51,7 @@ const StatsSummary: React.FC<StatsSummaryProps> = ({ weeklyStats, monthlyStats }
   const summaryCards = [
     {
       title: "Pasos Semanales",
-      value: formatNumber(weeklyStats.totalSteps),
+      value: formatNumber(weeklyStats.totalSteps || 0),
       description: `${stepsProgress.toFixed(0)}% del objetivo`,
       icon: Footprints,
       progress: stepsProgress,
@@ -43,21 +59,21 @@ const StatsSummary: React.FC<StatsSummaryProps> = ({ weeklyStats, monthlyStats }
     },
     {
       title: "Sesiones de Meditación",
-      value: weeklyStats.totalMeditationSessions,
-      description: `${weeklyStats.totalMeditationMinutes} min esta semana`,
+      value: weeklyStats.totalMeditationSessions || 0,
+      description: `${weeklyStats.totalMeditationMinutes || 0} min esta semana`,
       icon: Brain,
       color: "text-purple-600"
     },
     {
       title: "Promedio Diario",
-      value: weeklyStats.averageDailyPoints,
+      value: weeklyStats.averageDailyPoints || 0,
       description: "puntos por día",
       icon: Target,
       color: "text-green-600"
     },
     {
       title: "Puntos Mensuales",
-      value: monthlyStats.totalPoints,
+      value: monthlyStats.totalPoints || 0,
       description: "últimos 30 días",
       icon: TrendingUp,
       color: "text-orange-600"

@@ -24,9 +24,12 @@ export function useSaveNote() {
 
   return useMutation({
     mutationFn: (data: { content: string; date?: string }) =>
-      apiRequest('/api/daily-notes', {
+      apiRequest('/api/daily-notes/save', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          content: data.content,
+          date: data.date || new Date().toISOString().split('T')[0]
+        }),
       }),
     onSuccess: (data, variables) => {
       // Update the cache with the new note
