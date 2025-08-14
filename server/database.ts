@@ -162,6 +162,29 @@ export interface DatabaseSchema {
     next_send_at: string;
     created_at: string;
   };
+  achievements: {
+    id: number;
+    name: string;
+    description: string;
+    type: string;
+    category: string;
+    goal_value: number;
+    icon_url: string | null;
+    reward_type: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+  };
+  user_achievements: {
+    id: number;
+    user_id: number;
+    achievement_id: number;
+    progress_value: number;
+    achieved: number;
+    achieved_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 const dataDirectory = process.env.DATA_DIRECTORY || './data';
