@@ -155,9 +155,7 @@ const NutritionPage: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-600 mb-2">
                   Plan Personalizado en Preparación
                 </h3>
-                <p className="text-muted-foreground mb-6">
-                  La Lic. Ana Saloco está trabajando en crear un plan específico para ti.
-                </p>
+                <p className="text-muted-foreground mb-6"></p>
 
                 <div className="bg-gray-50 p-6 rounded-lg text-left max-w-2xl mx-auto">
                   <h4 className="font-medium mb-4">
@@ -280,81 +278,6 @@ const NutritionPage: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Hydration Tips */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              💧 Hidratación Inteligente
-            </CardTitle>
-            <CardDescription>Consejos para mantener una hidratación óptima</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">📊 Cantidad Recomendada</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• 8-10 vasos de agua al día (2-2.5 litros)</li>
-                  <li>• Aumenta en días calurosos o de ejercicio intenso</li>
-                  <li>• Distribuye el consumo a lo largo del día</li>
-                  <li>• Bebe un vaso al despertar</li>
-                  <li>• Hidrata antes, durante y después del ejercicio</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">🥤 Opciones Saludables</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• Agua natural como base principal</li>
-                  <li>• Infusiones de frutas naturales</li>
-                  <li>• Té verde o hierbas sin azúcar</li>
-                  <li>• Agua con limón para mejorar la digestión</li>
-                  <li>• Evita bebidas azucaradas y alcohol en exceso</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Meal Planning */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Planificación de Comidas</CardTitle>
-            <CardDescription>Organiza tu alimentación para obtener los mejores resultados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-orange-50 to-yellow-50">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">🍳</span>
-                </div>
-                <h4 className="font-semibold mb-2 text-orange-800">Preparación</h4>
-                <p className="text-sm text-orange-700">
-                  Dedica tiempo los domingos para planificar y preparar comidas de la semana
-                </p>
-              </div>
-              
-              <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">🛒</span>
-                </div>
-                <h4 className="font-semibold mb-2 text-blue-800">Compras</h4>
-                <p className="text-sm text-blue-700">
-                  Haz una lista de compras basada en tu plan nutricional para evitar tentaciones
-                </p>
-              </div>
-              
-              <div className="text-center p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">📝</span>
-                </div>
-                <h4 className="font-semibold mb-2 text-green-800">Seguimiento</h4>
-                <p className="text-sm text-green-700">
-                  Registra lo que comes para identificar patrones y áreas de mejora
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

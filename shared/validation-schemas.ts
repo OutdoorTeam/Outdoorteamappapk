@@ -181,16 +181,6 @@ export const systemLogSchema = z.object({
   metadata: z.record(z.unknown()).optional()
 });
 
-// Rate Limiting Schemas
-export const rateLimitConfigSchema = z.object({
-  windowMs: z.number().int().positive(),
-  maxRequests: z.number().int().positive(),
-  keyGenerator: z.function().optional(),
-  skipSuccessfulRequests: z.boolean().optional().default(false),
-  skipFailedRequests: z.boolean().optional().default(false),
-  customMessage: z.string().max(200).optional()
-});
-
 // Password Reset Schema (for future implementation)
 export const passwordResetRequestSchema = z.object({
   email: z.string()

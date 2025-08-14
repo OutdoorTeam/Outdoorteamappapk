@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { z } from 'zod';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
 import DailyResetScheduler from './scheduler.js';
@@ -32,7 +33,8 @@ import {
   meditationSessionSchema,
   fileUploadSchema,
   contentLibrarySchema,
-  broadcastMessageSchema
+  broadcastMessageSchema,
+  planAssignmentSchema
 } from '../shared/validation-schemas.js';
 
 dotenv.config();
@@ -370,7 +372,7 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
 // Plan Selection and Assignment
 app.post('/api/users/:id/assign-plan', 
   authenticateToken, 
-  validateRequest(z.object({ planId: z.number().int().positive() })),
+  validateRequest(planAssignmentSchema),
   async (req: any, res: express.Response) => {
     try {
       const { id } = req.params;
@@ -693,9 +695,6 @@ app.post('/api/daily-notes',
     }
   });
 
-// Continue with remaining routes...
-// (I'll include the rest in the next part to avoid making the response too long)
-
 // Meditation Sessions Routes with validation
 app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
   try {
@@ -753,7 +752,224 @@ app.post('/api/meditation-sessions',
     }
   });
 
-// Continue with rest of routes (truncated for space)...
+// Content Library Routes
+app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { category } = req.query;
+    console.log('Fetching content library for user:', req.user.email, 'category:', category);
+    
+    let query = db
+      .selectFrom('content_library')
+      .selectAll()
+      .where('is_active', '=', 1);
+    
+    if (category) {
+      query = query.where('category', '=', category as string);
+    }
+    
+    const content = await query.execute();
+    
+    console.log('Content library items fetched:', content.length);
+    res.json(content);
+  } catch (error) {
+    console.error('Error fetching content library:', error);
+    await SystemLogger.logCriticalError('Content library fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener biblioteca de contenido');
+  }
+});
+
+// Admin content management
+app.post('/api/content-library', 
+  authenticateToken, 
+  requireAdmin, 
+  validateRequest(contentLibrarySchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { title, description, video_url, category, subcategory } = req.body;
+      console.log('Admin creating content:', title, 'category:', category);
+      
+      const content = await db
+        .insertInto('content_library')
+        .values({
+          title,
+          description: description || null,
+          video_url: video_url || null,
+          category,
+          subcategory: subcategory || null,
+          is_active: 1,
+          created_at: new Date().toISOString()
+        })
+        .returning(['id', 'title', 'category'])
+        .executeTakeFirst();
+      
+      await SystemLogger.log('info', 'Content created', {
+        userId: req.user.id,
+        req,
+        metadata: { content_id: content?.id, title, category }
+      });
+      
+      res.status(201).json(content);
+    } catch (error) {
+      console.error('Error creating content:', error);
+      await SystemLogger.logCriticalError('Content creation error', error as Error, { userId: req.user?.id, req });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear contenido');
+    }
+  });
+
+// Workout of Day Routes
+app.get('/api/workout-of-day', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching workout of day for user:', req.user.email);
+    const workout = await db
+      .selectFrom('workout_of_day')
+      .selectAll()
+      .where('is_active', '=', 1)
+      .orderBy('created_at', 'desc')
+      .executeTakeFirst();
+    
+    console.log('Workout of day fetched:', workout?.title || 'None');
+    res.json(workout);
+  } catch (error) {
+    console.error('Error fetching workout of day:', error);
+    await SystemLogger.logCriticalError('Workout of day fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener entrenamiento del día');
+  }
+});
+
+// User Files Routes
+app.get('/api/user-files', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const { file_type } = req.query;
+    
+    console.log('Fetching user files for:', userId, 'type:', file_type || 'all');
+    
+    let query = db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('user_id', '=', userId);
+    
+    if (file_type) {
+      query = query.where('file_type', '=', file_type as string);
+    }
+    
+    const files = await query
+      .orderBy('created_at', 'desc')
+      .execute();
+    
+    console.log('User files fetched:', files.length);
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching user files:', error);
+    await SystemLogger.logCriticalError('User files fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener archivos del usuario');
+  }
+});
+
+// Plans Routes
+app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching all plans for user:', req.user.email);
+    const plans = await db.selectFrom('plans').selectAll().execute();
+    console.log('Plans fetched:', plans.length);
+    
+    const formattedPlans = plans.map(plan => ({
+      ...plan,
+      services_included: JSON.parse(plan.services_included),
+      features: getUserFeatures(plan.features_json)
+    }));
+    
+    res.json(formattedPlans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
+  }
+});
+
+// Users Routes (Admin only)
+app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all users - requested by:', req.user.email);
+    const users = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'features_json', 'created_at'])
+      .execute();
+    console.log('Users fetched:', users.length);
+    
+    const formattedUsers = users.map(user => ({
+      ...user,
+      features: getUserFeatures(user.features_json)
+    }));
+    
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
+  }
+});
+
+// Test endpoint to verify admin user setup
+app.get('/api/test/admin-user', async (req: express.Request, res: express.Response) => {
+  try {
+    const adminUser = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'is_active', 'password_hash', 'plan_type', 'features_json'])
+      .where('email', '=', 'franciscodanielechs@gmail.com')
+      .executeTakeFirst();
+    
+    if (adminUser) {
+      console.log('Admin user found:', { ...adminUser, password_hash: adminUser.password_hash ? '[HIDDEN]' : 'NULL' });
+      res.json({ 
+        message: 'Admin user exists',
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          full_name: adminUser.full_name,
+          role: adminUser.role,
+          is_active: adminUser.is_active,
+          plan_type: adminUser.plan_type,
+          features: getUserFeatures(adminUser.features_json)
+        },
+        password_hash_exists: adminUser.password_hash ? 'Yes' : 'No'
+      });
+    } else {
+      console.log('Admin user not found');
+      res.status(404).json({ message: 'Admin user not found' });
+    }
+  } catch (error) {
+    console.error('Error checking admin user:', error);
+    await SystemLogger.logCriticalError('Admin user check error', error as Error, { req });
+    res.status(500).json({ error: 'Error checking admin user' });
+  }
+});
+
+// Daily Reset API Routes for Admin
+app.get('/api/admin/reset-history', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const history = await resetScheduler.getResetHistory(50);
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching reset history:', error);
+    await SystemLogger.logCriticalError('Reset history fetch error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener historial de reset');
+  }
+});
+
+app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { date } = req.body;
+    console.log('Admin forcing reset for date:', date || 'today');
+    
+    await resetScheduler.forceReset(date);
+    res.json({ message: 'Reset ejecutado exitosamente' });
+  } catch (error) {
+    console.error('Error forcing reset:', error);
+    await SystemLogger.logCriticalError('Force reset error', error as Error, { userId: req.user?.id, req });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al ejecutar reset forzado');
+  }
+});
 
 // Export a function to start the server
 export async function startServer(port: number) {
