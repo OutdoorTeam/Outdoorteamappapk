@@ -25,7 +25,7 @@ const DashboardPage: React.FC = () => {
     steps: 0,
     daily_points: 0
   });
-  const [weeklyPoints, setWeeklyPoints] = React.useState(1);
+  const [weeklyPoints, setWeeklyPoints] = React.useState(0);
   const [dailyNote, setDailyNote] = React.useState('');
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [calendarData, setCalendarData] = React.useState<{[key: string]: number}>({});
@@ -137,6 +137,7 @@ const DashboardPage: React.FC = () => {
           [today]: updatedData.daily_points
         }));
 
+        // Refresh weekly points
         fetchDashboardData();
       }
     } catch (error) {
@@ -176,6 +177,7 @@ const DashboardPage: React.FC = () => {
           [today]: updatedData.daily_points
         }));
 
+        // Refresh weekly points
         fetchDashboardData();
       }
     } catch (error) {
@@ -233,33 +235,48 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const getHabitsForUser = () => {
+  const getAllHabits = () => {
     const habits = [];
 
-    if (user?.features.training) {
+    // Always show Exercise if user has training feature or is admin
+    if (user?.features.training || user?.role === 'admin') {
       habits.push({
         key: 'training_completed' as const,
         name: 'Ejercicio',
         description: 'Realizar la rutina de ejercicios del día',
-        completed: todayHabits.training_completed
+        completed: todayHabits.training_completed,
+        icon: '💪'
       });
     }
 
-    if (user?.features.nutrition) {
+    // Always show Nutrition if user has nutrition feature or is admin
+    if (user?.features.nutrition || user?.role === 'admin') {
       habits.push({
         key: 'nutrition_completed' as const,
         name: 'Alimentación',
         description: 'Seguir el plan nutricional del día',
-        completed: todayHabits.nutrition_completed
+        completed: todayHabits.nutrition_completed,
+        icon: '🥗'
       });
     }
 
-    if (user?.features.meditation) {
+    // Always show Steps - this is available to all users
+    habits.push({
+      key: 'movement_completed' as const,
+      name: 'Pasos diarios',
+      description: `Completar ${stepGoal.toLocaleString()} pasos`,
+      completed: todayHabits.movement_completed,
+      icon: '👟'
+    });
+
+    // Always show Meditation if user has meditation feature or is admin
+    if (user?.features.meditation || user?.role === 'admin') {
       habits.push({
         key: 'meditation_completed' as const,
         name: 'Respiración',
         description: 'Practicar ejercicios de respiración y relajación',
-        completed: todayHabits.meditation_completed
+        completed: todayHabits.meditation_completed,
+        icon: '🧘'
       });
     }
 
@@ -307,7 +324,7 @@ const DashboardPage: React.FC = () => {
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
   ];
 
-  const habits = getHabitsForUser();
+  const habits = getAllHabits();
   const completedHabitsCount = habits.filter(h => h.completed).length;
   const stepsProgress = Math.min((todayHabits.steps / stepGoal) * 100, 100);
 
@@ -350,20 +367,20 @@ const DashboardPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-gray-400 mb-1">Puntos Hoy</div>
-                  <div className="text-2xl font-bold text-[#D3B869]">{weeklyPoints}</div>
+                  <div className="text-2xl font-bold text-[#D3B869]">{todayHabits.daily_points}</div>
                 </div>
                 <div className="text-3xl">🏆</div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Hábitos */}
+          {/* Hábitos Completados */}
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-gray-400 mb-1">Hábitos</div>
-                  <div className="text-2xl font-bold text-[#D3B869]">{completedHabitsCount}</div>
+                  <div className="text-sm text-gray-400 mb-1">Hábitos Completados</div>
+                  <div className="text-2xl font-bold text-[#D3B869]">{completedHabitsCount}/{habits.length}</div>
                 </div>
                 <div className="text-3xl">⭐</div>
               </div>
@@ -393,7 +410,7 @@ const DashboardPage: React.FC = () => {
               <CardHeader>
                 <CardTitle className="text-[#D3B869] flex items-center gap-2">
                   👟 Contador de Pasos
-                  <span className="text-sm text-gray-400">Mantén un registro de tu actividad diaria</span>
+                  <span className="text-sm text-gray-400">Meta diaria: {stepGoal.toLocaleString()} pasos</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -401,11 +418,23 @@ const DashboardPage: React.FC = () => {
                   <div className="text-5xl font-bold text-white mb-2">
                     {todayHabits.steps.toLocaleString()}
                   </div>
-                  <div className="text-gray-400 text-sm mb-4">0.0%</div>
-                  <div className="text-gray-400 text-sm mb-6">{stepGoal.toLocaleString()} pasos</div>
+                  <div className="text-gray-400 text-sm mb-4">{stepsProgress.toFixed(1)}% de la meta</div>
+                  
+                  {/* Progress bar */}
+                  <div className="progress-bar mb-6 max-w-md mx-auto">
+                    <div className="progress-fill" style={{ width: `${stepsProgress}%` }}></div>
+                  </div>
                   
                   {/* Step adjustment buttons */}
                   <div className="flex justify-center items-center gap-4 mb-6">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => adjustSteps(-1000)}
+                      className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                    >
+                      -1000
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -414,23 +443,9 @@ const DashboardPage: React.FC = () => {
                     >
                       -100
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => adjustSteps(-100)}
-                      className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
-                    >
-                      -10
-                    </Button>
-                    <div className="text-2xl font-bold text-[#D3B869] px-4">0</div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => adjustSteps(100)}
-                      className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
-                    >
-                      +10
-                    </Button>
+                    <div className="text-lg font-bold text-[#D3B869] px-4 min-w-[80px] text-center">
+                      {todayHabits.steps}
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -439,21 +454,30 @@ const DashboardPage: React.FC = () => {
                     >
                       +100
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => adjustSteps(1000)}
+                      className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                    >
+                      +1000
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* ¿Cómo te fue hoy? */}
+            {/* ¿Cómo te fue hoy? - All 4 habits */}
             <Card className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <CardTitle className="text-[#D3B869]">¿Cómo te fue hoy?</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {habits.map((habit) => (
-                    <div key={habit.key} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                    <div key={habit.key} className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
                       <div className="flex items-center gap-3">
+                        <div className="text-2xl">{habit.icon}</div>
                         <div>
                           <div className="font-medium text-white">{habit.name}</div>
                           <div className="text-sm text-gray-400">{habit.description}</div>
@@ -462,41 +486,18 @@ const DashboardPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-[#D3B869] font-bold">+1</span>
                         <button
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
                             habit.completed 
                               ? 'bg-[#D3B869] border-[#D3B869] text-black' 
-                              : 'border-[#D3B869] text-[#D3B869]'
+                              : 'border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869]/20'
                           }`}
                           onClick={() => updateHabit(habit.key, !habit.completed)}
                         >
-                          {habit.completed && <Check size={16} />}
+                          {habit.completed && <Check size={18} />}
                         </button>
                       </div>
                     </div>
                   ))}
-
-                  {/* Steps habit */}
-                  <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <div className="font-medium text-white">Pasos diarios</div>
-                        <div className="text-sm text-gray-400">Completar la meta establecida</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#D3B869] font-bold">+1</span>
-                      <button
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                          todayHabits.movement_completed 
-                            ? 'bg-[#D3B869] border-[#D3B869] text-black' 
-                            : 'border-[#D3B869] text-[#D3B869]'
-                        }`}
-                        onClick={() => updateHabit('movement_completed', !todayHabits.movement_completed)}
-                      >
-                        {todayHabits.movement_completed && <Check size={16} />}
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -508,7 +509,7 @@ const DashboardPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <Textarea
-                  placeholder="Escriba tus reflexiones del día, logros, retos, etc..."
+                  placeholder="Escribe tus reflexiones del día, logros, retos, etc..."
                   value={dailyNote}
                   onChange={(e) => setDailyNote(e.target.value)}
                   onBlur={saveNote}
@@ -571,10 +572,33 @@ const DashboardPage: React.FC = () => {
                           day.points > 0 ? 'bg-yellow-600' : ''}
                         ${!day.isToday && day.points === 0 ? 'hover:bg-gray-700' : ''}
                       `}
+                      title={`${day.points} puntos`}
                     >
                       {day.date.getDate()}
                     </div>
                   ))}
+                </div>
+
+                {/* Legend */}
+                <div className="mt-4 text-xs text-gray-400">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-600 rounded"></div>
+                      <span>4 puntos</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                      <span>2-3 puntos</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-600 rounded"></div>
+                      <span>1 punto</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 border border-gray-600 rounded"></div>
+                      <span>0 puntos</span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
