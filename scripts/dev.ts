@@ -1,47 +1,28 @@
-import { startServer } from '../server/index.js';
+import { spawn } from 'child_process';
 import { createServer } from 'vite';
 
-let viteServer;
+// Start the Express server
+const serverProcess = spawn('node', ['dist/server/index.js'], {
+  stdio: 'inherit',
+  env: { ...process.env, NODE_ENV: 'development' }
+});
 
-async function startDev() {
-  // Start the Express API server first
-  await startServer(3001);
+// Start Vite dev server
+const viteServer = await createServer({
+  configFile: './vite.config.js',
+});
 
-  // Then start Vite in dev mode
-  const viteServer = await createServer({
-    configFile: './vite.config.js',
-  });
+await viteServer.listen();
+console.log(`Vite dev server running on port ${viteServer.config.server.port}`);
 
-  const x = await viteServer.listen();
-  console.log(
-    `Vite dev server running on port ${viteServer.config.server.port}`,
-  );
-}
+// Handle cleanup
+process.on('SIGTERM', () => {
+  serverProcess.kill();
+  viteServer.close();
+});
 
-// Handle nodemon restarts - only needed if we're running under nodemon
-if (
-  process.env.npm_lifecycle_event &&
-  process.env.npm_lifecycle_event.includes('watch')
-) {
-  let isRestarting = false;
-
-  process.once('SIGUSR2', async () => {
-    if (isRestarting) return;
-    isRestarting = true;
-
-    console.log('Nodemon restart detected, closing Vite server...');
-    if (viteServer) {
-      try {
-        await viteServer.close();
-        console.log('Vite server closed successfully');
-      } catch (err) {
-        console.error('Error closing Vite server:', err);
-      }
-    }
-
-    // Allow nodemon to restart the process
-    process.kill(process.pid, 'SIGUSR2');
-  });
-}
-
-startDev();
+process.on('SIGINT', () => {
+  serverProcess.kill();
+  viteServer.close();
+  process.exit(0);
+});

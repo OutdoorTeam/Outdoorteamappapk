@@ -61,6 +61,9 @@ export interface DatabaseSchema {
     user_id: number;
     steps: number;
     date: string;
+    source: string;
+    synced_at: string | null;
+    timezone: string | null;
     created_at: string;
   };
   user_files: {
@@ -182,6 +185,19 @@ export interface DatabaseSchema {
     progress_value: number;
     achieved: number;
     achieved_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+  user_step_sync: {
+    id: number;
+    user_id: number;
+    google_fit_enabled: number;
+    apple_health_enabled: number;
+    google_fit_token: string | null;
+    apple_health_authorized: number;
+    last_sync_date: string | null;
+    last_sync_at: string | null;
+    sync_errors: string | null;
     created_at: string;
     updated_at: string;
   };
