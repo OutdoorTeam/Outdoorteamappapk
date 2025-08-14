@@ -36,6 +36,19 @@ export interface DatabaseSchema {
     created_at: string;
     updated_at: string;
   };
+  daily_history: {
+    id: number;
+    user_id: number;
+    date: string;
+    daily_points: number;
+    steps: number;
+    training_completed: number;
+    nutrition_completed: number;
+    movement_completed: number;
+    meditation_completed: number;
+    notes_content: string | null;
+    archived_at: string;
+  };
   user_notes: {
     id: number;
     user_id: number;
@@ -104,6 +117,30 @@ export interface DatabaseSchema {
     breathing_cycle_json: string | null;
     comment: string | null;
     completed_at: string;
+  };
+  daily_reset_log: {
+    id: number;
+    reset_date: string;
+    executed_at: string;
+    users_processed: number;
+    total_daily_points: number;
+    total_steps: number;
+    total_notes: number;
+    status: string;
+    error_message: string | null;
+    execution_time_ms: number;
+    created_at: string;
+  };
+  system_logs: {
+    id: number;
+    level: string;
+    event: string;
+    user_id: number | null;
+    route: string | null;
+    ip_address: string | null;
+    user_agent: string | null;
+    metadata: string | null;
+    created_at: string;
   };
 }
 

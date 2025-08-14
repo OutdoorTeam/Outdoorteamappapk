@@ -1,22 +1,36 @@
 import * as React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { loginSchema, LoginFormData } from '../../shared/validation-schemas';
+import { apiRequest, parseApiError, getErrorMessage, isAuthError, focusFirstInvalidField } from '@/utils/error-handling';
+import { Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
-  
-  const { login, loginWithGoogle, user } = useAuth();
+  const [showPassword, setShowPassword] = React.useState(false);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   
   const from = (location.state as any)?.from?.pathname || '/';
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    setValue
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    mode: 'onBlur'
+  });
 
   React.useEffect(() => {
     if (user) {
@@ -28,46 +42,70 @@ const LoginPage: React.FC = () => {
     }
   }, [user, navigate, from]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
+  const onSubmit = async (data: LoginFormData) => {
     try {
-      console.log('Attempting login with:', { email, passwordLength: password.length });
-      await login(email, password);
-    } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.message || 'Error al iniciar sesión');
-    } finally {
-      setIsLoading(false);
+      const response = await apiRequest<{ user: any; token: string }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      localStorage.setItem('auth_token', response.token);
+      
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: `Bienvenido ${response.user.full_name}`,
+        variant: "success",
+      });
+
+      // The useEffect will handle navigation based on user role
+      window.location.reload(); // Force reload to update auth context
+    } catch (error) {
+      const apiError = parseApiError(error);
+      
+      if (isAuthError(apiError)) {
+        setError('email', { message: 'Credenciales inválidas' });
+        setError('password', { message: 'Credenciales inválidas' });
+      } else {
+        toast({
+          title: "Error al iniciar sesión",
+          description: getErrorMessage(apiError),
+          variant: "destructive",
+        });
+      }
+
+      focusFirstInvalidField();
     }
   };
 
   const handleGoogleLogin = async () => {
-    setError('');
-    try {
-      await loginWithGoogle();
-    } catch (error: any) {
-      console.error('Google login error:', error);
-      setError(error.message || 'Error con el login de Google');
-    }
+    toast({
+      title: "Función no disponible",
+      description: "El login con Google aún no está implementado. Por favor usa email y contraseña.",
+      variant: "warning",
+    });
+  };
+
+  const handleFillAdminCredentials = () => {
+    setValue('email', 'franciscodanielechs@gmail.com');
+    setValue('password', 'admin123');
   };
 
   const handleTestAdmin = async () => {
     try {
       const response = await fetch('/api/test/admin-user');
       const data = await response.json();
-      console.log('Admin user test:', data);
-      alert(`Admin user test: ${JSON.stringify(data, null, 2)}`);
+      toast({
+        title: "Test de usuario admin",
+        description: `Estado: ${data.message}`,
+        variant: "default",
+      });
     } catch (error) {
-      console.error('Error testing admin user:', error);
+      toast({
+        title: "Error en test",
+        description: "No se pudo verificar el usuario admin",
+        variant: "destructive",
+      });
     }
-  };
-
-  const handleFillAdminCredentials = () => {
-    setEmail('franciscodanielechs@gmail.com');
-    setPassword('admin123');
   };
 
   if (user) {
@@ -89,39 +127,64 @@ const LoginPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md text-sm">
-                {error}
-              </div>
-            )}
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="Ingresa tu correo electrónico"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
+                  {...register('email')}
+                  disabled={isSubmitting}
+                  aria-invalid={!!errors.email}
+                  className={errors.email ? 'border-red-500' : ''}
                 />
+                {errors.email && (
+                  <p className="text-sm text-red-600" role="alert">
+                    {errors.email.message}
+                  </p>
+                )}
               </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Ingresa tu contraseña"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={isLoading}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Ingresa tu contraseña"
+                    {...register('password')}
+                    disabled={isSubmitting}
+                    aria-invalid={!!errors.password}
+                    className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isSubmitting}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">
+                      {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    </span>
+                  </Button>
+                </div>
+                {errors.password && (
+                  <p className="text-sm text-red-600" role="alert">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
+
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>
 
@@ -141,7 +204,7 @@ const LoginPage: React.FC = () => {
                 variant="outline"
                 className="w-full mt-4"
                 onClick={handleGoogleLogin}
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
                 Continuar con Google
               </Button>
@@ -168,6 +231,7 @@ const LoginPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleFillAdminCredentials}
+                  disabled={isSubmitting}
                 >
                   Usar credenciales admin
                 </Button>
@@ -176,6 +240,7 @@ const LoginPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleTestAdmin}
+                  disabled={isSubmitting}
                 >
                   Verificar usuario admin
                 </Button>
