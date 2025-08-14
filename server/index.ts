@@ -7,12 +7,16 @@ import path from 'path';
 import fs from 'fs';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
+import DailyResetScheduler from './scheduler.js';
 
 dotenv.config();
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
+
+// Initialize daily reset scheduler
+let resetScheduler: DailyResetScheduler;
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
@@ -985,6 +989,41 @@ app.get('/api/files/:id', authenticateToken, async (req: any, res: express.Respo
   }
 });
 
+// Daily Reset API Routes for Admin
+app.get('/api/admin/reset-history', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const history = await resetScheduler.getResetHistory(50);
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching reset history:', error);
+    res.status(500).json({ error: 'Error al obtener historial de reset' });
+  }
+});
+
+app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { date } = req.body;
+    console.log('Admin forcing reset for date:', date || 'today');
+    
+    await resetScheduler.forceReset(date);
+    res.json({ message: 'Reset ejecutado exitosamente' });
+  } catch (error) {
+    console.error('Error forcing reset:', error);
+    res.status(500).json({ error: 'Error al ejecutar reset forzado' });
+  }
+});
+
+app.get('/api/admin/reset-status/:date', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { date } = req.params;
+    const status = await resetScheduler.getResetStatus(date);
+    res.json(status);
+  } catch (error) {
+    console.error('Error checking reset status:', error);
+    res.status(500).json({ error: 'Error al verificar estado del reset' });
+  }
+});
+
 // Test endpoint to verify admin user setup
 app.get('/api/test/admin-user', async (req: express.Request, res: express.Response) => {
   try {
@@ -1286,6 +1325,9 @@ app.post('/api/broadcast', authenticateToken, requireAdmin, async (req: any, res
 // Export a function to start the server
 export async function startServer(port: number) {
   try {
+    // Initialize the daily reset scheduler
+    resetScheduler = new DailyResetScheduler();
+    
     if (process.env.NODE_ENV === 'production') {
       setupStaticServing(app);
     }
@@ -1299,6 +1341,7 @@ export async function startServer(port: number) {
       console.log('Content library system enabled');
       console.log('Meditation session tracking enabled');
       console.log('Daily habits tracking enabled');
+      console.log('Daily reset scheduler initialized (00:05 AM Argentina time)');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
     });
   } catch (err) {
