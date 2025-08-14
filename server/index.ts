@@ -26,6 +26,12 @@ import {
   checkLoginBlock
 } from './middleware/rate-limiter.js';
 import {
+  createCorsMiddleware,
+  corsErrorHandler,
+  securityHeaders,
+  logCorsConfig
+} from './config/cors.js';
+import {
   registerSchema,
   loginSchema,
   dailyHabitsUpdateSchema,
@@ -88,15 +94,24 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
+// Security headers for all routes
+app.use(securityHeaders);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Apply CORS only to API routes
+app.use('/api/', createCorsMiddleware('/api'));
+
+// CORS error handler (must be after CORS middleware)
+app.use(corsErrorHandler);
 
 // Apply global rate limiting to all API routes
 app.use('/api/', globalApiLimit);
 app.use('/api/', burstLimit);
 
-// Health check endpoint (exempted from rate limiting)
+// Health check endpoint (exempted from rate limiting and CORS)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -867,9 +882,9 @@ app.get('/api/user-files', authenticateToken, async (req: any, res: express.Resp
 });
 
 // Plans Routes
-app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
+app.get('/api/plans', async (req: express.Request, res: express.Response) => {
   try {
-    console.log('Fetching all plans for user:', req.user.email);
+    console.log('Fetching all plans');
     const plans = await db.selectFrom('plans').selectAll().execute();
     console.log('Plans fetched:', plans.length);
     
@@ -882,7 +897,7 @@ app.get('/api/plans', authenticateToken, async (req: any, res: express.Response)
     res.json(formattedPlans);
   } catch (error) {
     console.error('Error fetching plans:', error);
-    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { req });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
   }
 });
@@ -977,6 +992,9 @@ export async function startServer(port: number) {
     // Initialize the daily reset scheduler
     resetScheduler = new DailyResetScheduler();
     
+    // Log CORS configuration in development
+    logCorsConfig();
+    
     if (process.env.NODE_ENV === 'production') {
       setupStaticServing(app);
     }
@@ -985,6 +1003,7 @@ export async function startServer(port: number) {
       console.log(`API Server running on port ${port}`);
       console.log('Database connection established');
       console.log('Authentication system initialized');
+      console.log('CORS system enabled with strict origin validation');
       console.log('Rate limiting system enabled');
       console.log('Role-based access control enabled');
       console.log('Enhanced file upload system enabled');
