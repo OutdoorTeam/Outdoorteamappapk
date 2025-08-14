@@ -1,6 +1,3 @@
-// Web Push VAPID keys - In production, these should be environment variables
-const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa40HnYmN7J21ZiNvJGDCG6n_bHUXP5Y8v_dKfNwvRz4rHNL8HpEPYWnSAAMoI';
-
 // Check if browser supports notifications
 export const isNotificationSupported = (): boolean => {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -37,6 +34,30 @@ export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration
   }
 };
 
+// Get VAPID public key from server
+export const getVapidPublicKey = async (): Promise<string> => {
+  try {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch('/api/notifications/vapid-public-key', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get VAPID public key');
+    }
+
+    const data = await response.json();
+    return data.publicKey;
+  } catch (error) {
+    console.error('Error getting VAPID public key:', error);
+    // Fallback to default key for development
+    return 'BEl62iUYgUivxIkv69yViEuiBIa40HnYmN7J21ZiNvJGDCG6n_bHUXP5Y8v_dKfNwvRz4rHNL8HpEPYWnSAAMoI';
+  }
+};
+
 // Convert VAPID key
 const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -56,9 +77,11 @@ const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
 // Subscribe to push notifications
 export const subscribeToPushNotifications = async (registration: ServiceWorkerRegistration) => {
   try {
+    const publicKey = await getVapidPublicKey();
+    
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
 
     console.log('Push subscription:', subscription);
@@ -100,8 +123,8 @@ export const saveSubscriptionToServer = async (subscription: PushSubscription) =
     const subscriptionData = {
       endpoint: subscription.endpoint,
       keys: {
-        p256dh: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('p256dh')!))),
-        auth: btoa(String.fromCharCode.apply(null, new Uint8Array(subscription.getKey('auth')!)))
+        p256dh: btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(subscription.getKey('p256dh')!)))),
+        auth: btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(subscription.getKey('auth')!))))
       }
     };
 
@@ -115,7 +138,8 @@ export const saveSubscriptionToServer = async (subscription: PushSubscription) =
     });
 
     if (!response.ok) {
-      throw new Error('Error guardando suscripción');
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Error guardando suscripción');
     }
 
     const result = await response.json();

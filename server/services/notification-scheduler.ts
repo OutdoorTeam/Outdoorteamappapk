@@ -1,32 +1,84 @@
-import cron from 'node-cron';
 import { db } from '../database.js';
 import { SystemLogger } from '../utils/logging.js';
-import webPush from 'web-push';
 
 class NotificationScheduler {
   private isRunning = false;
-  private cronJob: cron.ScheduledTask | null = null;
+  private cronJob: any = null;
+  private webPush: any = null;
+  private isConfigured = false;
 
   constructor() {
     this.initializeScheduler();
   }
 
-  private initializeScheduler() {
-    // Run every minute to check for due notifications
-    this.cronJob = cron.schedule('* * * * *', async () => {
-      await this.processNotifications();
-    }, {
-      scheduled: true,
-      timezone: 'America/Argentina/Buenos_Aires'
-    });
+  private async initializeWebPush() {
+    if (this.isConfigured) return true;
 
-    console.log('Notification scheduler initialized - checking every minute');
+    try {
+      // Dynamically import node-cron and web-push
+      const cronModule = await import('node-cron');
+      const webPushModule = await import('web-push');
+      
+      this.webPush = webPushModule.default;
+
+      const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+      const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+      const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
+
+      // Check if VAPID keys are properly configured
+      if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE') {
+        console.warn('VAPID keys not configured. Notification scheduler will not send push notifications.');
+        return false;
+      }
+
+      // Validate key format
+      if (VAPID_PRIVATE_KEY.length < 32) {
+        console.warn('VAPID private key appears to be invalid. Notification scheduler disabled.');
+        return false;
+      }
+
+      this.webPush.setVapidDetails(
+        `mailto:${VAPID_EMAIL}`,
+        VAPID_PUBLIC_KEY,
+        VAPID_PRIVATE_KEY
+      );
+
+      this.isConfigured = true;
+      console.log('Notification scheduler Web Push configured successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to configure notification scheduler Web Push:', error);
+      return false;
+    }
+  }
+
+  private async initializeScheduler() {
+    try {
+      const cronModule = await import('node-cron');
+      
+      // Run every minute to check for due notifications
+      this.cronJob = cronModule.default.schedule('* * * * *', async () => {
+        await this.processNotifications();
+      }, {
+        scheduled: true,
+        timezone: 'America/Argentina/Buenos_Aires'
+      });
+
+      console.log('Notification scheduler initialized - checking every minute');
+    } catch (error) {
+      console.error('Failed to initialize notification scheduler:', error);
+    }
   }
 
   public async processNotifications(): Promise<void> {
     if (this.isRunning) {
-      console.log('Notification processing already running, skipping...');
       return;
+    }
+
+    // Initialize web push if not already done
+    const isWebPushReady = await this.initializeWebPush();
+    if (!isWebPushReady) {
+      return; // Skip processing if web push is not configured
     }
 
     this.isRunning = true;
@@ -59,11 +111,11 @@ class NotificationScheduler {
         .where('user_notifications.push_endpoint', 'is not', null)
         .execute();
 
-      console.log(`Found ${dueJobs.length} due notifications`);
-
       if (dueJobs.length === 0) {
         return;
       }
+
+      console.log(`Found ${dueJobs.length} due notifications`);
 
       // Process each notification
       const results = await Promise.allSettled(
@@ -95,16 +147,18 @@ class NotificationScheduler {
         }
       }
 
-      await SystemLogger.log('info', 'Notification batch processed', {
-        metadata: { 
-          processed: dueJobs.length, 
-          sent: sentCount, 
-          failed: failedCount,
-          timestamp: currentTime
-        }
-      });
+      if (sentCount > 0 || failedCount > 0) {
+        await SystemLogger.log('info', 'Notification batch processed', {
+          metadata: { 
+            processed: dueJobs.length, 
+            sent: sentCount, 
+            failed: failedCount,
+            timestamp: currentTime
+          }
+        });
 
-      console.log(`Notification processing complete: ${sentCount} sent, ${failedCount} failed`);
+        console.log(`Notification processing complete: ${sentCount} sent, ${failedCount} failed`);
+      }
     } catch (error) {
       console.error('Error processing notifications:', error);
       await SystemLogger.logCriticalError('Notification processing error', error as Error);
@@ -164,7 +218,7 @@ class NotificationScheduler {
         timestamp: new Date().getTime()
       });
 
-      await webPush.sendNotification(pushSubscription, payload);
+      await this.webPush.sendNotification(pushSubscription, payload);
       console.log(`Habit reminder sent to user ${job.user_id} for ${habitName}`);
     } catch (error) {
       console.error(`Error sending habit reminder to user ${job.user_id}:`, error);
@@ -174,6 +228,12 @@ class NotificationScheduler {
 
   public async sendProgressAlert(userId: number, type: 'weekly_goal_close' | 'weekly_goal_achieved', data: any): Promise<void> {
     try {
+      const isWebPushReady = await this.initializeWebPush();
+      if (!isWebPushReady) {
+        console.log('Web Push not configured, skipping progress alert');
+        return;
+      }
+
       console.log(`Sending progress alert to user ${userId}:`, type);
 
       const userNotification = await db
@@ -221,7 +281,7 @@ class NotificationScheduler {
         data
       });
 
-      await webPush.sendNotification(pushSubscription, payload);
+      await this.webPush.sendNotification(pushSubscription, payload);
       console.log(`Progress alert sent to user ${userId}`);
     } catch (error) {
       console.error(`Error sending progress alert to user ${userId}:`, error);
@@ -231,6 +291,12 @@ class NotificationScheduler {
 
   public async sendAdminBroadcast(title: string, body: string, url?: string): Promise<{ sent: number; failed: number }> {
     try {
+      const isWebPushReady = await this.initializeWebPush();
+      if (!isWebPushReady) {
+        console.log('Web Push not configured, cannot send admin broadcast');
+        return { sent: 0, failed: 0 };
+      }
+
       console.log('Sending admin broadcast:', { title, body });
 
       const subscriptions = await db
@@ -270,7 +336,7 @@ class NotificationScheduler {
               keys: JSON.parse(subscription.push_keys!)
             };
             
-            await webPush.sendNotification(pushSubscription, payload);
+            await this.webPush.sendNotification(pushSubscription, payload);
           })
         );
 

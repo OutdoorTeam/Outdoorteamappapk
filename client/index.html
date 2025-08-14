@@ -11,9 +11,33 @@
     <meta name="description" content="Academia de Hábitos Saludables - Outdoor Team" />
     <meta name="keywords" content="salud, hábitos, entrenamiento, nutrición, meditación" />
     <title>Outdoor Team - Academia de Hábitos Saludables</title>
+    
+    <!-- PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Outdoor Team" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Preload Service Worker -->
+    <link rel="preload" href="/sw.js" as="script" />
   </head>
   <body>
     <div id="root" class="contents"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Register Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+              console.log('SW registered with scope: ', registration.scope);
+            })
+            .catch(function(registrationError) {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

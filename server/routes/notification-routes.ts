@@ -3,20 +3,62 @@ import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
-import webPush from 'web-push';
 
 const router = Router();
 
-// Configure Web Push
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa40HnYmN7J21ZiNvJGDCG6n_bHUXP5Y8v_dKfNwvRz4rHNL8HpEPYWnSAAMoI';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'YOUR_PRIVATE_KEY_HERE';
-const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
+// Lazy-load web-push and configure it only when needed
+let webPush: any = null;
+let isWebPushConfigured = false;
 
-webPush.setVapidDetails(
-  `mailto:${VAPID_EMAIL}`,
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
+const initializeWebPush = async () => {
+  if (isWebPushConfigured) return true;
+
+  try {
+    const webPushModule = await import('web-push');
+    webPush = webPushModule.default;
+
+    const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+    const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+    const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
+
+    // Check if VAPID keys are properly configured
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE') {
+      console.warn('VAPID keys not properly configured. Push notifications will be disabled.');
+      console.warn('To enable push notifications, set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.');
+      console.warn('Generate VAPID keys using: npx web-push generate-vapid-keys');
+      return false;
+    }
+
+    // Validate key format
+    if (VAPID_PRIVATE_KEY.length < 32) {
+      console.warn('VAPID private key appears to be invalid (too short). Push notifications disabled.');
+      return false;
+    }
+
+    webPush.setVapidDetails(
+      `mailto:${VAPID_EMAIL}`,
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
+    );
+
+    isWebPushConfigured = true;
+    console.log('Web Push configured successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to configure Web Push:', error);
+    return false;
+  }
+};
+
+// Middleware to check if push notifications are available
+const requirePushSupport = async (req: any, res: any, next: any) => {
+  const isConfigured = await initializeWebPush();
+  if (!isConfigured) {
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Las notificaciones push no están disponibles en este momento');
+    return;
+  }
+  next();
+};
 
 // Get user notification preferences
 router.get('/preferences', authenticateToken, async (req: any, res) => {
@@ -136,7 +178,7 @@ router.put('/preferences', authenticateToken, async (req: any, res) => {
 });
 
 // Subscribe to push notifications
-router.post('/subscribe', authenticateToken, async (req: any, res) => {
+router.post('/subscribe', authenticateToken, requirePushSupport, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const { endpoint, keys } = req.body;
@@ -223,7 +265,7 @@ router.post('/unsubscribe', authenticateToken, async (req: any, res) => {
 });
 
 // Send test notification
-router.post('/test', authenticateToken, async (req: any, res) => {
+router.post('/test', authenticateToken, requirePushSupport, async (req: any, res) => {
   try {
     const userId = req.user.id;
     console.log('Sending test notification to user:', userId);
@@ -272,7 +314,7 @@ router.post('/test', authenticateToken, async (req: any, res) => {
 });
 
 // Send broadcast notification (admin only)
-router.post('/broadcast', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/broadcast', authenticateToken, requireAdmin, requirePushSupport, async (req: any, res) => {
   try {
     const { title, body, url } = req.body;
     console.log('Sending broadcast notification:', { title, body });
@@ -361,22 +403,52 @@ router.post('/mark-complete', async (req, res) => {
 
     console.log(`Marking habit ${habitKey} complete for user ${userId} on ${date}`);
 
-    // Update habit completion
-    await db
-      .insertInto('daily_habits')
-      .values({
-        user_id: userId,
-        date,
+    // Get current record first
+    const currentRecord = await db
+      .selectFrom('daily_habits')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', date)
+      .executeTakeFirst();
+
+    if (currentRecord) {
+      // Update existing record
+      const updateData = {
         [habitKey]: 1,
-        daily_points: 1, // This will be recalculated by the update logic
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      })
-      .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({
-        [habitKey]: 1,
-        updated_at: new Date().toISOString()
-      }))
-      .execute();
+      };
+
+      // Recalculate daily points
+      const newData = {
+        training_completed: habitKey === 'training_completed' ? 1 : currentRecord.training_completed,
+        nutrition_completed: habitKey === 'nutrition_completed' ? 1 : currentRecord.nutrition_completed,
+        movement_completed: habitKey === 'movement_completed' ? 1 : currentRecord.movement_completed,
+        meditation_completed: habitKey === 'meditation_completed' ? 1 : currentRecord.meditation_completed
+      };
+
+      const dailyPoints = Object.values(newData).reduce((sum, completed) => sum + (completed ? 1 : 0), 0);
+      updateData.daily_points = dailyPoints;
+
+      await db
+        .updateTable('daily_habits')
+        .set(updateData)
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .execute();
+    } else {
+      // Create new record
+      await db
+        .insertInto('daily_habits')
+        .values({
+          user_id: userId,
+          date,
+          [habitKey]: 1,
+          daily_points: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .execute();
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -435,5 +507,16 @@ async function updateNotificationJobs(userId: number, habits: string[], times: R
     throw error;
   }
 }
+
+// Get VAPID public key for client
+router.get('/vapid-public-key', (req, res) => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  if (!publicKey) {
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'VAPID public key not configured');
+    return;
+  }
+  
+  res.json({ publicKey });
+});
 
 export default router;
