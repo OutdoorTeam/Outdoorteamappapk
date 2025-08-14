@@ -24,9 +24,11 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string()
     .min(1, 'Email es requerido')
-    .email('Formato de email inválido'),
+    .email('Formato de email inválido')
+    .max(255, 'Email no puede exceder 255 caracteres'),
   password: z.string()
     .min(1, 'Contraseña es requerida')
+    .max(128, 'Contraseña no puede exceder 128 caracteres')
 });
 
 // Daily Habits Schemas
@@ -179,6 +181,38 @@ export const systemLogSchema = z.object({
   metadata: z.record(z.unknown()).optional()
 });
 
+// Rate Limiting Schemas
+export const rateLimitConfigSchema = z.object({
+  windowMs: z.number().int().positive(),
+  maxRequests: z.number().int().positive(),
+  keyGenerator: z.function().optional(),
+  skipSuccessfulRequests: z.boolean().optional().default(false),
+  skipFailedRequests: z.boolean().optional().default(false),
+  customMessage: z.string().max(200).optional()
+});
+
+// Password Reset Schema (for future implementation)
+export const passwordResetRequestSchema = z.object({
+  email: z.string()
+    .min(1, 'Email es requerido')
+    .email('Formato de email inválido')
+    .max(255, 'Email no puede exceder 255 caracteres')
+});
+
+export const passwordResetConfirmSchema = z.object({
+  token: z.string()
+    .min(1, 'Token es requerido')
+    .max(255, 'Token inválido'),
+  password: z.string()
+    .min(8, 'Contraseña debe tener al menos 8 caracteres')
+    .max(128, 'Contraseña no puede exceder 128 caracteres')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Contraseña debe contener al menos una minúscula, una mayúscula y un número'),
+  confirmPassword: z.string()
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'Las contraseñas no coinciden',
+  path: ['confirmPassword']
+});
+
 // Helper types for TypeScript
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type LoginFormData = z.infer<typeof loginSchema>;
@@ -193,3 +227,5 @@ export type BroadcastMessageData = z.infer<typeof broadcastMessageSchema>;
 export type ProfileUpdateData = z.infer<typeof profileUpdateSchema>;
 export type UserFeaturesData = z.infer<typeof userFeaturesSchema>;
 export type SystemLogData = z.infer<typeof systemLogSchema>;
+export type PasswordResetRequestData = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetConfirmData = z.infer<typeof passwordResetConfirmSchema>;
