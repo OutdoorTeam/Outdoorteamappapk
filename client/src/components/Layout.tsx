@@ -167,10 +167,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     // Minimal header for dashboard with bottom navigation
     return (
       <div className="min-h-screen">
-        <nav className="bg-black border-b border-gray-800 px-4 py-2">
+        <nav className="bg-black border-b border-[#D3B869] px-4 py-2">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <Link to="/" className="text-xl font-bold text-[#D3B869]">
-              Academia de Hábitos Saludables
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/assets/logo-gold.png" 
+                alt="Outdoor Team Logo" 
+                className="h-10 w-auto"
+              />
             </Link>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-300">
@@ -190,7 +194,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <main className="pb-20">{children}</main>
 
         {/* Bottom Navigation for logged-in users */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 px-1 py-2 z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-[#D3B869] border-t border-gray-800 px-1 py-2 z-50">
           <div className="grid grid-cols-4 gap-0.5 max-w-md mx-auto">
             {navigationItems.slice(0, 8).map((item) => (
               <Link
@@ -198,9 +202,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 to={item.available ? item.path : "#"}
                 className={`flex flex-col items-center space-y-1 px-1 py-1 rounded-lg transition-colors ${
                   isActive(item.path)
-                    ? "text-[#D3B869]"
+                    ? "text-black bg-black/10"
                     : item.available
-                      ? "text-gray-400 hover:text-[#D3B869]"
+                      ? "text-black hover:text-black hover:bg-black/5"
                       : "text-gray-600 cursor-not-allowed"
                 }`}
                 onClick={(e) => {
@@ -226,11 +230,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   if (user && user.role === "user") {
     return (
       <div className="min-h-screen bg-background">
-        <nav className="border-b bg-white shadow-sm">
+        <nav className="border-b bg-[#D3B869] shadow-sm">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
-              <Link to="/" className="text-xl font-bold text-brand-black">
-                Outdoor Team
+              <Link to="/" className="flex items-center">
+                <img 
+                  src="/assets/logo-black.png" 
+                  alt="Outdoor Team Logo" 
+                  className="h-10 w-auto"
+                />
               </Link>
 
               {/* Desktop Navigation */}
@@ -239,12 +247,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link
                     key={item.path}
                     to={item.available ? item.path : "#"}
-                    className={`hover:text-brand-gold transition-colors ${
+                    className={`hover:text-black transition-colors font-medium ${
                       isActive(item.path)
-                        ? "text-brand-gold font-medium"
+                        ? "text-black font-bold"
                         : item.available
-                          ? "text-brand-black"
-                          : "text-gray-400 cursor-not-allowed"
+                          ? "text-gray-800"
+                          : "text-gray-500 cursor-not-allowed"
                     }`}
                     onClick={(e) => {
                       if (!item.available) {
@@ -263,14 +271,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
 
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-black font-medium">
                     Hola, {user.full_name.split(" ")[0]}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-brand-gold text-brand-black hover:bg-brand-gold hover:text-brand-black"
+                    className="border-black text-black hover:bg-black hover:text-[#D3B869]"
                   >
                     Cerrar Sesión
                   </Button>
@@ -280,14 +288,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {/* Mobile Navigation */}
               <div className="md:hidden">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-black font-medium">
                     {user.full_name.split(" ")[0]}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-brand-gold text-brand-black hover:bg-brand-gold hover:text-brand-black"
+                    className="border-black text-black hover:bg-black hover:text-[#D3B869]"
                   >
                     Salir
                   </Button>
@@ -300,7 +308,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <main className="flex-1 pb-20 md:pb-0">{children}</main>
 
         {/* Bottom Navigation for Mobile */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-1 py-2 z-50">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#D3B869] border-t shadow-lg px-1 py-2 z-50">
           <div className="grid grid-cols-4 gap-0.5">
             {navigationItems.slice(0, 8).map((item) => (
               <Link
@@ -308,10 +316,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 to={item.available ? item.path : "#"}
                 className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
                   isActive(item.path)
-                    ? "text-brand-gold bg-brand-gold/10"
+                    ? "text-black bg-black/10 font-bold"
                     : item.available
-                      ? "text-brand-black hover:text-brand-gold"
-                      : "text-gray-400 cursor-not-allowed"
+                      ? "text-black hover:text-black hover:bg-black/5"
+                      : "text-gray-600 cursor-not-allowed"
                 }`}
                 onClick={(e) => {
                   if (!item.available) {
@@ -341,17 +349,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <nav className="border-b bg-white shadow-sm">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link to="/" className="text-xl font-bold text-brand-black">
-              Outdoor Team
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/assets/logo-with-text-black.png" 
+                alt="Outdoor Team Logo" 
+                className="h-12 w-auto"
+              />
             </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
               <Link
                 to="/"
-                className={`hover:text-brand-gold transition-colors ${
+                className={`hover:text-[#D3B869] transition-colors ${
                   isActive("/")
-                    ? "text-brand-gold font-medium"
+                    ? "text-[#D3B869] font-medium"
                     : "text-brand-black"
                 }`}
               >
@@ -360,9 +372,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
               <Link
                 to="/planes"
-                className={`hover:text-brand-gold transition-colors ${
+                className={`hover:text-[#D3B869] transition-colors ${
                   isActive("/planes")
-                    ? "text-brand-gold font-medium"
+                    ? "text-[#D3B869] font-medium"
                     : "text-brand-black"
                 }`}
               >
@@ -374,9 +386,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   {user.role === "admin" ? (
                     <Link
                       to="/admin"
-                      className={`hover:text-brand-gold transition-colors ${
+                      className={`hover:text-[#D3B869] transition-colors ${
                         isActive("/admin")
-                          ? "text-brand-gold font-medium"
+                          ? "text-[#D3B869] font-medium"
                           : "text-brand-black"
                       }`}
                     >
@@ -385,9 +397,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   ) : (
                     <Link
                       to="/dashboard"
-                      className={`hover:text-brand-gold transition-colors ${
+                      className={`hover:text-[#D3B869] transition-colors ${
                         isActive("/dashboard")
-                          ? "text-brand-gold font-medium"
+                          ? "text-[#D3B869] font-medium"
                           : "text-brand-black"
                       }`}
                     >
@@ -401,7 +413,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-brand-gold text-brand-black hover:bg-brand-gold hover:text-brand-black"
+                    className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                   >
                     Cerrar Sesión
                   </Button>
@@ -412,7 +424,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="border-brand-gold text-brand-black hover:bg-brand-gold hover:text-brand-black"
+                      className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                     >
                       Iniciar Sesión
                     </Button>
@@ -420,7 +432,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/register">
                     <Button
                       size="sm"
-                      className="bg-brand-gold hover:bg-brand-gold/90 text-brand-black"
+                      className="bg-[#D3B869] hover:bg-[#D3B869]/90 text-black"
                     >
                       Registrarse
                     </Button>
@@ -440,7 +452,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-brand-gold text-brand-black hover:bg-brand-gold hover:text-brand-black"
+                    className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
                   >
                     Salir
                   </Button>
@@ -448,14 +460,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               ) : (
                 <div className="flex items-center space-x-1">
                   <Link to="/login">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                    >
                       Login
                     </Button>
                   </Link>
                   <Link to="/register">
                     <Button
                       size="sm"
-                      className="bg-brand-gold text-brand-black"
+                      className="bg-[#D3B869] text-black hover:bg-[#D3B869]/90"
                     >
                       Sign Up
                     </Button>
