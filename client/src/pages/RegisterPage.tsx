@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { registerSchema, RegisterFormData } from '../../shared/validation-schemas';
+import { registerSchema, RegisterFormData } from '../../../shared/validation-schemas';
 import { apiRequest, parseApiError, getErrorMessage, getFieldErrors, focusFirstInvalidField, setFormErrors } from '@/utils/error-handling';
 import { Eye, EyeOff } from 'lucide-react';
 

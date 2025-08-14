@@ -55,6 +55,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './client/src'),
+        // Add alias for shared folder
+        '~shared': path.resolve(__dirname, './shared'),
       },
     },
     root: path.join(process.cwd(), 'client'),
@@ -77,6 +79,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
       },
+      // Allow access to shared folder from client
+      fs: {
+        allow: ['..']
+      }
     },
     // Enable source maps for development
     css: {

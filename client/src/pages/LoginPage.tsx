@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { loginSchema, LoginFormData } from '../../shared/validation-schemas';
+import { loginSchema, LoginFormData } from '../../../shared/validation-schemas';
 import { apiRequest, parseApiError, getErrorMessage, isAuthError, focusFirstInvalidField } from '@/utils/error-handling';
 import { Eye, EyeOff } from 'lucide-react';
 
