@@ -5,10 +5,8 @@ import { apiRequest } from '@/utils/error-handling';
 export const ACHIEVEMENT_KEYS = {
   all: ['achievements'] as const,
   userAchievements: () => [...ACHIEVEMENT_KEYS.all, 'user'] as const,
-  leaderboards: () => [...ACHIEVEMENT_KEYS.all, 'leaderboards'] as const,
-  stepsLeaderboard: (month?: string) => [...ACHIEVEMENT_KEYS.leaderboards(), 'steps', month] as const,
-  habitsLeaderboard: (month?: string) => [...ACHIEVEMENT_KEYS.leaderboards(), 'habits', month] as const,
-  admin: () => [...ACHIEVEMENT_KEYS.all, 'admin'] as const,
+  adminAchievements: () => [...ACHIEVEMENT_KEYS.all, 'admin'] as const,
+  leaderboard: (type: string, month?: string) => [...ACHIEVEMENT_KEYS.all, 'leaderboard', type, month] as const,
 };
 
 // Hook for user achievements
@@ -17,42 +15,34 @@ export function useUserAchievements() {
     queryKey: ACHIEVEMENT_KEYS.userAchievements(),
     queryFn: () => apiRequest('/api/achievements/user-achievements'),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// Hook for admin achievements management
+export function useAdminAchievements() {
+  return useQuery({
+    queryKey: ACHIEVEMENT_KEYS.adminAchievements(),
+    queryFn: () => apiRequest('/api/achievements/admin/achievements'),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
 // Hook for steps leaderboard
 export function useStepsLeaderboard(month?: string) {
   return useQuery({
-    queryKey: ACHIEVEMENT_KEYS.stepsLeaderboard(month),
-    queryFn: () => {
-      const params = month ? `?month=${month}` : '';
-      return apiRequest(`/api/achievements/leaderboard/steps${params}`);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: true,
+    queryKey: ACHIEVEMENT_KEYS.leaderboard('steps', month),
+    queryFn: () => apiRequest(`/api/achievements/leaderboard/steps${month ? `?month=${month}` : ''}`),
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
 // Hook for habits leaderboard
 export function useHabitsLeaderboard(month?: string) {
   return useQuery({
-    queryKey: ACHIEVEMENT_KEYS.habitsLeaderboard(month),
-    queryFn: () => {
-      const params = month ? `?month=${month}` : '';
-      return apiRequest(`/api/achievements/leaderboard/habits${params}`);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: true,
-  });
-}
-
-// Hook for admin achievements
-export function useAdminAchievements() {
-  return useQuery({
-    queryKey: ACHIEVEMENT_KEYS.admin(),
-    queryFn: () => apiRequest('/api/achievements/admin/achievements'),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ACHIEVEMENT_KEYS.leaderboard('habits', month),
+    queryFn: () => apiRequest(`/api/achievements/leaderboard/habits${month ? `?month=${month}` : ''}`),
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
@@ -74,7 +64,8 @@ export function useCreateAchievement() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.admin() });
+      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.adminAchievements() });
+      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.userAchievements() });
     },
   });
 }
@@ -86,22 +77,23 @@ export function useUpdateAchievement() {
   return useMutation({
     mutationFn: ({ id, data }: { 
       id: number; 
-      data: {
-        name?: string;
-        description?: string;
-        type?: 'fixed' | 'progressive';
-        category?: 'exercise' | 'nutrition' | 'daily_steps' | 'meditation';
-        goal_value?: number;
-        icon_url?: string;
-        is_active?: boolean;
-      }
+      data: Partial<{
+        name: string;
+        description: string;
+        type: 'fixed' | 'progressive';
+        category: 'exercise' | 'nutrition' | 'daily_steps' | 'meditation';
+        goal_value: number;
+        icon_url: string;
+        is_active: boolean;
+      }>;
     }) =>
       apiRequest(`/api/achievements/admin/achievements/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.admin() });
+      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.adminAchievements() });
+      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.userAchievements() });
     },
   });
 }
@@ -116,7 +108,8 @@ export function useDeleteAchievement() {
         method: 'DELETE',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.admin() });
+      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.adminAchievements() });
+      queryClient.invalidateQueries({ queryKey: ACHIEVEMENT_KEYS.userAchievements() });
     },
   });
 }

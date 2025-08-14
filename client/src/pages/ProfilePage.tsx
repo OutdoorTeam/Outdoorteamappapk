@@ -12,7 +12,9 @@ import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
 import StatsSummary from '@/components/profile/StatsSummary';
 import NotificationSettings from '@/components/profile/NotificationSettings';
 import StepSyncSettings from '@/components/profile/StepSyncSettings';
-import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, Smartphone } from 'lucide-react';
+import LeaderboardTabs from '@/components/profile/LeaderboardTabs';
+import AchievementsGrid from '@/components/profile/AchievementsGrid';
+import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, Smartphone, Trophy } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const { user } = useAuth();
@@ -32,7 +34,7 @@ const ProfilePage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Resumen</span>
@@ -40,6 +42,10 @@ const ProfilePage: React.FC = () => {
           <TabsTrigger value="stats" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             <span className="hidden sm:inline">Estadísticas</span>
+          </TabsTrigger>
+          <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+            <Trophy className="w-4 h-4" />
+            <span className="hidden sm:inline">Rankings</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Activity className="w-4 h-4" />
@@ -199,6 +205,22 @@ const ProfilePage: React.FC = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Achievements Preview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-600" />
+                Logros Recientes
+              </CardTitle>
+              <CardDescription>
+                Tus últimos logros conseguidos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AchievementsGrid preview={true} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Statistics Tab */}
@@ -252,8 +274,29 @@ const ProfilePage: React.FC = () => {
                   <MonthlyHabitsChart />
                 </CardContent>
               </Card>
+
+              {/* Full Achievements Grid */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-600" />
+                    Todos tus Logros
+                  </CardTitle>
+                  <CardDescription>
+                    Progreso completo de logros y objetivos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AchievementsGrid />
+                </CardContent>
+              </Card>
             </div>
           )}
+        </TabsContent>
+
+        {/* Leaderboard Tab */}
+        <TabsContent value="leaderboard" className="space-y-6">
+          <LeaderboardTabs />
         </TabsContent>
 
         {/* Notifications Tab */}
