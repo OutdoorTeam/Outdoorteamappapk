@@ -60,7 +60,7 @@ export const meditationSessionSchema = z.object({
     .min(1, 'Duración mínima es 1 minuto')
     .max(120, 'Duración máxima es 120 minutos'),
   meditation_type: z.enum(['guided', 'free'], {
-    errorMap: () => ({ message: 'Tipo de meditación debe ser "guided" o "free"' })
+    message: 'Tipo de meditación debe ser "guided" o "free"'
   }),
   comment: z.string()
     .max(500, 'Comentario no puede exceder 500 caracteres')
@@ -100,7 +100,7 @@ export const fileUploadSchema = z.object({
     .int('ID de usuario debe ser un número entero')
     .positive('ID de usuario debe ser positivo'),
   file_type: z.enum(['training', 'nutrition'], {
-    errorMap: () => ({ message: 'Tipo de archivo debe ser "training" o "nutrition"' })
+    message: 'Tipo de archivo debe ser "training" o "nutrition"'
   }),
   replace_existing: z.string().optional().transform(val => val === 'true')
 });
@@ -127,7 +127,7 @@ export const contentLibrarySchema = z.object({
     .regex(/^https:\/\/(www\.)?(youtube\.com|youtu\.be)/, 'Debe ser una URL de YouTube válida')
     .optional(),
   category: z.enum(['exercise', 'meditation', 'active_breaks', 'nutrition'], {
-    errorMap: () => ({ message: 'Categoría debe ser válida' })
+    message: 'Categoría debe ser válida'
   }),
   subcategory: z.string()
     .max(100, 'Subcategoría no puede exceder 100 caracteres')

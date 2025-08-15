@@ -413,7 +413,7 @@ router.post('/mark-complete', async (req, res) => {
 
     if (currentRecord) {
       // Update existing record
-      const updateData = {
+      const updateData: any = {
         [habitKey]: 1,
         updated_at: new Date().toISOString()
       };

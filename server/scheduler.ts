@@ -23,7 +23,6 @@ class DailyResetScheduler {
     this.cronJob = cron.schedule('5 0 * * *', async () => {
       await this.executeDailyReset();
     }, {
-      scheduled: true,
       timezone: 'America/Argentina/Buenos_Aires'
     });
 

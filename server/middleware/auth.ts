@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../database.js';
 import { SystemLogger } from '../utils/logging.js';
-import { ERROR_CODES, sendErrorResponse } from '../utils/validation.js';
+import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 

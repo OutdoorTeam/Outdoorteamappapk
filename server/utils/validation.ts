@@ -42,9 +42,9 @@ export function validateRequest<T>(
 
       if (!result.success) {
         const fieldErrors: Record<string, string> = {};
-        result.error.errors.forEach(err => {
-          const path = err.path.join('.');
-          fieldErrors[path] = err.message;
+        result.error.issues.forEach(issue => {
+          const path = issue.path.join('.');
+          fieldErrors[path] = issue.message;
         });
 
         const errorResponse: ApiErrorResponse = {

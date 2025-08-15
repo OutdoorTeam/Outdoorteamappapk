@@ -60,7 +60,6 @@ class NotificationScheduler {
       this.cronJob = cronModule.default.schedule('* * * * *', async () => {
         await this.processNotifications();
       }, {
-        scheduled: true,
         timezone: 'America/Argentina/Buenos_Aires'
       });
 
