@@ -1,40 +1,39 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#D3B869" />
-    <meta name="description" content="Academia de Hábitos Saludables - Outdoor Team" />
-    <meta name="keywords" content="salud, hábitos, entrenamiento, nutrición, meditación" />
+    <meta name="description" content="Outdoor Team - Academia de Hábitos Saludables. Entrenamiento, Nutrición, Meditación y más." />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- OpenGraph Meta Tags -->
+    <meta property="og:title" content="Outdoor Team - Academia de Hábitos Saludables" />
+    <meta property="og:description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/assets/logo-gold.png" />
+    
     <title>Outdoor Team - Academia de Hábitos Saludables</title>
-    
-    <!-- PWA meta tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Outdoor Team" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    
-    <!-- Preload Service Worker -->
-    <link rel="preload" href="/sw.js" as="script" />
   </head>
   <body>
-    <div id="root" class="contents"></div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- Register Service Worker -->
+    <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
+        window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(function(registration) {
-              console.log('SW registered with scope: ', registration.scope);
+            .then((registration) => {
+              console.log('Service Worker registered successfully:', registration.scope);
             })
-            .catch(function(registrationError) {
-              console.log('SW registration failed: ', registrationError);
+            .catch((error) => {
+              console.log('Service Worker registration failed:', error);
             });
         });
       }

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "vite build && tsc --project tsconfig.server.json",
-    "start": "tsx watch scripts/dev.ts"
+    "start": "tsx watch scripts/dev.ts",
+    "generate-vapid": "node scripts/generate-vapid.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

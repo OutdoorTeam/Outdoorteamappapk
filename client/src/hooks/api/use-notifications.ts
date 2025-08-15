@@ -1,87 +1,126 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
-import { NotificationPreferences } from '@/utils/notifications';
 
-// Query keys
-export const NOTIFICATIONS_KEYS = {
-  all: ['notifications'] as const,
-  preferences: () => [...NOTIFICATIONS_KEYS.all, 'preferences'] as const,
+export interface NotificationPreferences {
+  enabled: boolean;
+  habits: string[];
+  times: Record<string, string>;
+  push_endpoint?: string | null;
+}
+
+export interface BroadcastNotificationData {
+  title: string;
+  body: string;
+  url?: string;
+}
+
+export interface BroadcastNotificationResult {
+  success: boolean;
+  sent: number;
+  failed: number;
+  message?: string;
+}
+
+// Get user notification preferences
+export const useNotificationPreferences = () => {
+  return useQuery({
+    queryKey: ['notification-preferences'],
+    queryFn: async () => {
+      return apiRequest<NotificationPreferences>('/api/notifications/preferences');
+    },
+    retry: 2,
+    staleTime: 30000, // 30 seconds
+  });
 };
 
-// Hook for user notification preferences
-export function useNotificationPreferences() {
-  return useQuery({
-    queryKey: NOTIFICATIONS_KEYS.preferences(),
-    queryFn: () => apiRequest('/api/notifications/preferences'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false,
-  });
-}
-
-// Mutation for updating notification preferences
-export function useUpdateNotificationPreferences() {
+// Update notification preferences
+export const useUpdateNotificationPreferences = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
-    mutationFn: (preferences: NotificationPreferences) =>
-      apiRequest('/api/notifications/preferences', {
+    mutationFn: async (data: { enabled: boolean; habits: string[]; times: Record<string, string> }) => {
+      return apiRequest<NotificationPreferences>('/api/notifications/preferences', {
         method: 'PUT',
-        body: JSON.stringify(preferences),
-      }),
+        body: JSON.stringify(data),
+      });
+    },
     onSuccess: (data) => {
-      // Update the cache with new preferences
-      queryClient.setQueryData(NOTIFICATIONS_KEYS.preferences(), data);
+      // Update the cached preferences
+      queryClient.setQueryData(['notification-preferences'], data);
+    },
+    onError: (error) => {
+      console.error('Failed to update notification preferences:', error);
     },
   });
-}
+};
 
-// Mutation for subscribing to push notifications
-export function useSubscribeToPush() {
+// Subscribe to push notifications
+export const useSubscribeToPushNotifications = () => {
+  const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: (subscriptionData: {
-      endpoint: string;
-      keys: { p256dh: string; auth: string };
-    }) =>
-      apiRequest('/api/notifications/subscribe', {
+    mutationFn: async (subscriptionData: { endpoint: string; keys: { p256dh: string; auth: string } }) => {
+      return apiRequest<{ success: boolean }>('/api/notifications/subscribe', {
         method: 'POST',
         body: JSON.stringify(subscriptionData),
-      }),
-  });
-}
-
-// Mutation for unsubscribing from push notifications
-export function useUnsubscribeFromPush() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () =>
-      apiRequest('/api/notifications/unsubscribe', {
-        method: 'POST',
-      }),
+      });
+    },
     onSuccess: () => {
-      // Invalidate preferences to reflect unsubscription
-      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEYS.preferences() });
+      // Refresh preferences to get updated subscription status
+      queryClient.invalidateQueries({ queryKey: ['notification-preferences'] });
     },
   });
-}
+};
 
-// Mutation for sending test notification
-export function useSendTestNotification() {
+// Unsubscribe from push notifications
+export const useUnsubscribeFromPushNotifications = () => {
+  const queryClient = useQueryClient();
+  
   return useMutation({
-    mutationFn: () =>
-      apiRequest('/api/notifications/test', {
+    mutationFn: async () => {
+      return apiRequest<{ success: boolean }>('/api/notifications/unsubscribe', {
         method: 'POST',
-      }),
+      });
+    },
+    onSuccess: () => {
+      // Refresh preferences to reflect unsubscribed state
+      queryClient.invalidateQueries({ queryKey: ['notification-preferences'] });
+    },
   });
-}
+};
 
-// Mutation for admin broadcast notifications
-export function useSendBroadcastNotification() {
+// Send test notification
+export const useSendTestNotification = () => {
   return useMutation({
-    mutationFn: (data: { title: string; body: string; url?: string }) =>
-      apiRequest('/api/notifications/broadcast', {
+    mutationFn: async () => {
+      return apiRequest<{ success: boolean }>('/api/notifications/test', {
+        method: 'POST',
+      });
+    },
+  });
+};
+
+// Send broadcast notification (admin only)
+export const useSendBroadcastNotification = () => {
+  return useMutation({
+    mutationFn: async (data: BroadcastNotificationData) => {
+      return apiRequest<BroadcastNotificationResult>('/api/notifications/broadcast', {
         method: 'POST',
         body: JSON.stringify(data),
-      }),
+      });
+    },
   });
-}
+};
+
+// Get VAPID public key
+export const useVapidPublicKey = () => {
+  return useQuery({
+    queryKey: ['vapid-public-key'],
+    queryFn: async () => {
+      const response = await apiRequest<{ publicKey: string }>('/api/notifications/vapid-public-key');
+      return response.publicKey;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+  });
+};

@@ -25,8 +25,16 @@ export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js');
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none'
+    });
+    
     console.log('Service Worker registrado:', registration);
+    
+    // Wait for service worker to be ready
+    await navigator.serviceWorker.ready;
+    
     return registration;
   } catch (error) {
     console.error('Error registrando Service Worker:', error);
@@ -207,7 +215,7 @@ export const setupPushNotifications = async (): Promise<PushSubscription> => {
     // Request permission
     const permission = await requestNotificationPermission();
     if (permission !== 'granted') {
-      throw new Error('Permisos de notificación denegados');
+      throw new Error('Permisos de notificación denegados. Para activar las notificaciones:\n\n1. Haz clic en el ícono de candado en la barra de direcciones\n2. Cambia "Notificaciones" a "Permitir"\n3. Recarga esta página');
     }
 
     // Initialize service worker and subscription
@@ -234,10 +242,12 @@ export const sendTestNotification = async () => {
     }
 
     new Notification('Outdoor Team - Test', {
-      body: 'Esta es una notificación de prueba',
+      body: 'Esta es una notificación de prueba desde el navegador',
       icon: '/assets/logo-gold.png',
       badge: '/assets/logo-gold.png',
-      vibrate: [100, 50, 100]
+      vibrate: [100, 50, 100],
+      tag: 'test-notification',
+      requireInteraction: false
     });
   } catch (error) {
     console.error('Error sending test notification:', error);
