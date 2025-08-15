@@ -11,272 +11,412 @@ import MonthlyHabitsChart from '@/components/profile/MonthlyHabitsChart';
 import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
 import StatsSummary from '@/components/profile/StatsSummary';
 import NotificationSettings from '@/components/profile/NotificationSettings';
-import StepSyncSettings from '@/components/profile/StepSyncSettings';
-import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, Smartphone } from 'lucide-react';
+import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, TrendingUp, Bell } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
-  const { data: userStats, isLoading: statsLoading } = useUserStats();
+  const { user, refreshUser } = useAuth();
+  const { data: userStats, isLoading: statsLoading, error: statsError } = useUserStats(user?.id || 0);
+
+  const getSubscriptionStatus = () => {
+    if (!user?.plan_type) return 'Sin plan';
+    
+    // Since we don't have subscription status in the database, we'll show active for any plan
+    return 'Activo';
+  };
+
+  const getSubscriptionColor = () => {
+    const status = getSubscriptionStatus();
+    if (status === 'Activo') return 'text-green-600';
+    if (status === 'Sin plan') return 'text-gray-500';
+    return 'text-yellow-600';
+  };
+
+  const getPlanIcon = () => {
+    if (!user?.plan_type) return <User className="w-5 h-5" />;
+    
+    if (user.plan_type === 'Programa Totum') return <Crown className="w-5 h-5 text-purple-600" />;
+    if (user.plan_type.includes('Entrenamiento Personalizado')) return <Star className="w-5 h-5 text-blue-600" />;
+    return <Activity className="w-5 h-5 text-green-600" />;
+  };
 
   if (!user) {
-    return null;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Cargando perfil...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Mi Perfil</h1>
-        <p className="text-muted-foreground">
-          Gestiona tu información personal, estadísticas y configuraciones
-        </p>
+        <p className="text-muted-foreground">Información de tu cuenta, estadísticas y configuración</p>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
+      <Tabs defaultValue="profile" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            <span className="hidden sm:inline">Resumen</span>
+            Información Personal
           </TabsTrigger>
-          <TabsTrigger value="stats" className="flex items-center gap-2">
+          <TabsTrigger value="statistics" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
-            <span className="hidden sm:inline">Estadísticas</span>
+            Estadísticas
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Activity className="w-4 h-4" />
-            <span className="hidden sm:inline">Notificaciones</span>
-          </TabsTrigger>
-          <TabsTrigger value="sync" className="flex items-center gap-2">
-            <Smartphone className="w-4 h-4" />
-            <span className="hidden sm:inline">Sincronización</span>
+            <Bell className="w-4 h-4" />
+            Notificaciones
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Personal Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-blue-600" />
-                  Información Personal
-                </CardTitle>
-                <CardDescription>
-                  Tu información básica y detalles de la cuenta
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="full-name">Nombre Completo</Label>
-                  <Input
-                    id="full-name"
-                    value={user.full_name}
-                    readOnly
-                    className="bg-muted"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico</Label>
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      value={user.email}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="member-since">Miembro Desde</Label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="member-since"
-                      value={new Date(user.created_at).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                </div>
-
-                {user.role === 'admin' && (
-                  <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <Crown className="w-4 h-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-800">
-                      Cuenta de Administrador
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Plan Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="w-5 h-5 text-purple-600" />
-                  Plan Actual
-                </CardTitle>
-                <CardDescription>
-                  Tu plan activo y funcionalidades disponibles
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Plan</Label>
-                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <span className="font-semibold text-purple-800">
-                      {user.plan_type || 'Sin plan asignado'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Funcionalidades Disponibles</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { key: 'training', label: 'Entrenamiento', icon: '💪' },
-                      { key: 'nutrition', label: 'Nutrición', icon: '🥗' },
-                      { key: 'meditation', label: 'Meditación', icon: '🧘' },
-                      { key: 'active_breaks', label: 'Pausas Activas', icon: '☕' },
-                    ].map((feature) => (
-                      <div
-                        key={feature.key}
-                        className={`p-2 rounded-lg border text-sm ${
-                          user.features?.[feature.key as keyof typeof user.features]
-                            ? 'bg-green-50 border-green-200 text-green-800'
-                            : 'bg-gray-50 border-gray-200 text-gray-600'
-                        }`}
-                      >
-                        <span className="mr-2">{feature.icon}</span>
-                        {feature.label}
-                        {user.features?.[feature.key as keyof typeof user.features] ? (
-                          <span className="ml-2 text-green-600">✓</span>
-                        ) : (
-                          <span className="ml-2 text-gray-400">✗</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {(!user.plan_type || user.plan_type === 'Sin plan asignado') && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-700 mb-2">
-                      ¿Quieres acceder a más funcionalidades?
-                    </p>
-                    <Button 
-                      size="sm" 
-                      className="bg-blue-600 hover:bg-blue-700"
-                      onClick={() => window.location.href = '/plans'}
-                    >
-                      Ver Planes Disponibles
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Quick Stats Summary */}
-          {!statsLoading && userStats && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Resumen de Actividad</CardTitle>
-                <CardDescription>
-                  Un vistazo rápido a tu progreso reciente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <StatsSummary />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* Statistics Tab */}
-        <TabsContent value="stats" className="space-y-6">
-          {statsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-sm text-muted-foreground">Cargando estadísticas...</div>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              {/* Summary Stats */}
-              <StatsSummary />
-              
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Weekly Points Chart */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Puntos Semanales</CardTitle>
-                    <CardDescription>
-                      Tu progreso en los últimos 7 días
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <WeeklyPointsChart />
-                  </CardContent>
-                </Card>
-
-                {/* Habit Completion Donut */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Distribución de Hábitos</CardTitle>
-                    <CardDescription>
-                      Porcentaje de completitud por categoría
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <HabitCompletionDonut />
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Monthly Habits Chart */}
+        <TabsContent value="profile" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Profile Information */}
+            <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Progreso Mensual</CardTitle>
-                  <CardDescription>
-                    Tendencia de tus hábitos en los últimos 30 días
-                  </CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Información Personal
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Nombre Completo</Label>
+                      <Input
+                        id="fullName"
+                        value={user.full_name}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Correo Electrónico</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={user.email}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Rol</Label>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                        {user.role === 'admin' ? (
+                          <>
+                            <Crown className="w-4 h-4 text-red-600" />
+                            <span className="text-red-600 font-medium">Administrador</span>
+                          </>
+                        ) : (
+                          <>
+                            <User className="w-4 h-4 text-blue-600" />
+                            <span className="text-blue-600 font-medium">Usuario</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Fecha de Registro</Label>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                        <Calendar className="w-4 h-4 text-gray-600" />
+                        <span className="text-gray-600">
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Plan Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {getPlanIcon()}
+                    Plan de Suscripción
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <MonthlyHabitsChart />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Plan Actual</Label>
+                      <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium">
+                          {user.plan_type || 'Sin plan asignado'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium">Estado</Label>
+                      <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                        <span className={`font-medium ${getSubscriptionColor()}`}>
+                          {getSubscriptionStatus()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <div className="mt-6">
+                    <Label className="text-sm font-medium mb-3 block">Características Activas</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.entries(user.features).map(([key, enabled]) => (
+                        <div
+                          key={key}
+                          className={`p-2 rounded-lg text-sm text-center border ${
+                            enabled 
+                              ? 'bg-green-50 border-green-200 text-green-800' 
+                              : 'bg-gray-50 border-gray-200 text-gray-500'
+                          }`}
+                        >
+                          {key === 'habits' && 'Hábitos'}
+                          {key === 'training' && 'Entrenamiento'}
+                          {key === 'nutrition' && 'Nutrición'}
+                          {key === 'meditation' && 'Meditación'}
+                          {key === 'active_breaks' && 'Pausas Activas'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {!user.plan_type && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-blue-800 text-sm mb-2">
+                        ¡No tienes un plan asignado aún!
+                      </p>
+                      <Button 
+                        onClick={() => window.location.href = '/plan-selection'}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Seleccionar Plan
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Basic Statistics */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumen</CardTitle>
+                  <CardDescription>Tu actividad reciente</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {statsLoading ? (
+                    <div className="text-center py-4">
+                      <div className="text-sm text-muted-foreground">Cargando estadísticas...</div>
+                    </div>
+                  ) : statsError ? (
+                    <div className="text-center py-4">
+                      <div className="text-sm text-red-600">Error al cargar estadísticas</div>
+                    </div>
+                  ) : userStats ? (
+                    <>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-primary">{userStats.weekly.totalPoints}</div>
+                        <div className="text-sm text-muted-foreground">Puntos esta semana</div>
+                      </div>
+                      
+                      {userStats.weekly.totalMeditationSessions > 0 && (
+                        <>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">{userStats.weekly.totalMeditationSessions}</div>
+                            <div className="text-sm text-muted-foreground">Sesiones de meditación</div>
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">{userStats.weekly.totalMeditationMinutes}</div>
+                            <div className="text-sm text-muted-foreground">Minutos meditando</div>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-4">
+                      <div className="text-sm text-muted-foreground">No hay datos disponibles</div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Acciones</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => window.location.href = '/plans'}
+                  >
+                    Ver Planes Disponibles
+                  </Button>
+                  
+                  {user.plan_type && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => window.location.href = '/dashboard'}
+                    >
+                      Ir al Dashboard
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => refreshUser()}
+                  >
+                    Actualizar Información
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Account Security */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Seguridad</CardTitle>
+                  <CardDescription>Gestiona la seguridad de tu cuenta</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Cambiar contraseña</span>
+                      <Button variant="outline" size="sm" disabled>
+                        Próximamente
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Verificación de email</span>
+                      <span className="text-xs text-green-600">✓ Verificado</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="statistics" className="space-y-6">
+          {statsLoading ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-lg">Cargando estadísticas...</div>
+            </div>
+          ) : statsError ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Card className="p-6 text-center">
+                <CardTitle className="text-red-600 mb-2">Error al cargar estadísticas</CardTitle>
+                <CardDescription>
+                  No se pudieron cargar las estadísticas. Por favor, intenta nuevamente.
+                </CardDescription>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => window.location.reload()}
+                >
+                  Reintentar
+                </Button>
+              </Card>
+            </div>
+          ) : !userStats ? (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Card className="p-6 text-center">
+                <CardTitle className="mb-2">No hay datos disponibles</CardTitle>
+                <CardDescription>
+                  Comienza a usar la aplicación para ver tus estadísticas aquí.
+                </CardDescription>
+                <Button 
+                  className="mt-4"
+                  onClick={() => window.location.href = '/dashboard'}
+                >
+                  Ir al Dashboard
+                </Button>
+              </Card>
+            </div>
+          ) : (
+            <>
+              {/* Summary Cards */}
+              <StatsSummary 
+                weeklyStats={userStats.weekly} 
+                monthlyStats={userStats.monthly} 
+              />
+
+              {/* Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Weekly Points Chart */}
+                <WeeklyPointsChart data={userStats.weekly.dailyData} />
+
+                {/* Habit Completion Donut */}
+                <HabitCompletionDonut data={userStats.monthly.habitCompletionRates} />
+              </div>
+
+              {/* Monthly Habits Chart - Full Width */}
+              <MonthlyHabitsChart data={userStats.monthly.habitCompletionData} />
+
+              {/* Additional Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Puntos Totales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-primary">{userStats.monthly.totalPoints}</div>
+                    <div className="text-xs text-muted-foreground">Últimos 30 días</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Pasos Totales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {userStats.monthly.totalSteps.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Últimos 30 días</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Sesiones Totales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-purple-600">
+                      {userStats.monthly.totalMeditationSessions}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Meditación</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Minutos Totales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {userStats.monthly.totalMeditationMinutes}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Meditación</div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
           )}
         </TabsContent>
 
-        {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-green-600" />
-                Configuración de Recordatorios
-              </CardTitle>
-              <CardDescription>
-                Personaliza cuándo y cómo quieres recibir recordatorios para tus hábitos
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <NotificationSettings />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Step Sync Tab */}
-        <TabsContent value="sync" className="space-y-6">
-          <StepSyncSettings />
+          <NotificationSettings />
         </TabsContent>
       </Tabs>
     </div>

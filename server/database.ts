@@ -4,7 +4,7 @@ import path from 'path';
 
 export interface DatabaseSchema {
   users: {
-    id?: number;
+    id: number;
     email: string;
     password_hash: string | null;
     full_name: string;
@@ -24,7 +24,7 @@ export interface DatabaseSchema {
     created_at: string;
   };
   daily_habits: {
-    id?: number;
+    id: number;
     user_id: number;
     date: string;
     training_completed: number;
@@ -50,7 +50,7 @@ export interface DatabaseSchema {
     archived_at: string;
   };
   user_notes: {
-    id?: number;
+    id: number;
     user_id: number;
     content: string;
     date: string;
@@ -61,13 +61,10 @@ export interface DatabaseSchema {
     user_id: number;
     steps: number;
     date: string;
-    source: string;
-    synced_at: string | null;
-    timezone: string | null;
     created_at: string;
   };
   user_files: {
-    id?: number;
+    id: number;
     user_id: number;
     filename: string;
     file_type: string;
@@ -76,7 +73,7 @@ export interface DatabaseSchema {
     created_at: string;
   };
   broadcast_messages: {
-    id?: number;
+    id: number;
     sender_id: number;
     message: string;
     created_at: string;
@@ -93,7 +90,7 @@ export interface DatabaseSchema {
     updated_at: string;
   };
   content_library: {
-    id?: number;
+    id: number;
     title: string;
     description: string | null;
     video_url: string | null;
@@ -113,7 +110,7 @@ export interface DatabaseSchema {
     updated_at: string;
   };
   meditation_sessions: {
-    id?: number;
+    id: number;
     user_id: number;
     duration_minutes: number;
     meditation_type: string;
@@ -146,7 +143,7 @@ export interface DatabaseSchema {
     created_at: string;
   };
   user_notifications: {
-    id?: number;
+    id: number;
     user_id: number;
     enabled: number;
     habits: string;
@@ -164,42 +161,6 @@ export interface DatabaseSchema {
     reminder_time: string;
     next_send_at: string;
     created_at: string;
-  };
-  achievements: {
-    id?: number;
-    name: string;
-    description: string;
-    type: string;
-    category: string;
-    goal_value: number;
-    icon_url: string | null;
-    reward_type: string;
-    is_active: number;
-    created_at: string;
-    updated_at: string;
-  };
-  user_achievements: {
-    id: number;
-    user_id: number;
-    achievement_id: number;
-    progress_value: number;
-    achieved: number;
-    achieved_at: string | null;
-    created_at: string;
-    updated_at: string;
-  };
-  user_step_sync: {
-    id: number;
-    user_id: number;
-    google_fit_enabled: number;
-    apple_health_enabled: number;
-    google_fit_token: string | null;
-    apple_health_authorized: number;
-    last_sync_date: string | null;
-    last_sync_at: string | null;
-    sync_errors: string | null;
-    created_at: string;
-    updated_at: string;
   };
 }
 
