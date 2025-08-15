@@ -1,13 +1,22 @@
-import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../database.js';
-import { SystemLogger } from '../utils/logging.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
+import { SystemLogger } from '../utils/logging.js';
+import type { Request, Response, NextFunction } from 'express';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+// Extend Request interface to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
 // Authentication middleware
-export const authenticateToken = async (req: any, res: Response, next: NextFunction) => {
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -47,8 +56,8 @@ export const authenticateToken = async (req: any, res: Response, next: NextFunct
 };
 
 // Admin middleware
-export const requireAdmin = (req: any, res: Response, next: NextFunction) => {
-  if (req.user.role !== 'admin') {
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user || req.user.role !== 'admin') {
     sendErrorResponse(res, ERROR_CODES.AUTHORIZATION_ERROR, 'Acceso denegado. Se requieren permisos de administrador.');
     return;
   }

@@ -12,6 +12,7 @@ import DailyResetScheduler from './scheduler.js';
 import NotificationScheduler from './services/notification-scheduler.js';
 import statsRoutes from './routes/stats-routes.js';
 import notificationRoutes from './routes/notification-routes.js';
+import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { 
   validateRequest, 
   validateFile, 
@@ -58,6 +59,31 @@ app.set('trust proxy', true);
 // Initialize schedulers
 let resetScheduler: DailyResetScheduler;
 let notificationScheduler: NotificationScheduler;
+
+// Check and log VAPID configuration
+const checkVapidConfiguration = () => {
+  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+  
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.warn('⚠️  VAPID keys are not configured!');
+    console.warn('   Push notifications will not work.');
+    console.warn('   To fix this:');
+    console.warn('   1. Run: npx web-push generate-vapid-keys');
+    console.warn('   2. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables');
+    console.warn('   3. Restart the server');
+    return false;
+  }
+  
+  if (VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE' || VAPID_PRIVATE_KEY.length < 32) {
+    console.warn('⚠️  VAPID private key appears to be invalid!');
+    console.warn('   Generate new keys with: npx web-push generate-vapid-keys');
+    return false;
+  }
+  
+  console.log('✅ VAPID keys are configured correctly');
+  return true;
+};
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
@@ -119,55 +145,6 @@ app.use('/api/', burstLimit);
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-// Authentication middleware
-const authenticateToken = async (req: any, res: express.Response, next: express.NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Token de acceso requerido');
-    return;
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const user = await db
-      .selectFrom('users')
-      .selectAll()
-      .where('id', '=', decoded.id)
-      .executeTakeFirst();
-
-    if (!user) {
-      await SystemLogger.logAuthError('User not found for token', undefined, req);
-      sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Usuario no encontrado');
-      return;
-    }
-
-    if (!user.is_active) {
-      await SystemLogger.logAuthError('Inactive user attempted access', user.email, req);
-      sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Cuenta desactivada');
-      return;
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    console.error('Token verification error:', error);
-    await SystemLogger.logAuthError('Invalid token', undefined, req);
-    sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Token inválido');
-    return;
-  }
-};
-
-// Admin middleware
-const requireAdmin = (req: any, res: express.Response, next: express.NextFunction) => {
-  if (req.user.role !== 'admin') {
-    sendErrorResponse(res, ERROR_CODES.AUTHORIZATION_ERROR, 'Acceso denegado. Se requieren permisos de administrador.');
-    return;
-  }
-  next();
-};
 
 // Helper function to parse user features
 const getUserFeatures = (featuresJson: string) => {
@@ -997,6 +974,9 @@ app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: 
 // Export a function to start the server
 export async function startServer(port: number) {
   try {
+    // Check VAPID configuration
+    const vapidConfigured = checkVapidConfiguration();
+    
     // Initialize the daily reset scheduler
     resetScheduler = new DailyResetScheduler();
     
@@ -1023,12 +1003,28 @@ export async function startServer(port: number) {
       console.log('Meditation session tracking enabled');
       console.log('Daily habits tracking enabled');
       console.log('User statistics API enabled');
-      console.log('Push notification system enabled');
+      
+      if (vapidConfigured) {
+        console.log('✅ Push notification system enabled');
+      } else {
+        console.log('❌ Push notification system DISABLED (VAPID keys not configured)');
+      }
+      
       console.log('Daily reset scheduler initialized (00:05 AM Argentina time)');
       console.log('Notification scheduler initialized (checking every minute)');
       console.log('System logging enabled with 90-day retention');
       console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
       console.log('Trust proxy enabled for rate limiting');
+      
+      if (!vapidConfigured) {
+        console.log('\n🔧 TO ENABLE PUSH NOTIFICATIONS:');
+        console.log('1. Run: npx web-push generate-vapid-keys');
+        console.log('2. Set environment variables:');
+        console.log('   VAPID_PUBLIC_KEY=<your_public_key>');
+        console.log('   VAPID_PRIVATE_KEY=<your_private_key>');
+        console.log('   VAPID_EMAIL=admin@outdoorteam.com');
+        console.log('3. Restart the server\n');
+      }
     });
   } catch (err) {
     console.error('Failed to start server:', err);

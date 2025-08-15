@@ -510,11 +510,7 @@ async function updateNotificationJobs(userId: number, habits: string[], times: R
 
 // Get VAPID public key for client
 router.get('/vapid-public-key', (req, res) => {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  if (!publicKey) {
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'VAPID public key not configured');
-    return;
-  }
+  const publicKey = process.env.VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa40HnYmN7J21ZiNvJGDCG6n_bHUXP5Y8v_dKfNwvRz4rHNL8HpEPYWnSAAMoI';
   
   res.json({ publicKey });
 });
