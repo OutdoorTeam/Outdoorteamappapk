@@ -4,6 +4,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
 import AchievementService from '../services/achievement-service.js';
+import { sql } from 'kysely';
 
 const router = Router();
 
@@ -86,20 +87,22 @@ router.get('/leaderboard/steps', authenticateToken, async (req: any, res) => {
       const userStepsCount = Number(userStats?.total_steps || 0);
       
       // Count how many users have more steps
-      const usersAbove = await db
+      const usersAboveCount = await db
         .selectFrom('daily_habits')
         .innerJoin('users', 'daily_habits.user_id', 'users.id')
-        .select((eb) => [eb.fn.count('distinct users.id').as('count')])
-        .select((eb) => [eb.fn.sum('daily_habits.steps').as('user_total')])
+        .select((eb) => [
+          eb.fn.sum('daily_habits.steps').as('user_total'),
+          'users.id'
+        ])
         .where('daily_habits.date', '>=', startDate)
         .where('daily_habits.date', '<', endDate)
         .where('users.is_active', '=', 1)
         .groupBy(['users.id'])
-        .having('user_total', '>', userStepsCount)
+        .having((eb) => eb('user_total', '>', userStepsCount))
         .execute();
 
       currentUserPosition = {
-        position: usersAbove.length + 1,
+        position: usersAboveCount.length + 1,
         user_id: currentUserId,
         full_name: req.user.full_name,
         total_steps: userStepsCount,
@@ -176,21 +179,23 @@ router.get('/leaderboard/habits', authenticateToken, async (req: any, res) => {
       const userPointsCount = Number(userStats?.total_points || 0);
       
       // Count how many Totum users have more points
-      const usersAbove = await db
+      const usersAboveCount = await db
         .selectFrom('daily_habits')
         .innerJoin('users', 'daily_habits.user_id', 'users.id')
-        .select((eb) => [eb.fn.count('distinct users.id').as('count')])
-        .select((eb) => [eb.fn.sum('daily_habits.daily_points').as('user_total')])
+        .select((eb) => [
+          eb.fn.sum('daily_habits.daily_points').as('user_total'),
+          'users.id'
+        ])
         .where('daily_habits.date', '>=', startDate)
         .where('daily_habits.date', '<', endDate)
         .where('users.is_active', '=', 1)
         .where('users.plan_type', '=', 'Programa Totum')
         .groupBy(['users.id'])
-        .having('user_total', '>', userPointsCount)
+        .having((eb) => eb('user_total', '>', userPointsCount))
         .execute();
 
       currentUserPosition = {
-        position: usersAbove.length + 1,
+        position: usersAboveCount.length + 1,
         user_id: currentUserId,
         full_name: req.user.full_name,
         total_points: userPointsCount,
