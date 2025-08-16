@@ -1,170 +1,196 @@
-// Service Worker for push notifications
-console.log('Service Worker: Loading...');
+// Service Worker for Push Notifications
+const CACHE_NAME = 'outdoor-team-v1';
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
+  console.log('Service Worker installing');
   self.skipWaiting();
 });
 
 // Activate event
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
+  console.log('Service Worker activating');
   event.waitUntil(self.clients.claim());
 });
 
-// Push event handler
+// Push event
 self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push event received', event);
+  console.log('Push event received:', event);
   
   let notificationData = {
     title: 'Outdoor Team',
     body: 'Tienes una nueva notificación',
     icon: '/assets/logo-gold.png',
     badge: '/assets/logo-gold.png',
-    tag: 'default',
-    url: '/dashboard'
+    url: '/',
+    type: 'default'
   };
-
+  
   if (event.data) {
     try {
       const data = event.data.json();
       notificationData = { ...notificationData, ...data };
-      console.log('Service Worker: Notification data parsed', notificationData);
+      console.log('Parsed notification data:', notificationData);
     } catch (error) {
-      console.error('Service Worker: Error parsing notification data', error);
-      notificationData.body = event.data.text() || notificationData.body;
+      console.error('Error parsing push data:', error);
+      notificationData.body = event.data.text();
     }
   }
-
+  
   const notificationOptions = {
     body: notificationData.body,
     icon: notificationData.icon,
     badge: notificationData.badge,
-    tag: notificationData.tag || 'default',
-    vibrate: [200, 100, 200],
-    requireInteraction: false,
-    silent: false,
+    vibrate: [100, 50, 100],
     data: {
-      url: notificationData.url || '/dashboard',
+      url: notificationData.url,
+      type: notificationData.type,
       habitKey: notificationData.habitKey,
       userId: notificationData.userId,
-      type: notificationData.type,
       timestamp: Date.now()
     },
     actions: []
   };
-
+  
   // Add action buttons for habit reminders
   if (notificationData.type === 'habit_reminder' && notificationData.habitKey) {
     notificationOptions.actions = [
       {
-        action: 'complete',
+        action: 'mark-complete',
         title: 'Marcar Completado',
-        icon: '/assets/logo-gold.png'
+        icon: '/assets/check-icon.png'
       },
       {
-        action: 'dismiss',
-        title: 'Recordar Después',
-        icon: '/assets/logo-gold.png'
+        action: 'open',
+        title: 'Abrir App',
+        icon: '/assets/open-icon.png'
       }
     ];
+    notificationOptions.requireInteraction = true;
   }
-
+  
   event.waitUntil(
     self.registration.showNotification(notificationData.title, notificationOptions)
   );
 });
 
-// Notification click handler
+// Notification click event
 self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification clicked', event);
+  console.log('Notification clicked:', event);
   
-  const notification = event.notification;
-  const data = notification.data;
+  event.notification.close();
   
-  notification.close();
-
-  // Handle action buttons
-  if (event.action === 'complete' && data.habitKey && data.userId) {
-    // Mark habit as complete
-    event.waitUntil(
-      fetch('/api/notifications/mark-complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          habitKey: data.habitKey,
-          userId: data.userId,
-          date: new Date().toISOString().split('T')[0]
-        })
-      }).then(response => {
-        console.log('Service Worker: Habit marked as complete', response.ok);
-        
-        // Show success notification
-        if (response.ok) {
-          return self.registration.showNotification('¡Hábito Completado!', {
-            body: 'Has marcado tu hábito como completado',
-            icon: '/assets/logo-gold.png',
-            badge: '/assets/logo-gold.png',
-            tag: 'habit-completed',
-            vibrate: [100, 50, 100],
-            requireInteraction: false
-          });
-        }
-      }).catch(error => {
-        console.error('Service Worker: Error marking habit complete', error);
-      })
-    );
+  const notificationData = event.notification.data || {};
+  
+  if (event.action === 'mark-complete') {
+    // Handle mark complete action
+    if (notificationData.habitKey && notificationData.userId) {
+      event.waitUntil(
+        markHabitComplete(notificationData.habitKey, notificationData.userId)
+      );
+    }
     return;
   }
-
-  if (event.action === 'dismiss') {
-    // Just dismiss the notification
-    console.log('Service Worker: Notification dismissed');
-    return;
-  }
-
-  // Open the app or focus existing window
-  const url = data.url || '/dashboard';
+  
+  // Default action: open the app
+  const urlToOpen = notificationData.url || '/dashboard';
   
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-      // Check if there's already a window/tab open with the target URL
-      for (const client of clients) {
-        if (client.url === self.location.origin + url && 'focus' in client) {
-          return client.focus();
+    self.clients.matchAll({ type: 'window' }).then((clientList) => {
+      // Check if the app is already open
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url.includes(self.location.origin)) {
+          // Focus the existing window and navigate
+          client.focus();
+          return client.navigate(urlToOpen);
         }
       }
       
-      // If no window/tab is open, open a new one
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
-      }
+      // Open new window if app is not open
+      return self.clients.openWindow(urlToOpen);
     })
   );
 });
 
-// Background sync (for future use)
+// Function to mark habit as complete
+async function markHabitComplete(habitKey, userId) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const response = await fetch('/api/notifications/mark-complete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        habitKey,
+        userId,
+        date: today
+      })
+    });
+    
+    if (response.ok) {
+      // Show success notification
+      await self.registration.showNotification('¡Hábito completado!', {
+        body: 'Se agregó 1 punto a tu progreso diario',
+        icon: '/assets/logo-gold.png',
+        badge: '/assets/logo-gold.png',
+        tag: 'habit-completed',
+        data: { url: '/dashboard' }
+      });
+    } else {
+      throw new Error('Failed to mark habit as complete');
+    }
+  } catch (error) {
+    console.error('Error marking habit complete:', error);
+    
+    // Show error notification
+    await self.registration.showNotification('Error', {
+      body: 'No se pudo marcar el hábito. Abre la app para intentar nuevamente.',
+      icon: '/assets/logo-gold.png',
+      badge: '/assets/logo-gold.png',
+      tag: 'habit-error',
+      data: { url: '/dashboard' }
+    });
+  }
+}
+
+// Background sync (future implementation)
 self.addEventListener('sync', (event) => {
-  console.log('Service Worker: Background sync event', event.tag);
+  console.log('Background sync:', event.tag);
   
-  if (event.tag === 'background-sync') {
-    event.waitUntil(
-      // Handle background sync tasks
-      Promise.resolve()
-    );
+  if (event.tag === 'habit-sync') {
+    event.waitUntil(syncHabits());
   }
 });
 
-// Error handling
-self.addEventListener('error', (event) => {
-  console.error('Service Worker: Error occurred', event);
+async function syncHabits() {
+  // Future implementation for offline habit tracking
+  console.log('Syncing habits...');
+}
+
+// Periodic background sync (future implementation)
+self.addEventListener('periodicsync', (event) => {
+  console.log('Periodic sync:', event.tag);
+  
+  if (event.tag === 'daily-reminder') {
+    event.waitUntil(checkDailyReminders());
+  }
 });
 
-self.addEventListener('unhandledrejection', (event) => {
-  console.error('Service Worker: Unhandled promise rejection', event);
+async function checkDailyReminders() {
+  // Future implementation for daily reminders
+  console.log('Checking daily reminders...');
+}
+
+// Message event for communication with the main thread
+self.addEventListener('message', (event) => {
+  console.log('Service Worker received message:', event.data);
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
-console.log('Service Worker: Loaded successfully');
+console.log('Service Worker loaded successfully');

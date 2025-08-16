@@ -1,6 +1,45 @@
 import { Request } from 'express';
 import { db } from '../database.js';
-import { systemLogSchema, SystemLogData } from '../../shared/validation-schemas.js';
+
+// Define the system log data interface
+interface SystemLogData {
+  level: 'info' | 'warn' | 'error' | 'critical';
+  event: string;
+  user_id?: number;
+  route?: string;
+  ip_address?: string;
+  user_agent?: string;
+  metadata?: Record<string, unknown>;
+}
+
+// Simple validation function to replace Zod
+function validateSystemLogData(data: any): SystemLogData {
+  // Ensure required fields exist and have correct types
+  if (!data.level || typeof data.level !== 'string') {
+    throw new Error('Invalid level field');
+  }
+  
+  if (!data.event || typeof data.event !== 'string') {
+    throw new Error('Invalid event field');
+  }
+
+  // Validate level is one of the allowed values
+  const validLevels = ['info', 'warn', 'error', 'critical'];
+  if (!validLevels.includes(data.level)) {
+    data.level = 'info'; // Default to info if invalid
+  }
+
+  // Clean and validate other fields
+  return {
+    level: data.level,
+    event: String(data.event).substring(0, 200), // Limit length
+    user_id: typeof data.user_id === 'number' && data.user_id > 0 ? data.user_id : undefined,
+    route: typeof data.route === 'string' ? data.route.substring(0, 500) : undefined,
+    ip_address: typeof data.ip_address === 'string' ? data.ip_address.substring(0, 45) : undefined,
+    user_agent: typeof data.user_agent === 'string' ? data.user_agent.substring(0, 1000) : undefined,
+    metadata: typeof data.metadata === 'object' && data.metadata !== null ? data.metadata : undefined
+  };
+}
 
 export class SystemLogger {
   static async log(
@@ -27,8 +66,8 @@ export class SystemLogger {
         metadata: options?.metadata
       };
 
-      // Validate log data
-      const validated = systemLogSchema.parse(logData);
+      // Validate log data with simple validation
+      const validated = validateSystemLogData(logData);
 
       // Insert into database
       await db
@@ -36,10 +75,10 @@ export class SystemLogger {
         .values({
           level: validated.level,
           event: validated.event,
-          user_id: validated.user_id,
-          route: validated.route,
-          ip_address: validated.ip_address,
-          user_agent: validated.user_agent,
+          user_id: validated.user_id || null,
+          route: validated.route || null,
+          ip_address: validated.ip_address || null,
+          user_agent: validated.user_agent || null,
           metadata: validated.metadata ? JSON.stringify(validated.metadata) : null,
           created_at: new Date().toISOString()
         })
@@ -49,7 +88,7 @@ export class SystemLogger {
       const logLevel = level === 'critical' ? 'error' : level;
       console[logLevel](`[${level.toUpperCase()}] ${event}`, {
         userId: options?.userId,
-        route: logData.route,
+        route: validated.route,
         metadata: options?.metadata
       });
 

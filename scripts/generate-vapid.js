@@ -1,76 +1,53 @@
-#!/usr/bin/env node
-
-import webPush from 'web-push';
+import webpush from 'web-push';
 import fs from 'fs';
 import path from 'path';
 
+console.log('Generating VAPID keys for push notifications...\n');
+
 try {
-  console.log('Generating VAPID keys...');
+  const vapidKeys = webpush.generateVAPIDKeys();
   
-  const vapidKeys = webPush.generateVAPIDKeys();
+  console.log('✅ VAPID keys generated successfully!\n');
+  console.log('📋 Copy these environment variables to your .env file:\n');
+  console.log(`VAPID_PUBLIC_KEY=${vapidKeys.publicKey}`);
+  console.log(`VAPID_PRIVATE_KEY=${vapidKeys.privateKey}`);
+  console.log(`VAPID_EMAIL=admin@outdoorteam.com`);
+  console.log('\n');
   
-  console.log('\n=== VAPID Keys Generated ===');
-  console.log('Public Key:', vapidKeys.publicKey);
-  console.log('Private Key:', vapidKeys.privateKey);
-  
-  // Create .env.example if it doesn't exist
-  const envExamplePath = path.join(process.cwd(), '.env.example');
-  const envExampleContent = `# VAPID Keys for Push Notifications
-VAPID_PUBLIC_KEY=${vapidKeys.publicKey}
-VAPID_PRIVATE_KEY=${vapidKeys.privateKey}
-VAPID_EMAIL=admin@outdoorteam.com
-
-# Database
-DATA_DIRECTORY=./data
-
-# JWT Secret
-JWT_SECRET=your-secret-key-change-in-production
-
-# Server Port
-PORT=3001
-`;
-
-  if (!fs.existsSync(envExamplePath)) {
-    fs.writeFileSync(envExamplePath, envExampleContent);
-    console.log('\n✅ Created .env.example with VAPID keys');
-  }
-  
-  // Check if .env exists and update it
+  // Try to create or update .env file
   const envPath = path.join(process.cwd(), '.env');
   let envContent = '';
   
+  // Read existing .env file if it exists
   if (fs.existsSync(envPath)) {
     envContent = fs.readFileSync(envPath, 'utf8');
-    
-    // Update existing keys or add new ones
-    if (envContent.includes('VAPID_PUBLIC_KEY=')) {
-      envContent = envContent.replace(/VAPID_PUBLIC_KEY=.*/, `VAPID_PUBLIC_KEY=${vapidKeys.publicKey}`);
-    } else {
-      envContent += `\nVAPID_PUBLIC_KEY=${vapidKeys.publicKey}`;
-    }
-    
-    if (envContent.includes('VAPID_PRIVATE_KEY=')) {
-      envContent = envContent.replace(/VAPID_PRIVATE_KEY=.*/, `VAPID_PRIVATE_KEY=${vapidKeys.privateKey}`);
-    } else {
-      envContent += `\nVAPID_PRIVATE_KEY=${vapidKeys.privateKey}`;
-    }
-    
-    if (!envContent.includes('VAPID_EMAIL=')) {
-      envContent += `\nVAPID_EMAIL=admin@outdoorteam.com`;
-    }
-  } else {
-    envContent = envExampleContent;
   }
   
-  fs.writeFileSync(envPath, envContent);
-  console.log('✅ Updated .env with new VAPID keys');
+  // Remove existing VAPID keys if they exist
+  envContent = envContent.replace(/^VAPID_PUBLIC_KEY=.*$/gm, '');
+  envContent = envContent.replace(/^VAPID_PRIVATE_KEY=.*$/gm, '');
+  envContent = envContent.replace(/^VAPID_EMAIL=.*$/gm, '');
   
-  console.log('\n=== Next Steps ===');
-  console.log('1. Restart your server to use the new keys');
-  console.log('2. Users may need to re-enable notifications in their browser');
-  console.log('3. Test notifications from the admin panel');
+  // Clean up empty lines
+  envContent = envContent.replace(/\n\n+/g, '\n').trim();
+  
+  // Add new VAPID keys
+  if (envContent) {
+    envContent += '\n';
+  }
+  envContent += `\n# Push Notification VAPID Keys\n`;
+  envContent += `VAPID_PUBLIC_KEY=${vapidKeys.publicKey}\n`;
+  envContent += `VAPID_PRIVATE_KEY=${vapidKeys.privateKey}\n`;
+  envContent += `VAPID_EMAIL=admin@outdoorteam.com\n`;
+  
+  // Write back to .env file
+  fs.writeFileSync(envPath, envContent);
+  
+  console.log('✅ VAPID keys have been automatically added to .env file');
+  console.log('\n🔄 Please restart your server to apply the new configuration');
+  console.log('\n📱 Push notifications will now work correctly');
   
 } catch (error) {
-  console.error('Error generating VAPID keys:', error);
+  console.error('❌ Error generating VAPID keys:', error);
   process.exit(1);
 }

@@ -168,19 +168,6 @@ export const userFeaturesSchema = z.object({
     .transform(val => val?.trim())
 });
 
-// System Log Schema
-export const systemLogSchema = z.object({
-  level: z.enum(['info', 'warn', 'error', 'critical']).default('info'),
-  event: z.string()
-    .min(1, 'Evento es requerido')
-    .max(200, 'Evento no puede exceder 200 caracteres'),
-  user_id: z.number().int().positive().optional(),
-  route: z.string().max(500).optional(),
-  ip_address: z.string().max(45).optional(),
-  user_agent: z.string().max(1000).optional(),
-  metadata: z.record(z.unknown()).optional()
-});
-
 // Password Reset Schema (for future implementation)
 export const passwordResetRequestSchema = z.object({
   email: z.string()
@@ -216,6 +203,16 @@ export type ContentLibraryData = z.infer<typeof contentLibrarySchema>;
 export type BroadcastMessageData = z.infer<typeof broadcastMessageSchema>;
 export type ProfileUpdateData = z.infer<typeof profileUpdateSchema>;
 export type UserFeaturesData = z.infer<typeof userFeaturesSchema>;
-export type SystemLogData = z.infer<typeof systemLogSchema>;
 export type PasswordResetRequestData = z.infer<typeof passwordResetRequestSchema>;
 export type PasswordResetConfirmData = z.infer<typeof passwordResetConfirmSchema>;
+
+// Simple System Log Data interface (no Zod schema to avoid validation issues)
+export interface SystemLogData {
+  level: 'info' | 'warn' | 'error' | 'critical';
+  event: string;
+  user_id?: number;
+  route?: string;
+  ip_address?: string;
+  user_agent?: string;
+  metadata?: Record<string, unknown>;
+}
