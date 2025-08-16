@@ -4,7 +4,9 @@ import { ERROR_CODES, createErrorResponse } from '../utils/validation.js';
 
 interface RateLimitStore {
   get(key: string): Promise<number | null>;
+  getInfo(key: string): Promise<{ count: number; resetTime: number } | null>;
   increment(key: string, windowMs: number): Promise<number>;
+  setWithExpiry(key: string, windowMs: number): Promise<void>;
   reset(key: string): Promise<void>;
 }
 
@@ -23,6 +25,18 @@ class MemoryStore implements RateLimitStore {
     
     return item.count;
   }
+
+  async getInfo(key: string): Promise<{ count: number; resetTime: number } | null> {
+    const item = this.store.get(key);
+    if (!item) return null;
+    
+    if (Date.now() > item.resetTime) {
+      this.store.delete(key);
+      return null;
+    }
+    
+    return { count: item.count, resetTime: item.resetTime };
+  }
   
   async increment(key: string, windowMs: number): Promise<number> {
     const now = Date.now();
@@ -37,6 +51,11 @@ class MemoryStore implements RateLimitStore {
     item.count++;
     this.store.set(key, item);
     return item.count;
+  }
+
+  async setWithExpiry(key: string, windowMs: number): Promise<void> {
+    const now = Date.now();
+    this.store.set(key, { count: 1, resetTime: now + windowMs });
   }
   
   async reset(key: string): Promise<void> {
@@ -62,6 +81,7 @@ interface RateLimitConfig {
   skipFailedRequests?: boolean;
   onLimitReached?: (req: Request, rateLimitInfo: RateLimitInfo) => void;
   customMessage?: string;
+  mode?: 'increment' | 'check'; // 'check' uses getInfo() and never increments/creates keys
 }
 
 interface RateLimitInfo {
@@ -88,6 +108,11 @@ class RateLimiter {
   createMiddleware(config: RateLimitConfig) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
+        // Skip rate limiting in development if disabled
+        if (process.env.DISABLE_RATE_LIMITING === 'true') {
+          return next();
+        }
+
         // Skip internal routes
         if (this.shouldSkipRateLimit(req)) {
           return next();
@@ -99,28 +124,61 @@ class RateLimiter {
         
         // Check all keys (IP, user, etc.)
         for (const key of keys) {
-          const current = await this.store.increment(key, config.windowMs);
-          const resetTime = Date.now() + config.windowMs;
-          
-          const rateLimitInfo: RateLimitInfo = {
-            limit: config.maxRequests,
-            current,
-            remaining: Math.max(0, config.maxRequests - current),
-            resetTime
-          };
-          
-          results.push(rateLimitInfo);
-          
-          if (current > config.maxRequests) {
-            isLimited = true;
+          let rateLimitInfo: RateLimitInfo;
+
+          if (config.mode === 'check') {
+            // Check-only mode: use getInfo and never increment
+            const info = await this.store.getInfo(key);
+            if (info) {
+              rateLimitInfo = {
+                limit: config.maxRequests,
+                current: info.count,
+                remaining: Math.max(0, config.maxRequests - info.count),
+                resetTime: info.resetTime
+              };
+              
+              // If the existing entry exceeds the limit, mark as limited
+              if (info.count > config.maxRequests) {
+                isLimited = true;
+                
+                if (config.onLimitReached) {
+                  config.onLimitReached(req, rateLimitInfo);
+                }
+              }
+            } else {
+              // No existing entry, not limited in check mode
+              rateLimitInfo = {
+                limit: config.maxRequests,
+                current: 0,
+                remaining: config.maxRequests,
+                resetTime: Date.now() + config.windowMs
+              };
+            }
+          } else {
+            // Default increment mode
+            const current = await this.store.increment(key, config.windowMs);
+            const resetTime = Date.now() + config.windowMs;
             
-            // Log the rate limit violation
-            await this.logRateLimitViolation(req, key, rateLimitInfo);
+            rateLimitInfo = {
+              limit: config.maxRequests,
+              current,
+              remaining: Math.max(0, config.maxRequests - current),
+              resetTime
+            };
             
-            if (config.onLimitReached) {
-              config.onLimitReached(req, rateLimitInfo);
+            if (current > config.maxRequests) {
+              isLimited = true;
+              
+              // Log the rate limit violation
+              await this.logRateLimitViolation(req, key, rateLimitInfo);
+              
+              if (config.onLimitReached) {
+                config.onLimitReached(req, rateLimitInfo);
+              }
             }
           }
+
+          results.push(rateLimitInfo);
         }
         
         // Set rate limit headers based on the most restrictive limit
@@ -131,7 +189,7 @@ class RateLimiter {
         this.setRateLimitHeaders(res, mostRestrictive);
         
         if (isLimited) {
-          const retryAfter = Math.ceil(config.windowMs / 1000);
+          const retryAfter = Math.ceil((mostRestrictive.resetTime - Date.now()) / 1000);
           res.set('Retry-After', retryAfter.toString());
           
           const errorResponse = createErrorResponse(
@@ -222,19 +280,24 @@ class RateLimiter {
       
       await SystemLogger.log('warn', 'RATE_LIMITED', {
         userId,
-        req,
         metadata: {
           rate_limit_key: key,
           limit: rateLimitInfo.limit,
           current: rateLimitInfo.current,
           ip_address: this.getClientIP(req),
-          user_agent: req.get('User-Agent'),
+          user_agent: req.get('User-Agent') || undefined,
           timestamp: new Date().toISOString()
         }
       });
     } catch (error) {
       console.error('Failed to log rate limit violation:', error);
     }
+  }
+
+  // Helper to reset login blocks (for admin/dev use)
+  public async resetLoginBlocks(email: string, ip: string): Promise<void> {
+    await this.store.reset(`login:block:ip:${ip}`);
+    await this.store.reset(`login:block:email:${email.toLowerCase()}`);
   }
 }
 
@@ -255,7 +318,7 @@ export const burstLimit = rateLimiter.createMiddleware({
 });
 
 export const loginLimit = rateLimiter.createMiddleware({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 5,
   keyGenerator: (req) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
@@ -266,15 +329,12 @@ export const loginLimit = rateLimiter.createMiddleware({
     ];
   },
   customMessage: 'Too many login attempts. Please try again in 15 minutes.',
-  onLimitReached: async (req, rateLimitInfo) => {
-    // Additional blocking for 15 minutes after hitting limit
+  onLimitReached: async (req) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const email = req.body?.email?.toLowerCase() || 'no-email';
-    
-    // Set extended block
     const extendedBlockMs = 15 * 60 * 1000; // 15 minutes
-    await rateLimiter['store'].increment(`login:block:ip:${clientIP}`, extendedBlockMs);
-    await rateLimiter['store'].increment(`login:block:email:${email}`, extendedBlockMs);
+    await rateLimiter['store'].setWithExpiry(`login:block:ip:${clientIP}`, extendedBlockMs);
+    await rateLimiter['store'].setWithExpiry(`login:block:email:${email}`, extendedBlockMs);
   }
 });
 
@@ -290,10 +350,11 @@ export const passwordResetLimit = rateLimiter.createMiddleware({
   customMessage: 'Too many password reset requests. Please try again in an hour.'
 });
 
-// Extended login block check middleware
+// Extended login block check middleware (check-only mode)
 export const checkLoginBlock = rateLimiter.createMiddleware({
-  windowMs: 1, // Just check, don't increment
-  maxRequests: 0, // Always block if key exists
+  mode: 'check',                // Check-only mode
+  windowMs: 15 * 60 * 1000,     // Used for Retry-After fallback if needed
+  maxRequests: 0,               // Not used in 'check' mode
   keyGenerator: (req) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const email = req.body?.email?.toLowerCase() || 'no-email';

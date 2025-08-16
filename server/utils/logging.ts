@@ -12,33 +12,51 @@ interface SystemLogData {
   metadata?: Record<string, unknown>;
 }
 
+// Sanitize objects to prevent circular references and non-serializable values
+function sanitize(obj: unknown): unknown {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return undefined;
+  }
+}
+
 // Simple validation function to replace Zod
 function validateSystemLogData(data: any): SystemLogData {
-  // Ensure required fields exist and have correct types
-  if (!data.level || typeof data.level !== 'string') {
-    throw new Error('Invalid level field');
-  }
-  
-  if (!data.event || typeof data.event !== 'string') {
-    throw new Error('Invalid event field');
-  }
+  try {
+    // Ensure required fields exist and have correct types
+    if (!data.level || typeof data.level !== 'string') {
+      data.level = 'info'; // Default to info if invalid
+    }
+    
+    if (!data.event || typeof data.event !== 'string') {
+      data.event = 'Unknown event';
+    }
 
-  // Validate level is one of the allowed values
-  const validLevels = ['info', 'warn', 'error', 'critical'];
-  if (!validLevels.includes(data.level)) {
-    data.level = 'info'; // Default to info if invalid
-  }
+    // Validate level is one of the allowed values
+    const validLevels = ['info', 'warn', 'error', 'critical'];
+    if (!validLevels.includes(data.level)) {
+      data.level = 'info'; // Default to info if invalid
+    }
 
-  // Clean and validate other fields
-  return {
-    level: data.level,
-    event: String(data.event).substring(0, 200), // Limit length
-    user_id: typeof data.user_id === 'number' && data.user_id > 0 ? data.user_id : undefined,
-    route: typeof data.route === 'string' ? data.route.substring(0, 500) : undefined,
-    ip_address: typeof data.ip_address === 'string' ? data.ip_address.substring(0, 45) : undefined,
-    user_agent: typeof data.user_agent === 'string' ? data.user_agent.substring(0, 1000) : undefined,
-    metadata: typeof data.metadata === 'object' && data.metadata !== null ? data.metadata : undefined
-  };
+    // Clean and validate other fields
+    return {
+      level: data.level,
+      event: String(data.event).substring(0, 200), // Limit length
+      user_id: typeof data.user_id === 'number' && data.user_id > 0 ? data.user_id : undefined,
+      route: typeof data.route === 'string' ? data.route.substring(0, 500) : undefined,
+      ip_address: typeof data.ip_address === 'string' ? data.ip_address.substring(0, 45) : undefined,
+      user_agent: typeof data.user_agent === 'string' ? data.user_agent.substring(0, 1000) : undefined,
+      metadata: typeof data.metadata === 'object' && data.metadata !== null ? data.metadata : undefined
+    };
+  } catch (error) {
+    // If validation fails completely, return minimal safe defaults
+    return {
+      level: 'error',
+      event: 'Validation failed',
+      metadata: { validation_error: String(error) }
+    };
+  }
 }
 
 export class SystemLogger {
@@ -55,18 +73,21 @@ export class SystemLogger {
     }
   ): Promise<void> {
     try {
-      // Extract request data if provided
+      // Sanitize all inputs to prevent circular references
+      const safeOptions = sanitize(options) as typeof options;
+
+      // Extract request data if provided (sanitized)
       const logData: SystemLogData = {
         level,
         event,
-        user_id: options?.userId,
-        route: options?.route || options?.req?.route?.path || options?.req?.path,
-        ip_address: options?.ipAddress || options?.req?.ip,
-        user_agent: options?.userAgent || options?.req?.get('User-Agent'),
-        metadata: options?.metadata
+        user_id: safeOptions?.userId,
+        route: safeOptions?.route || safeOptions?.req?.path,
+        ip_address: safeOptions?.ipAddress || (safeOptions?.req as any)?.ip,
+        user_agent: safeOptions?.userAgent || (safeOptions?.req as any)?.get?.('User-Agent'),
+        metadata: safeOptions?.metadata
       };
 
-      // Validate log data with simple validation
+      // Validate log data with safe validation
       const validated = validateSystemLogData(logData);
 
       // Insert into database
@@ -84,17 +105,18 @@ export class SystemLogger {
         })
         .execute();
 
-      // Also log to console for development
+      // Also log to console for development (but don't include sensitive data)
       const logLevel = level === 'critical' ? 'error' : level;
-      console[logLevel](`[${level.toUpperCase()}] ${event}`, {
-        userId: options?.userId,
+      const consoleData = {
+        userId: validated.user_id,
         route: validated.route,
-        metadata: options?.metadata
-      });
+        event: validated.event
+      };
+      console[logLevel](`[${level.toUpperCase()}] ${event}`, consoleData);
 
     } catch (error) {
-      // Don't throw errors from logging - just console log
-      console.error('Failed to write system log:', error);
+      // Never throw errors from logging - just console log
+      console.error('Failed to write system log (non-fatal):', error);
       console[level === 'critical' ? 'error' : level](`[${level.toUpperCase()}] ${event}`);
     }
   }
@@ -109,9 +131,8 @@ export class SystemLogger {
   ): Promise<void> {
     await this.log('warn', `Validation Error: ${event}`, {
       userId: options?.userId,
-      req: options?.req,
       metadata: {
-        validation_errors: fieldErrors,
+        validation_errors: sanitize(fieldErrors),
         timestamp: new Date().toISOString()
       }
     });
@@ -123,9 +144,10 @@ export class SystemLogger {
     req?: Request
   ): Promise<void> {
     await this.log('warn', `Auth Error: ${event}`, {
-      req,
       metadata: {
         email: email ? email.substring(0, 3) + '***' : undefined, // Partially mask email
+        ip_address: req?.ip,
+        user_agent: req?.get('User-Agent'),
         timestamp: new Date().toISOString()
       }
     });
@@ -142,10 +164,9 @@ export class SystemLogger {
   ): Promise<void> {
     await this.log('error', `File Upload Error: ${event}`, {
       userId: options?.userId,
-      req: options?.req,
       metadata: {
-        filename,
-        error,
+        filename: sanitize(filename),
+        error: sanitize(error),
         timestamp: new Date().toISOString()
       }
     });
@@ -161,10 +182,9 @@ export class SystemLogger {
   ): Promise<void> {
     await this.log('critical', `Critical Error: ${event}`, {
       userId: options?.userId,
-      req: options?.req,
       metadata: {
-        error_message: error.message,
-        error_stack: error.stack?.substring(0, 1000), // Limit stack trace length
+        error_message: sanitize(error.message),
+        error_stack: error.stack ? String(error.stack).substring(0, 1000) : undefined, // Limit stack trace length
         timestamp: new Date().toISOString()
       }
     });
@@ -182,7 +202,7 @@ export class SystemLogger {
 
       console.log(`Cleaned up ${result.length} old log entries older than ${retentionDays} days`);
     } catch (error) {
-      console.error('Failed to cleanup old logs:', error);
+      console.error('Failed to cleanup old logs (non-fatal):', error);
     }
   }
 
@@ -203,7 +223,7 @@ export class SystemLogger {
 
       return await query.execute();
     } catch (error) {
-      console.error('Failed to fetch recent logs:', error);
+      console.error('Failed to fetch recent logs (non-fatal):', error);
       return [];
     }
   }
@@ -222,7 +242,7 @@ export class SystemLogger {
         return acc;
       }, {} as Record<string, number>);
     } catch (error) {
-      console.error('Failed to get log stats:', error);
+      console.error('Failed to get log stats (non-fatal):', error);
       return {};
     }
   }

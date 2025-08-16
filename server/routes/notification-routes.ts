@@ -9,31 +9,38 @@ const router = Router();
 // Lazy-load web-push and configure it only when needed
 let webPush: any = null;
 let isWebPushConfigured = false;
+let vapidWarned = false;
+
+// Helper to check and warn about VAPID configuration once
+function ensureVapidConfigured(): boolean {
+  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+  
+  const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
+  
+  if (!isConfigured && !vapidWarned) {
+    console.warn('VAPID keys not properly configured. Push notifications will be disabled.');
+    vapidWarned = true;
+  }
+  
+  return isConfigured;
+}
 
 const initializeWebPush = async () => {
   if (isWebPushConfigured) return true;
+
+  // Check VAPID configuration first
+  if (!ensureVapidConfigured()) {
+    return false;
+  }
 
   try {
     const webPushModule = await import('web-push');
     webPush = webPushModule.default;
 
-    const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-    const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+    const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY!;
+    const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
     const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
-
-    // Check if VAPID keys are properly configured
-    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE') {
-      console.warn('VAPID keys not properly configured. Push notifications will be disabled.');
-      console.warn('To enable push notifications, set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables.');
-      console.warn('Generate VAPID keys using: npx web-push generate-vapid-keys');
-      return false;
-    }
-
-    // Validate key format
-    if (VAPID_PRIVATE_KEY.length < 32) {
-      console.warn('VAPID private key appears to be invalid (too short). Push notifications disabled.');
-      return false;
-    }
 
     webPush.setVapidDetails(
       `mailto:${VAPID_EMAIL}`,
@@ -98,7 +105,7 @@ router.get('/preferences', authenticateToken, async (req: any, res) => {
     res.json(response);
   } catch (error) {
     console.error('Error fetching notification preferences:', error);
-    await SystemLogger.logCriticalError('Notification preferences fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Notification preferences fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener preferencias de notificaciones');
   }
 });
@@ -172,7 +179,7 @@ router.put('/preferences', authenticateToken, async (req: any, res) => {
     res.json(response);
   } catch (error) {
     console.error('Error updating notification preferences:', error);
-    await SystemLogger.logCriticalError('Notification preferences update error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Notification preferences update error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar preferencias de notificaciones');
   }
 });
@@ -227,7 +234,7 @@ router.post('/subscribe', authenticateToken, requirePushSupport, async (req: any
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving push subscription:', error);
-    await SystemLogger.logCriticalError('Push subscription error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Push subscription error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar suscripción push');
   }
 });
@@ -259,7 +266,7 @@ router.post('/unsubscribe', authenticateToken, async (req: any, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error unsubscribing from push:', error);
-    await SystemLogger.logCriticalError('Push unsubscription error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Push unsubscription error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al cancelar suscripción push');
   }
 });
@@ -308,7 +315,7 @@ router.post('/test', authenticateToken, requirePushSupport, async (req: any, res
     res.json({ success: true });
   } catch (error) {
     console.error('Error sending test notification:', error);
-    await SystemLogger.logCriticalError('Test notification error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Test notification error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al enviar notificación de prueba');
   }
 });
@@ -378,7 +385,6 @@ router.post('/broadcast', authenticateToken, requireAdmin, requirePushSupport, a
 
     await SystemLogger.log('info', 'Broadcast notification sent', {
       userId: req.user.id,
-      req,
       metadata: { title, body, sent: sentCount, failed: failedCount }
     });
 
@@ -386,7 +392,7 @@ router.post('/broadcast', authenticateToken, requireAdmin, requirePushSupport, a
     res.json({ success: true, sent: sentCount, failed: failedCount });
   } catch (error) {
     console.error('Error sending broadcast notification:', error);
-    await SystemLogger.logCriticalError('Broadcast notification error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Broadcast notification error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al enviar notificación masiva');
   }
 });

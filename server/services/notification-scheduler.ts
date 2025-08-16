@@ -1,6 +1,24 @@
 import { db } from '../database.js';
 import { SystemLogger } from '../utils/logging.js';
 
+// Flag to prevent repeated VAPID warnings
+let vapidWarned = false;
+
+// Helper to check and warn about VAPID configuration once
+function ensureVapidConfigured(): boolean {
+  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+  
+  const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
+  
+  if (!isConfigured && !vapidWarned) {
+    console.warn('VAPID keys not configured. Notification scheduler will not send push notifications.');
+    vapidWarned = true;
+  }
+  
+  return isConfigured;
+}
+
 class NotificationScheduler {
   private isRunning = false;
   private cronJob: any = null;
@@ -14,6 +32,11 @@ class NotificationScheduler {
   private async initializeWebPush() {
     if (this.isConfigured) return true;
 
+    // Check VAPID configuration first
+    if (!ensureVapidConfigured()) {
+      return false;
+    }
+
     try {
       // Dynamically import node-cron and web-push
       const cronModule = await import('node-cron');
@@ -21,21 +44,9 @@ class NotificationScheduler {
       
       this.webPush = webPushModule.default;
 
-      const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-      const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+      const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY!;
+      const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
       const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
-
-      // Check if VAPID keys are properly configured
-      if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE') {
-        console.warn('VAPID keys not configured. Notification scheduler will not send push notifications.');
-        return false;
-      }
-
-      // Validate key format
-      if (VAPID_PRIVATE_KEY.length < 32) {
-        console.warn('VAPID private key appears to be invalid. Notification scheduler disabled.');
-        return false;
-      }
 
       this.webPush.setVapidDetails(
         `mailto:${VAPID_EMAIL}`,

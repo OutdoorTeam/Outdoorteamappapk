@@ -53,36 +53,37 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 
-// Enable trust proxy to get real client IPs
-app.set('trust proxy', true);
+// Enable trust proxy to get real client IPs (REQUIRED for rate limiting behind reverse proxy)
+app.set('trust proxy', 1);
 
 // Initialize schedulers
 let resetScheduler: DailyResetScheduler;
 let notificationScheduler: NotificationScheduler;
 
-// Check and log VAPID configuration
+// Check and log VAPID configuration (single warning only)
+let vapidWarned = false;
 const checkVapidConfiguration = () => {
   const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
   const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
+
+  if (!isConfigured && !vapidWarned) {
     console.warn('⚠️  VAPID keys are not configured!');
     console.warn('   Push notifications will not work.');
     console.warn('   To fix this:');
-    console.warn('   1. Run: npx web-push generate-vapid-keys');
-    console.warn('   2. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables');
-    console.warn('   3. Restart the server');
+    console.warn('   1. Run: npm run generate-vapid');
+    console.warn('   2. Restart the server');
+    vapidWarned = true;
     return false;
   }
 
-  if (VAPID_PRIVATE_KEY === 'YOUR_PRIVATE_KEY_HERE' || VAPID_PRIVATE_KEY.length < 32) {
-    console.warn('⚠️  VAPID private key appears to be invalid!');
-    console.warn('   Generate new keys with: npx web-push generate-vapid-keys');
-    return false;
+  if (isConfigured && !vapidWarned) {
+    console.log('✅ VAPID keys are configured correctly');
+    vapidWarned = true;
   }
 
-  console.log('✅ VAPID keys are configured correctly');
-  return true;
+  return isConfigured;
 };
 
 // Create uploads directory if it doesn't exist
@@ -180,7 +181,7 @@ const formatUserResponse = (user: any) => {
 app.use('/api/', statsRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Auth Routes with Rate Limiting
+// Auth Routes with Rate Limiting (CORRECT ORDER)
 app.post('/api/auth/register',
   registerLimit,
   validateRequest(registerSchema),
@@ -250,7 +251,6 @@ app.post('/api/auth/register',
       console.log('User registered successfully:', newUser.email, 'Role:', newUser.role);
       await SystemLogger.log('info', 'User registered', {
         userId: newUser.id,
-        req,
         metadata: { email: newUser.email, role: newUser.role }
       });
 
@@ -260,14 +260,15 @@ app.post('/api/auth/register',
       });
     } catch (error) {
       console.error('Error registering user:', error);
-      await SystemLogger.logCriticalError('Registration error', error as Error, { req });
+      await SystemLogger.logCriticalError('Registration error', error as Error);
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor al registrar usuario');
     }
   });
 
+// LOGIN ROUTE WITH CORRECT MIDDLEWARE ORDER
 app.post('/api/auth/login',
-  checkLoginBlock, // Check if IP/email is blocked first
-  loginLimit,
+  checkLoginBlock,    // MUST run first - check-only mode, never creates keys
+  loginLimit,         // Creates block keys on limit
   validateRequest(loginSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -337,7 +338,6 @@ app.post('/api/auth/login',
       console.log('Login successful for user:', user.email, 'Role:', user.role, 'Plan:', user.plan_type);
       await SystemLogger.log('info', 'User login successful', {
         userId: user.id,
-        req,
         metadata: { email: user.email, role: user.role }
       });
 
@@ -347,7 +347,7 @@ app.post('/api/auth/login',
       });
     } catch (error) {
       console.error('Error logging in user:', error);
-      await SystemLogger.logCriticalError('Login error', error as Error, { req });
+      await SystemLogger.logCriticalError('Login error', error as Error);
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor al iniciar sesión');
     }
   });
@@ -357,7 +357,7 @@ app.post('/api/auth/reset-password',
   passwordResetLimit,
   async (req: express.Request, res: express.Response) => {
     try {
-      await SystemLogger.log('info', 'Password reset requested', { req });
+      await SystemLogger.log('info', 'Password reset requested');
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Funcionalidad de reset de contraseña aún no implementada');
     } catch (error) {
       console.error('Password reset error:', error);
@@ -421,14 +421,13 @@ app.post('/api/users/:id/assign-plan',
       console.log('Plan assigned successfully:', plan.name, 'to user:', updatedUser.email);
       await SystemLogger.log('info', 'Plan assigned', {
         userId: updatedUser.id,
-        req,
         metadata: { plan_name: plan.name, assigned_by: requestingUserId }
       });
 
       res.json(formatUserResponse(updatedUser));
     } catch (error) {
       console.error('Error assigning plan:', error);
-      await SystemLogger.logCriticalError('Plan assignment error', error as Error, { userId: req.user?.id, req });
+      await SystemLogger.logCriticalError('Plan assignment error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al asignar plan');
     }
   });
@@ -463,7 +462,7 @@ app.get('/api/daily-habits/today', authenticateToken, async (req: any, res: expr
     }
   } catch (error) {
     console.error('Error fetching daily habits:', error);
-    await SystemLogger.logCriticalError('Daily habits fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Daily habits fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener hábitos diarios');
   }
 });
@@ -488,7 +487,7 @@ app.get('/api/daily-habits/weekly-points', authenticateToken, async (req: any, r
     res.json({ total_points: weeklyData?.total_points || 0 });
   } catch (error) {
     console.error('Error fetching weekly points:', error);
-    await SystemLogger.logCriticalError('Weekly points fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Weekly points fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener puntos semanales');
   }
 });
@@ -512,7 +511,7 @@ app.get('/api/daily-habits/calendar', authenticateToken, async (req: any, res: e
     res.json(calendarData);
   } catch (error) {
     console.error('Error fetching calendar data:', error);
-    await SystemLogger.logCriticalError('Calendar data fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Calendar data fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener datos del calendario');
   }
 });
@@ -609,7 +608,7 @@ app.put('/api/daily-habits/update',
         return;
       }
 
-      await SystemLogger.logCriticalError('Daily habits update error', error as Error, { userId: req.user?.id, req });
+      await SystemLogger.logCriticalError('Daily habits update error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar hábitos diarios');
     }
   });
@@ -636,7 +635,7 @@ app.get('/api/daily-notes/today', authenticateToken, async (req: any, res: expre
     }
   } catch (error) {
     console.error('Error fetching daily note:', error);
-    await SystemLogger.logCriticalError('Daily note fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Daily note fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener nota diaria');
   }
 });
@@ -690,7 +689,7 @@ app.post('/api/daily-notes',
       }
     } catch (error) {
       console.error('Error saving note:', error);
-      await SystemLogger.logCriticalError('Daily note save error', error as Error, { userId: req.user?.id, req });
+      await SystemLogger.logCriticalError('Daily note save error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar nota');
     }
   });
@@ -713,7 +712,7 @@ app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: exp
     res.json(sessions);
   } catch (error) {
     console.error('Error fetching meditation sessions:', error);
-    await SystemLogger.logCriticalError('Meditation sessions fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Meditation sessions fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener sesiones de meditación');
   }
 });
@@ -747,7 +746,7 @@ app.post('/api/meditation-sessions',
       res.status(201).json(session);
     } catch (error) {
       console.error('Error saving meditation session:', error);
-      await SystemLogger.logCriticalError('Meditation session save error', error as Error, { userId: req.user?.id, req });
+      await SystemLogger.logCriticalError('Meditation session save error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar sesión de meditación');
     }
   });
@@ -773,7 +772,7 @@ app.get('/api/content-library', authenticateToken, async (req: any, res: express
     res.json(content);
   } catch (error) {
     console.error('Error fetching content library:', error);
-    await SystemLogger.logCriticalError('Content library fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Content library fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener biblioteca de contenido');
   }
 });
@@ -804,14 +803,13 @@ app.post('/api/content-library',
 
       await SystemLogger.log('info', 'Content created', {
         userId: req.user.id,
-        req,
         metadata: { content_id: content?.id, title, category }
       });
 
       res.status(201).json(content);
     } catch (error) {
       console.error('Error creating content:', error);
-      await SystemLogger.logCriticalError('Content creation error', error as Error, { userId: req.user?.id, req });
+      await SystemLogger.logCriticalError('Content creation error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear contenido');
     }
   });
@@ -831,7 +829,7 @@ app.get('/api/workout-of-day', authenticateToken, async (req: any, res: express.
     res.json(workout);
   } catch (error) {
     console.error('Error fetching workout of day:', error);
-    await SystemLogger.logCriticalError('Workout of day fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Workout of day fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener entrenamiento del día');
   }
 });
@@ -861,7 +859,7 @@ app.get('/api/user-files', authenticateToken, async (req: any, res: express.Resp
     res.json(files);
   } catch (error) {
     console.error('Error fetching user files:', error);
-    await SystemLogger.logCriticalError('User files fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('User files fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener archivos del usuario');
   }
 });
@@ -882,7 +880,7 @@ app.get('/api/plans', async (req: express.Request, res: express.Response) => {
     res.json(formattedPlans);
   } catch (error) {
     console.error('Error fetching plans:', error);
-    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { req });
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error);
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
   }
 });
@@ -905,7 +903,7 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
     res.json(formattedUsers);
   } catch (error) {
     console.error('Error fetching users:', error);
-    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
   }
 });
@@ -940,7 +938,7 @@ app.get('/api/test/admin-user', async (req: express.Request, res: express.Respon
     }
   } catch (error) {
     console.error('Error checking admin user:', error);
-    await SystemLogger.logCriticalError('Admin user check error', error as Error, { req });
+    await SystemLogger.logCriticalError('Admin user check error', error as Error);
     res.status(500).json({ error: 'Error checking admin user' });
   }
 });
@@ -952,7 +950,7 @@ app.get('/api/admin/reset-history', authenticateToken, requireAdmin, async (req:
     res.json(history);
   } catch (error) {
     console.error('Error fetching reset history:', error);
-    await SystemLogger.logCriticalError('Reset history fetch error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Reset history fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener historial de reset');
   }
 });
@@ -966,7 +964,7 @@ app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: 
     res.json({ message: 'Reset ejecutado exitosamente' });
   } catch (error) {
     console.error('Error forcing reset:', error);
-    await SystemLogger.logCriticalError('Force reset error', error as Error, { userId: req.user?.id, req });
+    await SystemLogger.logCriticalError('Force reset error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al ejecutar reset forzado');
   }
 });
@@ -974,7 +972,7 @@ app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: 
 // Export a function to start the server
 export async function startServer(port: number) {
   try {
-    // Check VAPID configuration
+    // Check VAPID configuration (single warning only)
     const vapidConfigured = checkVapidConfiguration();
 
     // Initialize the daily reset scheduler
@@ -987,53 +985,25 @@ export async function startServer(port: number) {
     logCorsConfig();
 
     if (process.env.NODE_ENV === 'production') {
+      // In production, serve static files from the Express server
       setupStaticServing(app);
     }
 
     app.listen(port, () => {
-      console.log(`API Server running on port ${port}`);
-      console.log('Database connection established');
-      console.log('Authentication system initialized');
-      console.log('CORS system enabled with strict origin validation');
-      console.log('Rate limiting system enabled');
-      console.log('Role-based access control enabled');
-      console.log('Enhanced file upload system enabled');
-      console.log('User file management system ready');
-      console.log('Content library system enabled');
-      console.log('Meditation session tracking enabled');
-      console.log('Daily habits tracking enabled');
-      console.log('User statistics API enabled');
-
-      if (vapidConfigured) {
-        console.log('✅ Push notification system enabled');
-      } else {
-        console.log('❌ Push notification system DISABLED (VAPID keys not configured)');
-      }
-
-      console.log('Daily reset scheduler initialized (00:05 AM Argentina time)');
-      console.log('Notification scheduler initialized (checking every minute)');
-      console.log('System logging enabled with 90-day retention');
-      console.log('Admin account: franciscodanielechs@gmail.com with password: admin123');
-      console.log('Trust proxy enabled for rate limiting');
-
-      if (!vapidConfigured) {
-        console.log('\n🔧 TO ENABLE PUSH NOTIFICATIONS:');
-        console.log('1. Run: npx web-push generate-vapid-keys');
-        console.log('2. Set environment variables:');
-        console.log('   VAPID_PUBLIC_KEY=<your_public_key>');
-        console.log('   VAPID_PRIVATE_KEY=<your_private_key>');
-        console.log('   VAPID_EMAIL=admin@outdoorteam.com');
-        console.log('3. Restart the server\n');
-      }
+      console.log(`Server running on port ${port}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Data directory: ${DATA_DIRECTORY}`);
     });
-  } catch (err) {
-    console.error('Failed to start server:', err);
+  } catch (error) {
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-// Start the server directly if this is the main module
-if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log('Starting server...');
-  startServer(parseInt(process.env.PORT || '3001'));
+// Start the server if this file is run directly
+if (process.env.NODE_ENV === 'production') {
+  const port = parseInt(process.env.PORT || '3001');
+  startServer(port);
 }
+
+export default app;
