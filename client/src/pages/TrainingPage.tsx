@@ -2,8 +2,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dumbbell, FileText, Eye, CheckCircle, Play, Clock, Target, Calendar } from 'lucide-react';
+import { Dumbbell, FileText, Eye, CheckCircle, Play, ExternalLink, Clock, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
@@ -15,7 +14,6 @@ const TrainingPage: React.FC = () => {
   const { toast } = useToast();
   const [showPDFViewer, setShowPDFViewer] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<any>(null);
-  const [selectedDay, setSelectedDay] = React.useState<number>(1);
   
   // Check if user has access to training features
   const hasTrainingAccess = user?.features?.training || false;
@@ -38,8 +36,8 @@ const TrainingPage: React.FC = () => {
         title: todayHabits?.training_completed ? "Entrenamiento marcado como no completado" : "¡Entrenamiento completado!",
         description: todayHabits?.training_completed ? 
           "Has desmarcado el entrenamiento de hoy" : 
-          "¡Excelente! Has completado tu entrenamiento hoy.",
-        variant: "success",
+          "¡Excelente! Has completado tu entrenamiento de hoy.",
+        variant: "default",
       });
     } catch (error) {
       console.error('Error updating training completion:', error);
@@ -56,32 +54,25 @@ const TrainingPage: React.FC = () => {
     setShowPDFViewer(true);
   };
 
-  const handleVideoClick = (exercise: any) => {
-    if (exercise.content_video_url) {
-      window.open(exercise.content_video_url, '_blank');
-    } else if (exercise.youtube_url) {
-      window.open(exercise.youtube_url, '_blank');
-    }
+  const handleOpenVideo = (url: string) => {
+    window.open(url, '_blank');
   };
 
   const getIntensityColor = (intensity: string) => {
     switch (intensity) {
       case 'baja':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'media':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'alta':
-        return 'bg-red-100 text-red-800';
-      case 'RPE6':
-      case 'RPE7':
-        return 'bg-blue-100 text-blue-800';
-      case 'RPE8':
       case 'RPE9':
-        return 'bg-orange-100 text-orange-800';
       case 'RPE10':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'RPE7':
+      case 'RPE8':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-blue-800 border-blue-200';
     }
   };
 
@@ -138,10 +129,10 @@ const TrainingPage: React.FC = () => {
     );
   }
 
-  const trainingPlan = trainingData?.plan;
-  const planDays = trainingData?.days || [];
+  const plan = trainingData?.plan;
+  const days = trainingData?.days || [];
   const legacyPdf = trainingData?.legacyPdf;
-  const hasStructuredPlan = trainingPlan && planDays.length > 0;
+  const hasStructuredPlan = plan && days.length > 0;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -176,184 +167,127 @@ const TrainingPage: React.FC = () => {
       {/* Main Content */}
       {hasStructuredPlan ? (
         <div className="space-y-6">
-          {/* Plan Overview */}
+          {/* Plan Header */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  {trainingPlan.title}
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-green-100 text-green-800">
-                    {trainingPlan.status === 'published' ? 'Activo' : 'Borrador'}
-                  </Badge>
-                  <Badge variant="outline">v{trainingPlan.version}</Badge>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    {plan.title || 'Plan de Entrenamiento'}
+                  </CardTitle>
+                  <CardDescription>
+                    Plan personalizado - Versión {plan.version} • {plan.status === 'published' ? 'Publicado' : 'Borrador'}
+                  </CardDescription>
                 </div>
+                <Badge variant={plan.status === 'published' ? 'default' : 'secondary'}>
+                  {plan.status === 'published' ? 'Activo' : 'Borrador'}
+                </Badge>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[#D3B869]">{planDays.length}</div>
-                  <div className="text-sm text-muted-foreground">Días</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[#D3B869]">
-                    {planDays.reduce((sum, day) => sum + (day.exercises?.length || 0), 0)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Ejercicios</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[#D3B869]">
-                    {planDays.filter(day => day.exercises && day.exercises.length > 0).length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Días activos</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[#D3B869]">
-                    v{trainingPlan.version}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Versión</div>
-                </div>
-              </div>
-            </CardContent>
           </Card>
 
-          {/* Day Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Seleccionar Día</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 7 }, (_, i) => i + 1).map((dayNum) => {
-                  const dayData = planDays.find(d => d.day_index === dayNum);
-                  const exerciseCount = dayData?.exercises?.length || 0;
-                  
-                  return (
-                    <Button
-                      key={dayNum}
-                      variant={selectedDay === dayNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedDay(dayNum)}
-                      className="flex flex-col h-auto py-3"
-                      disabled={exerciseCount === 0}
-                    >
-                      <span className="font-medium">Día {dayNum}</span>
-                      <span className="text-xs opacity-70">
-                        {exerciseCount} ej.
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Training Days */}
+          <div className="grid gap-6">
+            {days
+              .sort((a, b) => a.day_index - b.day_index)
+              .map((day) => (
+                <Card key={day.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      {day.title || `Día ${day.day_index}`}
+                    </CardTitle>
+                    {day.notes && (
+                      <CardDescription>{day.notes}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {day.exercises.length > 0 ? (
+                      <div className="space-y-4">
+                        {day.exercises
+                          .sort((a, b) => a.sort_order - b.sort_order)
+                          .map((exercise) => (
+                            <Card key={exercise.id} className="border-l-4 border-l-[#D3B869]">
+                              <CardContent className="pt-4">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-lg mb-2">{exercise.exercise_name}</h4>
+                                    
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 text-sm">
+                                      {exercise.sets && exercise.reps && (
+                                        <div className="flex items-center gap-2">
+                                          <Dumbbell className="w-4 h-4 text-muted-foreground" />
+                                          <span>{exercise.sets} × {exercise.reps}</span>
+                                        </div>
+                                      )}
+                                      
+                                      {exercise.intensity && (
+                                        <div className="flex items-center gap-2">
+                                          <Zap className="w-4 h-4 text-muted-foreground" />
+                                          <Badge 
+                                            variant="outline" 
+                                            className={getIntensityColor(exercise.intensity)}
+                                          >
+                                            {exercise.intensity}
+                                          </Badge>
+                                        </div>
+                                      )}
+                                      
+                                      {exercise.rest_seconds && (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="w-4 h-4 text-muted-foreground" />
+                                          <span>{exercise.rest_seconds}s descanso</span>
+                                        </div>
+                                      )}
+                                      
+                                      {exercise.tempo && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-medium">TEMPO:</span>
+                                          <span className="text-xs">{exercise.tempo}</span>
+                                        </div>
+                                      )}
+                                    </div>
 
-          {/* Selected Day Exercises */}
-          {(() => {
-            const selectedDayData = planDays.find(d => d.day_index === selectedDay);
-            if (!selectedDayData || !selectedDayData.exercises || selectedDayData.exercises.length === 0) {
-              return (
-                <Card>
-                  <CardContent className="text-center py-12">
-                    <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-600 mb-2">
-                      Sin ejercicios para el Día {selectedDay}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      No hay ejercicios programados para este día.
-                    </p>
+                                    {exercise.notes && (
+                                      <div className="mb-3">
+                                        <p className="text-sm text-muted-foreground italic">
+                                          💡 {exercise.notes}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Video Button */}
+                                  {(exercise.content_library_id || exercise.youtube_url) && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const url = exercise.content_video_url || exercise.youtube_url;
+                                        if (url) handleOpenVideo(url);
+                                      }}
+                                      className="ml-4"
+                                    >
+                                      <Play className="w-4 h-4 mr-2" />
+                                      Ver Video
+                                    </Button>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Dumbbell className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No hay ejercicios asignados para este día</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              );
-            }
-
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Dumbbell className="w-5 h-5" />
-                    {selectedDayData.title || `Día ${selectedDay}`}
-                  </CardTitle>
-                  {selectedDayData.notes && (
-                    <CardDescription>{selectedDayData.notes}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {selectedDayData.exercises.map((exercise: any, index: number) => (
-                      <Card key={exercise.id} className="border-l-4 border-l-[#D3B869]">
-                        <CardContent className="pt-6">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="text-lg font-medium mb-2">{exercise.exercise_name}</h4>
-                              
-                              {/* Exercise Parameters */}
-                              <div className="flex items-center gap-4 mb-3 text-sm text-muted-foreground">
-                                {exercise.sets && (
-                                  <div className="flex items-center gap-1">
-                                    <Target className="w-4 h-4" />
-                                    <span>{exercise.sets} series</span>
-                                  </div>
-                                )}
-                                {exercise.reps && (
-                                  <div className="flex items-center gap-1">
-                                    <span>{exercise.reps} reps</span>
-                                  </div>
-                                )}
-                                {exercise.rest_seconds && (
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="w-4 h-4" />
-                                    <span>{exercise.rest_seconds}s descanso</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Intensity Badge */}
-                              {exercise.intensity && (
-                                <div className="mb-3">
-                                  <Badge className={getIntensityColor(exercise.intensity)}>
-                                    {exercise.intensity}
-                                  </Badge>
-                                </div>
-                              )}
-
-                              {/* Tempo */}
-                              {exercise.tempo && (
-                                <div className="mb-3 text-sm">
-                                  <span className="text-muted-foreground">Tempo: </span>
-                                  <span className="font-mono">{exercise.tempo}</span>
-                                </div>
-                              )}
-
-                              {/* Notes */}
-                              {exercise.notes && (
-                                <p className="text-sm text-muted-foreground mb-3">{exercise.notes}</p>
-                              )}
-                            </div>
-
-                            {/* Video Button */}
-                            {(exercise.content_video_url || exercise.youtube_url) && (
-                              <Button
-                                onClick={() => handleVideoClick(exercise)}
-                                size="sm"
-                                className="ml-4 bg-red-600 hover:bg-red-700"
-                              >
-                                <Play className="w-4 h-4 mr-2" />
-                                Ver Video
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
+              ))}
+          </div>
         </div>
       ) : legacyPdf ? (
         <Card>
@@ -398,8 +332,8 @@ const TrainingPage: React.FC = () => {
             <div className="text-sm text-muted-foreground">
               <p>Mientras tanto, puedes:</p>
               <ul className="mt-2 space-y-1">
-                <li>• Explorar ejercicios en la sección de Ejercicios</li>
-                <li>• Realizar pausas activas</li>
+                <li>• Realizar actividades de calentamiento general</li>
+                <li>• Mantener tu rutina de ejercicio básico</li>
                 <li>• Contactar a tu entrenador si tienes dudas</li>
               </ul>
             </div>
@@ -407,35 +341,35 @@ const TrainingPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Training Tips */}
+      {/* Tips Card */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-lg">💪 Consejos de Entrenamiento</CardTitle>
+          <CardTitle className="text-lg">💪 Tips de Entrenamiento</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div>
-              <h4 className="font-medium mb-2">Calentamiento</h4>
+              <h4 className="font-medium mb-2">Antes del Entrenamiento</h4>
               <p className="text-muted-foreground">
-                Siempre realiza 5-10 minutos de calentamiento antes de empezar tu entrenamiento.
+                Realiza un calentamiento de 5-10 minutos y asegúrate de estar bien hidratado.
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-2">Técnica</h4>
+              <h4 className="font-medium mb-2">Durante el Entrenamiento</h4>
               <p className="text-muted-foreground">
-                Concéntrate en la forma correcta antes que en el peso. La técnica es fundamental.
+                Mantén la técnica correcta, respeta los tiempos de descanso y escucha a tu cuerpo.
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-2">Descanso</h4>
+              <h4 className="font-medium mb-2">Después del Entrenamiento</h4>
               <p className="text-muted-foreground">
-                Respeta los tiempos de descanso entre series para mantener la intensidad.
+                Realiza estiramientos, hidrátate adecuadamente y permite que tu cuerpo se recupere.
               </p>
             </div>
             <div>
               <h4 className="font-medium mb-2">Progresión</h4>
               <p className="text-muted-foreground">
-                Aumenta gradualmente la intensidad y el volumen semana a semana.
+                Aumenta gradualmente la intensidad y siempre consulta con tu entrenador sobre cambios.
               </p>
             </div>
           </div>
@@ -444,5 +378,26 @@ const TrainingPage: React.FC = () => {
     </div>
   );
 };
+
+// Calendar component for day display - fixed import
+const Calendar = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect height="18" rx="2" ry="2" width="18" x="3" y="4" />
+    <line x1="16" x2="16" y1="2" y2="6" />
+    <line x1="8" x2="8" y1="2" y2="6" />
+    <line x1="3" x2="21" y1="10" y2="10" />
+  </svg>
+);
 
 export default TrainingPage;

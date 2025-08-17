@@ -2,53 +2,65 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Save, Eye, FileText, User } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 import { useUsers } from '@/hooks/api/use-users';
 import { useNutritionPlan, useUpsertNutritionPlan } from '@/hooks/api/use-nutrition-plan';
-import { useToast } from '@/hooks/use-toast';
 import { markdownToSafeHtml } from '@/utils/markdown';
+import { Eye, Save, Send, FileText, User, Clock } from 'lucide-react';
 
-export const NutritionPlanAdmin: React.FC = () => {
+const NutritionPlanAdmin: React.FC = () => {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = React.useState<number | null>(null);
-  const [content, setContent] = React.useState('');
-  const [previewMode, setPreviewMode] = React.useState<'edit' | 'preview'>('edit');
-  
-  // Fetch users
-  const { data: users, isLoading: usersLoading } = useUsers();
-  
-  // Fetch nutrition plan for selected user
-  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(selectedUserId || 0);
-  
-  // Upsert mutation
-  const upsertMutation = useUpsertNutritionPlan(selectedUserId || 0);
+  const [markdownContent, setMarkdownContent] = React.useState('');
+  const [previewMode, setPreviewMode] = React.useState(false);
 
-  // Update content when plan loads
+  // Fetch users and nutrition plan data
+  const { data: users } = useUsers();
+  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(selectedUserId || 0);
+  const upsertPlanMutation = useUpsertNutritionPlan(selectedUserId || 0);
+
+  // Update content when plan data changes
   React.useEffect(() => {
     if (nutritionData?.plan?.content_md) {
-      setContent(nutritionData.plan.content_md);
+      setMarkdownContent(nutritionData.plan.content_md);
     } else {
-      setContent('');
+      setMarkdownContent('');
     }
-  }, [nutritionData]);
+  }, [nutritionData?.plan?.content_md]);
+
+  const handleUserSelect = (userId: string) => {
+    const id = parseInt(userId);
+    setSelectedUserId(id);
+  };
 
   const handleSaveDraft = async () => {
-    if (!selectedUserId) return;
-    
+    if (!selectedUserId) {
+      toast({
+        title: "Error",
+        description: "Selecciona un usuario primero",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await upsertMutation.mutateAsync({
-        content_md: content,
+      await upsertPlanMutation.mutateAsync({
+        content_md: markdownContent,
         status: 'draft'
       });
-      
+
       toast({
         title: "Borrador guardado",
-        description: "Los cambios se han guardado como borrador",
-        variant: "success",
+        description: "El plan nutricional se ha guardado como borrador",
+        variant: "default",
       });
     } catch (error) {
+      console.error('Error saving draft:', error);
       toast({
         title: "Error",
         description: "No se pudo guardar el borrador",
@@ -58,20 +70,37 @@ export const NutritionPlanAdmin: React.FC = () => {
   };
 
   const handlePublish = async () => {
-    if (!selectedUserId || !content.trim()) return;
-    
+    if (!selectedUserId) {
+      toast({
+        title: "Error",
+        description: "Selecciona un usuario primero",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!markdownContent.trim()) {
+      toast({
+        title: "Error",
+        description: "El contenido no puede estar vacío para publicar",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await upsertMutation.mutateAsync({
-        content_md: content,
+      await upsertPlanMutation.mutateAsync({
+        content_md: markdownContent,
         status: 'published'
       });
-      
+
       toast({
-        title: "Plan publicado",
-        description: "El plan nutricional ha sido publicado y es visible para el usuario",
-        variant: "success",
+        title: "¡Plan publicado!",
+        description: "El plan nutricional ha sido publicado exitosamente",
+        variant: "default",
       });
     } catch (error) {
+      console.error('Error publishing plan:', error);
       toast({
         title: "Error",
         description: "No se pudo publicar el plan",
@@ -80,218 +109,210 @@ export const NutritionPlanAdmin: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'published':
-        return <Badge className="bg-green-100 text-green-800">Publicado</Badge>;
-      case 'draft':
-        return <Badge variant="secondary">Borrador</Badge>;
-      default:
-        return null;
-    }
-  };
+  const selectedUser = users?.find(u => u.id === selectedUserId);
 
   return (
     <div className="space-y-6">
       {/* User Selection */}
-      <div>
-        <label className="text-sm font-medium mb-2 block">
-          Seleccionar Usuario
-        </label>
-        <Select
-          value={selectedUserId?.toString() || ''}
-          onValueChange={(value) => setSelectedUserId(parseInt(value))}
-          disabled={usersLoading}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecciona un usuario..." />
-          </SelectTrigger>
-          <SelectContent>
-            {users?.map((user) => (
-              <SelectItem key={user.id} value={user.id.toString()}>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  {user.full_name} ({user.email})
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Seleccionar Usuario
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="user-select">Usuario</Label>
+              <Select onValueChange={handleUserSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un usuario" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users?.map((user) => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{user.full_name}</span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          {user.email}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      {selectedUserId && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Editor */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Editor de Plan
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  {nutritionData?.plan && getStatusBadge(nutritionData.plan.status)}
+            {selectedUser && (
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <h3 className="font-medium">{selectedUser.full_name}</h3>
+                    <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                    <p className="text-sm">
+                      Plan: <Badge variant="outline">{selectedUser.plan_type || 'Sin plan'}</Badge>
+                    </p>
+                  </div>
                   {nutritionData?.plan && (
-                    <Badge variant="outline">v{nutritionData.plan.version}</Badge>
+                    <div className="ml-auto text-right">
+                      <p className="text-sm font-medium">
+                        Estado: <Badge variant={nutritionData.plan.status === 'published' ? 'default' : 'secondary'}>
+                          {nutritionData.plan.status === 'published' ? 'Publicado' : 'Borrador'}
+                        </Badge>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Versión {nutritionData.plan.version}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant={previewMode === 'edit' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setPreviewMode('edit')}
-                >
-                  Editar
-                </Button>
-                <Button
-                  variant={previewMode === 'preview' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setPreviewMode('preview')}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Vista Previa
-                </Button>
-              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-              {previewMode === 'edit' ? (
+      {selectedUserId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Editor de Plan Nutricional
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPreviewMode(!previewMode)}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {previewMode ? 'Editor' : 'Vista previa'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="editor" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="editor">Editor</TabsTrigger>
+                <TabsTrigger value="preview">Vista Previa</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="editor" className="space-y-4">
                 <div>
+                  <Label htmlFor="content">Contenido (Markdown)</Label>
                   <Textarea
-                    placeholder="Escribe el plan nutricional en formato Markdown..."
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    className="min-h-[400px] font-mono text-sm"
+                    id="content"
+                    value={markdownContent}
+                    onChange={(e) => setMarkdownContent(e.target.value)}
+                    placeholder="# Plan Nutricional&#10;&#10;## Desayuno&#10;- Avena con frutas&#10;- Té verde&#10;&#10;## Almuerzo&#10;- Pollo a la plancha&#10;- Ensalada mixta&#10;- Arroz integral"
+                    rows={20}
+                    className="font-mono text-sm"
                   />
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Usa formato Markdown: **negrita**, *cursiva*, # títulos, - listas, etc.
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Usa formato Markdown. Ejemplo: # Título, ## Subtítulo, - Lista, **negrita**, *cursiva*
                   </div>
                 </div>
-              ) : (
-                <div className="border rounded-md p-4 min-h-[400px] bg-muted/20">
-                  {content.trim() ? (
+              </TabsContent>
+
+              <TabsContent value="preview" className="space-y-4">
+                <div className="border rounded-lg p-6 min-h-[400px] bg-white">
+                  {markdownContent.trim() ? (
                     <div 
                       className="prose prose-sm max-w-none"
                       dangerouslySetInnerHTML={{ 
-                        __html: markdownToSafeHtml(content) 
+                        __html: markdownToSafeHtml(markdownContent) 
                       }}
                     />
                   ) : (
-                    <p className="text-muted-foreground italic">
-                      Vista previa aparecerá aquí...
-                    </p>
+                    <div className="text-center text-muted-foreground py-12">
+                      <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>Escribe contenido en el editor para ver la vista previa</p>
+                    </div>
                   )}
                 </div>
-              )}
+              </TabsContent>
+            </Tabs>
 
-              <div className="flex gap-2 pt-4">
-                <Button
-                  onClick={handleSaveDraft}
-                  variant="outline"
-                  disabled={!selectedUserId || upsertMutation.isPending}
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Guardar Borrador
-                </Button>
-                <Button
-                  onClick={handlePublish}
-                  disabled={!selectedUserId || !content.trim() || upsertMutation.isPending}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  Publicar Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Plan Info & Legacy PDF */}
-          <div className="space-y-4">
-            {planLoading ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-                  <p className="text-sm text-muted-foreground">Cargando plan...</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Current Plan Status */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Estado Actual</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {nutritionData?.plan ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Estado:</span>
-                          {getStatusBadge(nutritionData.plan.status)}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Versión:</span>
-                          <Badge variant="outline">v{nutritionData.plan.version}</Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Última actualización:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(nutritionData.plan.updated_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Contenido:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {nutritionData.plan.content_md ? 'Con contenido' : 'Sin contenido'}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground">No hay plan creado para este usuario</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Legacy PDF */}
-                {nutritionData?.legacyPdf && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">PDF Legacy</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
-                        <FileText className="w-8 h-8 text-red-600" />
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{nutritionData.legacyPdf.filename}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Subido el {new Date(nutritionData.legacyPdf.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Este PDF se muestra como fallback cuando no hay contenido Markdown
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {!selectedUserId && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-600 mb-2">
-              Selecciona un Usuario
-            </h3>
-            <p className="text-muted-foreground">
-              Elige un usuario de la lista para gestionar su plan nutricional
-            </p>
+            <div className="flex gap-2 pt-4">
+              <Button
+                onClick={handleSaveDraft}
+                variant="outline"
+                disabled={upsertPlanMutation.isPending}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {upsertPlanMutation.isPending ? 'Guardando...' : 'Guardar Borrador'}
+              </Button>
+              <Button
+                onClick={handlePublish}
+                disabled={upsertPlanMutation.isPending || !markdownContent.trim()}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {upsertPlanMutation.isPending ? 'Publicando...' : 'Publicar Plan'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Legacy PDF Info */}
+      {selectedUserId && nutritionData?.legacyPdf && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="text-blue-800">Plan PDF Existente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <FileText className="w-8 h-8 text-blue-600" />
+              <div>
+                <p className="font-medium text-blue-800">{nutritionData.legacyPdf.filename}</p>
+                <p className="text-sm text-blue-600">
+                  Subido el {new Date(nutritionData.legacyPdf.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`/api/files/${nutritionData.legacyPdf.id}`, '_blank')}
+                className="ml-auto"
+              >
+                Ver PDF
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Help Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>💡 Guía de Markdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <h4 className="font-medium mb-2">Formato básico:</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li><code># Título</code> → Título principal</li>
+                <li><code>## Subtítulo</code> → Subtítulo</li>
+                <li><code>**texto**</code> → <strong>texto en negrita</strong></li>
+                <li><code>*texto*</code> → <em>texto en cursiva</em></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Listas y más:</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li><code>- Item</code> → Lista con viñetas</li>
+                <li><code>1. Item</code> → Lista numerada</li>
+                <li><code>---</code> → Línea separadora</li>
+                <li><code>> Cita</code> → Texto citado</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
+
+export default NutritionPlanAdmin;

@@ -5,7 +5,7 @@ export interface ContentVideo {
   id: number;
   title: string;
   description: string | null;
-  category: 'exercise' | 'active_breaks' | 'meditation';
+  category: string;
   video_url: string;
   is_active: boolean;
   created_at: string;
@@ -17,7 +17,7 @@ export const CONTENT_VIDEOS_KEYS = {
   byCategory: (category: string) => [...CONTENT_VIDEOS_KEYS.all, 'category', category] as const,
 };
 
-// Hook to get all content videos (admin)
+// Hook to get all content videos
 export function useContentVideos() {
   return useQuery({
     queryKey: CONTENT_VIDEOS_KEYS.all,
@@ -27,7 +27,7 @@ export function useContentVideos() {
   });
 }
 
-// Hook to get content videos by category (users)
+// Hook to get content videos by category
 export function useContentVideosByCategory(category: string) {
   return useQuery({
     queryKey: CONTENT_VIDEOS_KEYS.byCategory(category),
@@ -38,7 +38,7 @@ export function useContentVideosByCategory(category: string) {
   });
 }
 
-// Create video mutation
+// Create content video mutation (admin only)
 export function useCreateContentVideo() {
   const queryClient = useQueryClient();
 
@@ -54,7 +54,7 @@ export function useCreateContentVideo() {
   });
 }
 
-// Update video mutation
+// Update content video mutation (admin only)
 export function useUpdateContentVideo() {
   const queryClient = useQueryClient();
 
@@ -70,7 +70,7 @@ export function useUpdateContentVideo() {
   });
 }
 
-// Delete video mutation
+// Delete content video mutation (admin only)
 export function useDeleteContentVideo() {
   const queryClient = useQueryClient();
 

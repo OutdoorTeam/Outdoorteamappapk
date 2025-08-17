@@ -1,114 +1,101 @@
 import * as React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Dumbbell, Apple, Settings, FileText, BarChart3 } from 'lucide-react';
-import { BroadcastNotifications } from '@/components/admin/BroadcastNotifications';
-import { useUsers } from '@/hooks/api/use-users';
-import PlansManagementPage from './admin/PlansManagementPage';
-
-// Import other admin components (assuming they exist)
-// import { UserManagement } from '@/components/admin/UserManagement';
-// import { ContentLibraryManagement } from '@/components/admin/ContentLibraryManagement';
-// import { FileManagement } from '@/components/admin/FileManagement';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUsers, useToggleUserStatus } from '@/hooks/api/use-users';
+import { useToast } from '@/hooks/use-toast';
+import { usePlans } from '@/hooks/api/use-plans';
+import BroadcastNotifications from '@/components/admin/BroadcastNotifications';
+import PlansManagementPage from '@/pages/admin/PlansManagementPage';
+import { 
+  Users, 
+  Shield, 
+  Settings, 
+  Crown,
+  UserCheck,
+  UserX,
+  Bell,
+  Dumbbell,
+  Mail
+} from 'lucide-react';
 
 const AdminPage: React.FC = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
   const { data: users, isLoading: usersLoading } = useUsers();
+  const { data: plans } = usePlans();
+  const toggleUserStatusMutation = useToggleUserStatus();
 
-  const stats = React.useMemo(() => {
-    if (!users) return { total: 0, active: 0, withPlans: 0 };
-    
-    return {
-      total: users.length,
-      active: users.filter(u => u.is_active).length,
-      withPlans: users.filter(u => u.plan_type).length,
-    };
-  }, [users]);
+  const handleToggleUserStatus = async (userId: number, currentStatus: boolean) => {
+    try {
+      await toggleUserStatusMutation.mutateAsync({
+        userId,
+        is_active: !currentStatus
+      });
+      
+      toast({
+        title: !currentStatus ? "Usuario activado" : "Usuario desactivado",
+        description: `El usuario ha sido ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cambiar el estado del usuario",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-600 mb-4">Acceso Denegado</h2>
+          <p className="text-muted-foreground">
+            No tienes permisos para acceder a esta página.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
         <p className="text-muted-foreground">
-          Gestiona usuarios, contenido y configuración de la plataforma
+          Gestiona usuarios, contenido y configuraciones del sistema
         </p>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <Users className="h-10 w-10 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Total Usuarios</p>
-                <p className="text-2xl font-bold">
-                  {usersLoading ? '...' : stats.total}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <Users className="h-10 w-10 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Usuarios Activos</p>
-                <p className="text-2xl font-bold">
-                  {usersLoading ? '...' : stats.active}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center">
-              <BarChart3 className="h-10 w-10 text-[#D3B869]" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Con Plan</p>
-                <p className="text-2xl font-bold">
-                  {usersLoading ? '...' : stats.withPlans}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Admin Tabs */}
-      <Tabs defaultValue="plans" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="plans" className="flex items-center gap-2">
-            <Dumbbell className="w-4 h-4" />
-            <span className="hidden sm:inline">Planes</span>
-          </TabsTrigger>
+      <Tabs defaultValue="users" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Usuarios</span>
+            Usuarios
           </TabsTrigger>
-          <TabsTrigger value="content" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">Contenido</span>
-          </TabsTrigger>
-          <TabsTrigger value="files" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">Archivos</span>
+          <TabsTrigger value="plans" className="flex items-center gap-2">
+            <Dumbbell className="w-4 h-4" />
+            Planes
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Notificaciones
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">Notif.</span>
+            Configuración
           </TabsTrigger>
         </TabsList>
 
-        {/* Plans Management */}
-        <TabsContent value="plans">
-          <PlansManagementPage />
-        </TabsContent>
-
-        {/* Users Management */}
+        {/* Users Tab */}
         <TabsContent value="users">
           <Card>
             <CardHeader>
@@ -117,82 +104,176 @@ const AdminPage: React.FC = () => {
                 Gestión de Usuarios
               </CardTitle>
               <CardDescription>
-                Administra usuarios, roles y estados de cuenta
+                Administra los usuarios registrados en la plataforma
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Componente de gestión de usuarios en desarrollo
-                </p>
-              </div>
+              {usersLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                  <p className="text-sm text-muted-foreground">Cargando usuarios...</p>
+                </div>
+              ) : users && users.length > 0 ? (
+                <div className="space-y-4">
+                  {users.map((userItem) => (
+                    <Card key={userItem.id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            userItem.role === 'admin' ? 'bg-yellow-100' : 'bg-blue-100'
+                          }`}>
+                            {userItem.role === 'admin' ? (
+                              <Crown className="w-5 h-5 text-yellow-600" />
+                            ) : (
+                              <Users className="w-5 h-5 text-blue-600" />
+                            )}
+                          </div>
+                          
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium">{userItem.full_name}</h3>
+                              <Badge variant={userItem.role === 'admin' ? 'default' : 'secondary'}>
+                                {userItem.role === 'admin' ? 'Administrador' : 'Usuario'}
+                              </Badge>
+                              <Badge variant={userItem.is_active ? 'default' : 'destructive'}>
+                                {userItem.is_active ? 'Activo' : 'Inactivo'}
+                              </Badge>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground">{userItem.email}</p>
+                            
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <span>Plan: {userItem.plan_type || 'Sin plan'}</span>
+                              <span>Registrado: {new Date(userItem.created_at).toLocaleDateString()}</span>
+                            </div>
+                            
+                            {/* Features */}
+                            <div className="flex items-center gap-2 mt-2">
+                              {userItem.features.habits && <Badge variant="outline" className="text-xs">Hábitos</Badge>}
+                              {userItem.features.training && <Badge variant="outline" className="text-xs">Entrenamiento</Badge>}
+                              {userItem.features.nutrition && <Badge variant="outline" className="text-xs">Nutrición</Badge>}
+                              {userItem.features.meditation && <Badge variant="outline" className="text-xs">Meditación</Badge>}
+                              {userItem.features.active_breaks && <Badge variant="outline" className="text-xs">Pausas Activas</Badge>}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={userItem.is_active}
+                              onCheckedChange={() => handleToggleUserStatus(userItem.id, userItem.is_active)}
+                              disabled={toggleUserStatusMutation.isPending || userItem.role === 'admin'}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              {userItem.is_active ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </div>
+                          
+                          {userItem.is_active ? (
+                            <UserCheck className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <UserX className="w-5 h-5 text-red-600" />
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">No hay usuarios</h3>
+                  <p className="text-muted-foreground">
+                    Los usuarios registrados aparecerán aquí
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Content Management */}
-        <TabsContent value="content">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Biblioteca de Contenido
-              </CardTitle>
-              <CardDescription>
-                Gestiona videos, ejercicios y material educativo
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Gestión de biblioteca de contenido en desarrollo
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Plans Tab */}
+        <TabsContent value="plans">
+          <PlansManagementPage />
         </TabsContent>
 
-        {/* Files Management */}
-        <TabsContent value="files">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Gestión de Archivos
-              </CardTitle>
-              <CardDescription>
-                Administra PDFs y archivos de usuario
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Gestión de archivos en desarrollo
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Notifications */}
+        {/* Notifications Tab */}
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Notificaciones y Configuración
+                <Bell className="w-5 h-5" />
+                Gestión de Notificaciones
               </CardTitle>
               <CardDescription>
-                Envía mensajes broadcast y configura notificaciones
+                Envía notificaciones masivas a los usuarios
               </CardDescription>
             </CardHeader>
             <CardContent>
               <BroadcastNotifications />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Configuración del Sistema
+                </CardTitle>
+                <CardDescription>
+                  Configuraciones generales de la aplicación
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="p-4">
+                      <h4 className="font-medium mb-2">Estadísticas Generales</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Total de usuarios:</span>
+                          <span className="font-medium">{users?.length || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Usuarios activos:</span>
+                          <span className="font-medium">
+                            {users?.filter(u => u.is_active).length || 0}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Planes disponibles:</span>
+                          <span className="font-medium">{plans?.length || 0}</span>
+                        </div>
+                      </div>
+                    </Card>
+                    
+                    <Card className="p-4">
+                      <h4 className="font-medium mb-2">Estado del Sistema</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span>Base de datos:</span>
+                          <Badge variant="default">Conectada</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Notificaciones Push:</span>
+                          <Badge variant="default">Configuradas</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Versión:</span>
+                          <span className="font-medium">1.0.0</span>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -3,62 +3,50 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, Save, Search } from 'lucide-react';
-import { useAddOrUpdateExercise } from '@/hooks/api/use-training-plan';
-import { useContentLibrary } from '@/hooks/api/use-content-library';
 import { useToast } from '@/hooks/use-toast';
+import { useAddOrUpdateExercise, useDeleteExercise } from '@/hooks/api/use-training-plan';
+import { useContentLibrary } from '@/hooks/api/use-content-library';
+import type { TrainingPlanDay, TrainingExercise } from '@/hooks/api/use-training-plan';
+import { ArrowLeft, Save, Trash2, Play, Search } from 'lucide-react';
 
 interface ExerciseEditorProps {
-  dayId: number;
+  day: TrainingPlanDay;
+  exercise?: TrainingExercise | null;
   userId: number;
-  exercise?: any;
-  onClose: () => void;
+  onBack: () => void;
 }
 
 export const ExerciseEditor: React.FC<ExerciseEditorProps> = ({
-  dayId,
-  userId,
+  day,
   exercise,
-  onClose
+  userId,
+  onBack,
 }) => {
   const { toast } = useToast();
-  const [formData, setFormData] = React.useState({
-    exercise_name: '',
-    content_library_id: null as number | null,
-    youtube_url: '',
-    sets: null as number | null,
-    reps: '',
-    intensity: '',
-    rest_seconds: null as number | null,
-    tempo: '',
-    notes: '',
-    sort_order: 0
-  });
+  const isEditing = !!exercise;
 
-  const addOrUpdateMutation = useAddOrUpdateExercise(userId);
+  // Form state
+  const [exerciseName, setExerciseName] = React.useState(exercise?.exercise_name || '');
+  const [sets, setSets] = React.useState(exercise?.sets?.toString() || '');
+  const [reps, setReps] = React.useState(exercise?.reps || '');
+  const [intensity, setIntensity] = React.useState(exercise?.intensity || '');
+  const [restSeconds, setRestSeconds] = React.useState(exercise?.rest_seconds?.toString() || '');
+  const [tempo, setTempo] = React.useState(exercise?.tempo || '');
+  const [notes, setNotes] = React.useState(exercise?.notes || '');
+  const [youtubeUrl, setYoutubeUrl] = React.useState(exercise?.youtube_url || '');
+  const [selectedLibraryId, setSelectedLibraryId] = React.useState<number | null>(
+    exercise?.content_library_id || null
+  );
+
+  // API hooks
   const { data: contentLibrary } = useContentLibrary();
-
-  // Initialize form with exercise data
-  React.useEffect(() => {
-    if (exercise) {
-      setFormData({
-        exercise_name: exercise.exercise_name || '',
-        content_library_id: exercise.content_library_id || null,
-        youtube_url: exercise.youtube_url || '',
-        sets: exercise.sets || null,
-        reps: exercise.reps || '',
-        intensity: exercise.intensity || '',
-        rest_seconds: exercise.rest_seconds || null,
-        tempo: exercise.tempo || '',
-        notes: exercise.notes || '',
-        sort_order: exercise.sort_order || 0
-      });
-    }
-  }, [exercise]);
+  const addOrUpdateExerciseMutation = useAddOrUpdateExercise(userId);
+  const deleteExerciseMutation = useDeleteExercise(userId);
 
   const handleSave = async () => {
-    if (!formData.exercise_name.trim()) {
+    if (!exerciseName.trim()) {
       toast({
         title: "Error",
         description: "El nombre del ejercicio es requerido",
@@ -67,33 +55,35 @@ export const ExerciseEditor: React.FC<ExerciseEditorProps> = ({
       return;
     }
 
-    // Validate YouTube URL if provided
-    if (formData.youtube_url && !isValidYouTubeUrl(formData.youtube_url)) {
-      toast({
-        title: "Error",
-        description: "La URL de YouTube no es válida",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      await addOrUpdateMutation.mutateAsync({
-        dayId,
-        exerciseData: {
-          ...(exercise && { id: exercise.id }),
-          ...formData
-        }
+      const exerciseData = {
+        id: exercise?.id,
+        exercise_name: exerciseName.trim(),
+        content_library_id: selectedLibraryId,
+        youtube_url: youtubeUrl.trim() || null,
+        sets: sets ? parseInt(sets) : null,
+        reps: reps.trim() || null,
+        intensity: intensity || null,
+        rest_seconds: restSeconds ? parseInt(restSeconds) : null,
+        tempo: tempo.trim() || null,
+        notes: notes.trim() || null,
+        sort_order: exercise?.sort_order || day.exercises.length
+      };
+
+      await addOrUpdateExerciseMutation.mutateAsync({
+        dayId: day.id,
+        exerciseData
       });
 
       toast({
-        title: "Ejercicio guardado",
-        description: exercise ? "Ejercicio actualizado correctamente" : "Ejercicio agregado correctamente",
-        variant: "success",
+        title: isEditing ? "Ejercicio actualizado" : "Ejercicio agregado",
+        description: "Los cambios se han guardado exitosamente",
+        variant: "default",
       });
 
-      onClose();
+      onBack();
     } catch (error) {
+      console.error('Error saving exercise:', error);
       toast({
         title: "Error",
         description: "No se pudo guardar el ejercicio",
@@ -102,206 +92,243 @@ export const ExerciseEditor: React.FC<ExerciseEditorProps> = ({
     }
   };
 
-  const handleContentLibrarySelect = (contentId: string) => {
-    const selectedContent = contentLibrary?.find(c => c.id === parseInt(contentId));
-    if (selectedContent) {
-      setFormData(prev => ({
-        ...prev,
-        content_library_id: selectedContent.id,
-        youtube_url: '', // Clear YouTube URL when selecting from library
-      }));
-    }
-  };
+  const handleDelete = async () => {
+    if (!exercise?.id) return;
 
-  const isValidYouTubeUrl = (url: string): boolean => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este ejercicio?')) {
+      return;
+    }
+
     try {
-      const urlObj = new URL(url);
-      return (
-        (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') ||
-        (urlObj.hostname === 'youtu.be')
-      );
-    } catch {
-      return false;
+      await deleteExerciseMutation.mutateAsync(exercise.id);
+
+      toast({
+        title: "Ejercicio eliminado",
+        description: "El ejercicio ha sido eliminado exitosamente",
+        variant: "default",
+      });
+
+      onBack();
+    } catch (error) {
+      console.error('Error deleting exercise:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el ejercicio",
+        variant: "destructive",
+      });
     }
   };
 
-  const intensityOptions = [
-    { value: 'baja', label: 'Baja' },
-    { value: 'media', label: 'Media' },
-    { value: 'alta', label: 'Alta' },
-    { value: 'RPE6', label: 'RPE 6' },
-    { value: 'RPE7', label: 'RPE 7' },
-    { value: 'RPE8', label: 'RPE 8' },
-    { value: 'RPE9', label: 'RPE 9' },
-    { value: 'RPE10', label: 'RPE 10' },
-  ];
+  const handleLibrarySelect = (value: string) => {
+    const libraryId = value === 'none' ? null : parseInt(value);
+    setSelectedLibraryId(libraryId);
+    
+    if (libraryId && contentLibrary) {
+      const selectedItem = contentLibrary.find(item => item.id === libraryId);
+      if (selectedItem && selectedItem.video_url) {
+        setYoutubeUrl(''); // Clear YouTube URL if selecting from library
+      }
+    }
+  };
+
+  const exerciseLibraryItems = contentLibrary?.filter(item => 
+    item.category === 'exercise' && item.is_active
+  ) || [];
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>
-            {exercise ? 'Editar Ejercicio' : 'Nuevo Ejercicio'}
-          </CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Exercise Name */}
-        <div>
-          <label className="text-sm font-medium mb-1 block">
-            Nombre del ejercicio *
-          </label>
-          <Input
-            value={formData.exercise_name}
-            onChange={(e) => setFormData(prev => ({ ...prev, exercise_name: e.target.value }))}
-            placeholder="Ej: Sentadillas con barra"
-          />
-        </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <CardTitle>
+                {isEditing ? 'Editar Ejercicio' : 'Agregar Ejercicio'}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {day.title || `Día ${day.day_index}`}
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
-        {/* Video Source */}
-        <div className="space-y-4">
-          <label className="text-sm font-medium block">Fuente de video</label>
-          
-          {/* Content Library Selection */}
+      {/* Exercise Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Información del Ejercicio</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Exercise Name */}
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">
-              Seleccionar de biblioteca de contenido
-            </label>
-            <Select 
-              value={formData.content_library_id?.toString() || ''} 
-              onValueChange={handleContentLibrarySelect}
+            <Label htmlFor="exercise-name">Nombre del ejercicio *</Label>
+            <Input
+              id="exercise-name"
+              value={exerciseName}
+              onChange={(e) => setExerciseName(e.target.value)}
+              placeholder="Ej: Press de banca con mancuernas"
+            />
+          </div>
+
+          {/* Video Selection */}
+          <div className="space-y-4">
+            <Label>Video de referencia</Label>
+            
+            <div>
+              <Label htmlFor="library-select">Desde la biblioteca de contenidos</Label>
+              <Select value={selectedLibraryId?.toString() || 'none'} onValueChange={handleLibrarySelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar desde biblioteca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Ninguno</SelectItem>
+                  {exerciseLibraryItems.map((item) => (
+                    <SelectItem key={item.id} value={item.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Play className="w-4 h-4" />
+                        {item.title}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!selectedLibraryId && (
+              <div>
+                <Label htmlFor="youtube-url">O URL de YouTube</Label>
+                <Input
+                  id="youtube-url"
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Exercise Parameters */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="sets">Series</Label>
+              <Input
+                id="sets"
+                type="number"
+                value={sets}
+                onChange={(e) => setSets(e.target.value)}
+                placeholder="3"
+                min="1"
+                max="20"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reps">Repeticiones</Label>
+              <Input
+                id="reps"
+                value={reps}
+                onChange={(e) => setReps(e.target.value)}
+                placeholder="10-12"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="intensity">Intensidad</Label>
+              <Select value={intensity} onValueChange={setIntensity}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Ninguna</SelectItem>
+                  <SelectItem value="baja">Baja</SelectItem>
+                  <SelectItem value="media">Media</SelectItem>
+                  <SelectItem value="alta">Alta</SelectItem>
+                  <SelectItem value="RPE6">RPE 6</SelectItem>
+                  <SelectItem value="RPE7">RPE 7</SelectItem>
+                  <SelectItem value="RPE8">RPE 8</SelectItem>
+                  <SelectItem value="RPE9">RPE 9</SelectItem>
+                  <SelectItem value="RPE10">RPE 10</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="rest">Descanso (seg)</Label>
+              <Input
+                id="rest"
+                type="number"
+                value={restSeconds}
+                onChange={(e) => setRestSeconds(e.target.value)}
+                placeholder="90"
+                min="0"
+                max="600"
+              />
+            </div>
+          </div>
+
+          {/* Tempo */}
+          <div>
+            <Label htmlFor="tempo">Tempo</Label>
+            <Input
+              id="tempo"
+              value={tempo}
+              onChange={(e) => setTempo(e.target.value)}
+              placeholder="Ej: 2-1-2-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Formato: excéntrico-pausa-concéntrico-pausa (ej: 2-1-2-1)
+            </p>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <Label htmlFor="notes">Notas/Instrucciones</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Instrucciones especiales, modificaciones, etc."
+              rows={3}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Actions */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              {isEditing && (
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteExerciseMutation.isPending}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {deleteExerciseMutation.isPending ? 'Eliminando...' : 'Eliminar Ejercicio'}
+                </Button>
+              )}
+            </div>
+            
+            <Button
+              onClick={handleSave}
+              disabled={addOrUpdateExerciseMutation.isPending || !exerciseName.trim()}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Buscar en biblioteca..." />
-              </SelectTrigger>
-              <SelectContent>
-                {contentLibrary?.filter(c => c.category === 'exercise').map(content => (
-                  <SelectItem key={content.id} value={content.id.toString()}>
-                    {content.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Save className="w-4 h-4 mr-2" />
+              {addOrUpdateExerciseMutation.isPending 
+                ? 'Guardando...' 
+                : isEditing 
+                  ? 'Actualizar Ejercicio' 
+                  : 'Guardar Ejercicio'
+              }
+            </Button>
           </div>
-
-          <div className="text-center text-sm text-muted-foreground">
-            — O —
-          </div>
-
-          {/* YouTube URL */}
-          <div>
-            <label className="text-sm text-muted-foreground mb-1 block">
-              URL de YouTube
-            </label>
-            <Input
-              value={formData.youtube_url}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                youtube_url: e.target.value,
-                content_library_id: e.target.value ? null : prev.content_library_id // Clear library selection
-              }))}
-              placeholder="https://www.youtube.com/watch?v=..."
-              disabled={!!formData.content_library_id}
-            />
-          </div>
-        </div>
-
-        {/* Exercise Parameters */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium mb-1 block">Series</label>
-            <Input
-              type="number"
-              value={formData.sets || ''}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                sets: e.target.value ? parseInt(e.target.value) : null 
-              }))}
-              placeholder="Ej: 3"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1 block">Repeticiones</label>
-            <Input
-              value={formData.reps}
-              onChange={(e) => setFormData(prev => ({ ...prev, reps: e.target.value }))}
-              placeholder="Ej: 10-12, AMRAP"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium mb-1 block">Intensidad</label>
-            <Select 
-              value={formData.intensity} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, intensity: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar..." />
-              </SelectTrigger>
-              <SelectContent>
-                {intensityOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-1 block">Descanso (seg)</label>
-            <Input
-              type="number"
-              value={formData.rest_seconds || ''}
-              onChange={(e) => setFormData(prev => ({ 
-                ...prev, 
-                rest_seconds: e.target.value ? parseInt(e.target.value) : null 
-              }))}
-              placeholder="Ej: 90"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-1 block">Tempo (opcional)</label>
-          <Input
-            value={formData.tempo}
-            onChange={(e) => setFormData(prev => ({ ...prev, tempo: e.target.value }))}
-            placeholder="Ej: 3-1-2-1"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-1 block">Notas (opcional)</label>
-          <Textarea
-            value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            placeholder="Instrucciones especiales, variaciones, etc..."
-            rows={3}
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 pt-4">
-          <Button onClick={onClose} variant="outline" className="flex-1">
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={addOrUpdateMutation.isPending || !formData.exercise_name.trim()}
-            className="flex-1"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {exercise ? 'Actualizar' : 'Guardar'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

@@ -3,140 +3,127 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Save, Edit, Trash2, GripVertical } from 'lucide-react';
-import { useAddOrUpdateDay, useAddOrUpdateExercise, useDeleteExercise } from '@/hooks/api/use-training-plan';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAddOrUpdateDay } from '@/hooks/api/use-training-plan';
+import type { TrainingPlanDay } from '@/hooks/api/use-training-plan';
 import { ExerciseEditor } from './ExerciseEditor';
+import { ArrowLeft, Calendar, Save, Plus } from 'lucide-react';
 
 interface TrainingDayEditorProps {
-  planId: number;
-  dayIndex: number;
+  day: TrainingPlanDay;
   userId: number;
-  existingDay?: any;
+  onBack: () => void;
 }
 
 export const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({
-  planId,
-  dayIndex,
+  day,
   userId,
-  existingDay
+  onBack,
 }) => {
   const { toast } = useToast();
-  const [dayTitle, setDayTitle] = React.useState('');
-  const [dayNotes, setDayNotes] = React.useState('');
-  const [editingExercise, setEditingExercise] = React.useState<any>(null);
-  const [showExerciseForm, setShowExerciseForm] = React.useState(false);
-  
-  const updateDayMutation = useAddOrUpdateDay(userId);
-  const deleteExerciseMutation = useDeleteExercise(userId);
+  const [title, setTitle] = React.useState(day.title || `Día ${day.day_index}`);
+  const [notes, setNotes] = React.useState(day.notes || '');
+  const [showExerciseEditor, setShowExerciseEditor] = React.useState(false);
+  const [selectedExercise, setSelectedExercise] = React.useState<any>(null);
 
-  // Initialize form with existing data
-  React.useEffect(() => {
-    if (existingDay) {
-      setDayTitle(existingDay.title || `Día ${dayIndex}`);
-      setDayNotes(existingDay.notes || '');
-    } else {
-      setDayTitle(`Día ${dayIndex}`);
-      setDayNotes('');
-    }
-    setEditingExercise(null);
-    setShowExerciseForm(false);
-  }, [dayIndex, existingDay]);
+  const updateDayMutation = useAddOrUpdateDay(userId);
 
   const handleSaveDay = async () => {
     try {
       await updateDayMutation.mutateAsync({
-        planId,
-        day_index: dayIndex,
-        title: dayTitle,
-        notes: dayNotes,
-        sort_order: dayIndex
+        planId: day.plan_id,
+        day_index: day.day_index,
+        title,
+        notes,
+        sort_order: day.sort_order
       });
 
       toast({
-        title: "Día guardado",
-        description: `Día ${dayIndex} actualizado correctamente`,
-        variant: "success",
+        title: "Día actualizado",
+        description: "Los cambios se han guardado exitosamente",
+        variant: "default",
       });
     } catch (error) {
+      console.error('Error saving day:', error);
       toast({
         title: "Error",
-        description: "No se pudo guardar el día",
+        description: "No se pudieron guardar los cambios",
         variant: "destructive",
       });
     }
-  };
-
-  const handleEditExercise = (exercise: any) => {
-    setEditingExercise(exercise);
-    setShowExerciseForm(true);
   };
 
   const handleAddExercise = () => {
-    setEditingExercise(null);
-    setShowExerciseForm(true);
+    setSelectedExercise(null);
+    setShowExerciseEditor(true);
   };
 
-  const handleCloseExerciseForm = () => {
-    setEditingExercise(null);
-    setShowExerciseForm(false);
+  const handleEditExercise = (exercise: any) => {
+    setSelectedExercise(exercise);
+    setShowExerciseEditor(true);
   };
 
-  const handleDeleteExercise = async (exerciseId: number) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este ejercicio?')) return;
-
-    try {
-      await deleteExerciseMutation.mutateAsync(exerciseId);
-      toast({
-        title: "Ejercicio eliminado",
-        description: "El ejercicio se ha eliminado correctamente",
-        variant: "success",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el ejercicio",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const exercises = existingDay?.exercises || [];
+  if (showExerciseEditor) {
+    return (
+      <ExerciseEditor
+        day={day}
+        exercise={selectedExercise}
+        userId={userId}
+        onBack={() => setShowExerciseEditor(false)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Day Configuration */}
+      {/* Header */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Configuración del Día {dayIndex}</CardTitle>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Editar {title}
+              </CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Day Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuración del Día</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Título del día</label>
+            <Label htmlFor="title">Título del día</Label>
             <Input
-              value={dayTitle}
-              onChange={(e) => setDayTitle(e.target.value)}
-              placeholder={`Día ${dayIndex}`}
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={`Día ${day.day_index}`}
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">Notas (opcional)</label>
+            <Label htmlFor="notes">Notas/Instrucciones</Label>
             <Textarea
-              value={dayNotes}
-              onChange={(e) => setDayNotes(e.target.value)}
-              placeholder="Instrucciones especiales, calentamiento, etc..."
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ej: Entrenar con intensidad moderada, descansar bien entre series..."
               rows={3}
             />
           </div>
 
-          <Button
-            onClick={handleSaveDay}
-            disabled={updateDayMutation.isPending}
-            size="sm"
-          >
+          <Button onClick={handleSaveDay} disabled={updateDayMutation.isPending}>
             <Save className="w-4 h-4 mr-2" />
-            Guardar Día
+            {updateDayMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
         </CardContent>
       </Card>
@@ -145,94 +132,100 @@ export const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              Ejercicios ({exercises.length})
+            <CardTitle>
+              Ejercicios ({day.exercises.length})
             </CardTitle>
-            <Button onClick={handleAddExercise} size="sm">
+            <Button onClick={handleAddExercise}>
               <Plus className="w-4 h-4 mr-2" />
               Agregar Ejercicio
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {exercises.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">
-                No hay ejercicios para este día
-              </p>
-              <Button onClick={handleAddExercise} variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar primer ejercicio
-              </Button>
-            </div>
-          ) : (
-            exercises.map((exercise: any, index: number) => (
-              <div key={exercise.id} className="flex items-start gap-3 p-4 border rounded-lg">
-                <div className="flex-shrink-0 mt-1">
-                  <GripVertical className="w-4 h-4 text-gray-400" />
-                </div>
-                
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-medium">{exercise.exercise_name}</h4>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        {exercise.sets && <span>{exercise.sets} series</span>}
-                        {exercise.reps && <span>{exercise.reps} reps</span>}
-                        {exercise.intensity && (
-                          <span className="bg-muted px-2 py-0.5 rounded text-xs">
-                            {exercise.intensity}
-                          </span>
+        <CardContent>
+          {day.exercises.length > 0 ? (
+            <div className="space-y-4">
+              {day.exercises
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((exercise, index) => (
+                  <Card key={exercise.id} className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium mb-2">{exercise.exercise_name}</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                          {exercise.sets && exercise.reps && (
+                            <div>
+                              <span className="font-medium">Series × Reps:</span>
+                              <br />
+                              {exercise.sets} × {exercise.reps}
+                            </div>
+                          )}
+                          {exercise.intensity && (
+                            <div>
+                              <span className="font-medium">Intensidad:</span>
+                              <br />
+                              {exercise.intensity}
+                            </div>
+                          )}
+                          {exercise.rest_seconds && (
+                            <div>
+                              <span className="font-medium">Descanso:</span>
+                              <br />
+                              {exercise.rest_seconds}s
+                            </div>
+                          )}
+                          {exercise.tempo && (
+                            <div>
+                              <span className="font-medium">Tempo:</span>
+                              <br />
+                              {exercise.tempo}
+                            </div>
+                          )}
+                        </div>
+                        {exercise.notes && (
+                          <div className="mt-2">
+                            <span className="text-sm font-medium">Notas: </span>
+                            <span className="text-sm text-muted-foreground">{exercise.notes}</span>
+                          </div>
+                        )}
+                        {(exercise.content_library_id || exercise.youtube_url) && (
+                          <div className="mt-2">
+                            <span className="text-sm font-medium">Video: </span>
+                            <span className="text-sm text-blue-600">
+                              {exercise.content_title || 'Enlace disponible'}
+                            </span>
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1">
                       <Button
+                        variant="outline"
                         size="sm"
-                        variant="ghost"
                         onClick={() => handleEditExercise(exercise)}
                       >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteExercise(exercise.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
+                        Editar
                       </Button>
                     </div>
-                  </div>
-
-                  {exercise.notes && (
-                    <p className="text-sm text-muted-foreground">{exercise.notes}</p>
-                  )}
-
-                  {(exercise.content_title || exercise.youtube_url) && (
-                    <div className="text-sm text-blue-600">
-                      {exercise.content_title ? 
-                        `📹 ${exercise.content_title}` : 
-                        '🎬 Video de YouTube'
-                      }
-                    </div>
-                  )}
-                </div>
+                  </Card>
+                ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus className="w-8 h-8 text-gray-400" />
               </div>
-            ))
+              <h3 className="text-lg font-medium text-gray-600 mb-2">
+                No hay ejercicios en este día
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                Agrega ejercicios para completar el plan del día
+              </p>
+              <Button onClick={handleAddExercise}>
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar Primer Ejercicio
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Exercise Form Modal/Dialog */}
-      {showExerciseForm && existingDay && (
-        <ExerciseEditor
-          dayId={existingDay.id}
-          userId={userId}
-          exercise={editingExercise}
-          onClose={handleCloseExerciseForm}
-        />
-      )}
     </div>
   );
 };
