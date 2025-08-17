@@ -11,8 +11,8 @@ import {
   useEnsureDraftTrainingPlan,
   usePublishTrainingPlan 
 } from '@/hooks/api/use-training-plan';
-import { TrainingPlanOverview } from './TrainingPlanOverview';
-import { TrainingDayEditor } from './TrainingDayEditor';
+import TrainingPlanOverview from './TrainingPlanOverview';
+import TrainingDayEditor from './TrainingDayEditor';
 import { User, Dumbbell, Plus, Send, FileText } from 'lucide-react';
 
 const TrainingPlanAdmin: React.FC = () => {

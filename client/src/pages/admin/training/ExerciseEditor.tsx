@@ -18,7 +18,7 @@ interface ExerciseEditorProps {
   onBack: () => void;
 }
 
-export const ExerciseEditor: React.FC<ExerciseEditorProps> = ({
+const ExerciseEditor: React.FC<ExerciseEditorProps> = ({
   day,
   exercise,
   userId,
@@ -332,3 +332,5 @@ export const ExerciseEditor: React.FC<ExerciseEditorProps> = ({
     </div>
   );
 };
+
+export default ExerciseEditor;

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAddOrUpdateDay } from '@/hooks/api/use-training-plan';
 import type { TrainingPlanDay } from '@/hooks/api/use-training-plan';
-import { ExerciseEditor } from './ExerciseEditor';
+import ExerciseEditor from './ExerciseEditor';
 import { ArrowLeft, Calendar, Save, Plus } from 'lucide-react';
 
 interface TrainingDayEditorProps {
@@ -16,7 +16,7 @@ interface TrainingDayEditorProps {
   onBack: () => void;
 }
 
-export const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({
+const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({
   day,
   userId,
   onBack,
@@ -229,3 +229,5 @@ export const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({
     </div>
   );
 };
+
+export default TrainingPlanOverview;

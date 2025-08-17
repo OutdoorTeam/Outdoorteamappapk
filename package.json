@@ -41,7 +41,6 @@
     "dotenv": "16.4.7",
     "esbuild": "0.25.1",
     "express": "5.1.0",
-    "isomorphic-dompurify": "^2.26.0",
     "jsdom": "^26.1.0",
     "jsonwebtoken": "^9.0.2",
     "kysely": "^0.28.5",

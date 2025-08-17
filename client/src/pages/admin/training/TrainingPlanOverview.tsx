@@ -190,3 +190,5 @@ export const TrainingPlanOverview: React.FC<TrainingPlanOverviewProps> = ({
     </div>
   );
 };
+
+export default TrainingPlanOverview;

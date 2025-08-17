@@ -1,5 +1,4 @@
 import { marked } from 'marked';
-import DOMPurify from 'isomorphic-dompurify';
 
 // Configure marked for safe rendering
 marked.setOptions({
@@ -16,16 +15,12 @@ export function markdownToSafeHtml(markdown: string): string {
     // Convert markdown to HTML
     const html = marked(markdown);
     
-    // Sanitize the HTML to prevent XSS
-    const safeHtml = DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: [
-        'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 
-        'tr', 'td', 'th', 'hr', 'div', 'span'
-      ],
-      ALLOWED_ATTR: ['class'],
-      ALLOW_DATA_ATTR: false
-    });
+    // Basic HTML sanitization - removing dangerous tags and attributes
+    const safeHtml = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      .replace(/on\w+="[^"]*"/gi, '')
+      .replace(/javascript:/gi, '');
 
     return safeHtml;
   } catch (error) {
