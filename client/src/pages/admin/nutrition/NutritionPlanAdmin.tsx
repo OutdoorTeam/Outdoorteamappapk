@@ -305,7 +305,7 @@ const NutritionPlanAdmin: React.FC = () => {
                 <li><code>- Item</code> → Lista con viñetas</li>
                 <li><code>1. Item</code> → Lista numerada</li>
                 <li><code>---</code> → Línea separadora</li>
-                <li><code>> Cita</code> → Texto citado</li>
+                <li><code>&gt; Cita</code> → Texto citado</li>
               </ul>
             </div>
           </div>
