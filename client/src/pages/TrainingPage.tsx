@@ -1,13 +1,12 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dumbbell, Play, ExternalLink, FileText, Eye } from 'lucide-react';
+import { Dumbbell, FileText, Eye, CheckCircle, PlayCircle, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useContentLibrary } from '@/hooks/api/use-content-library';
 import { useUserFiles } from '@/hooks/api/use-user-files';
-import { useDailyHabits } from '@/hooks/api/use-daily-habits';
-import { useWorkoutOfDay } from '@/hooks/api/use-workout';
+import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
+import { useContentVideosByCategory } from '@/hooks/api/use-content-videos';
 import PDFViewer from '@/components/PDFViewer';
 
 const TrainingPage: React.FC = () => {
@@ -19,21 +18,19 @@ const TrainingPage: React.FC = () => {
   // Check if user has access to training features
   const hasTrainingAccess = user?.features?.training || false;
   
-  // Fetch training content
-  const { data: trainingContent, isLoading: contentLoading } = useContentLibrary('exercise');
-  
   // Fetch user's training files
   const { data: userFiles, isLoading: filesLoading } = useUserFiles('training');
   
   // Daily habits for completion tracking
-  const { data: todayHabits, mutate: updateHabits } = useDailyHabits();
+  const { data: todayHabits } = useTodayHabits();
+  const updateHabitMutation = useUpdateHabit();
   
-  // Workout of the day
-  const { data: workoutOfDay, isLoading: workoutLoading } = useWorkoutOfDay();
+  // Fetch exercise videos
+  const { data: exerciseVideos, isLoading: videosLoading } = useContentVideosByCategory('exercise');
 
   const handleCompleteTraining = async () => {
     try {
-      await updateHabits({
+      await updateHabitMutation.mutateAsync({
         date: new Date().toISOString().split('T')[0],
         training_completed: !todayHabits?.training_completed
       });
@@ -42,7 +39,7 @@ const TrainingPage: React.FC = () => {
         title: todayHabits?.training_completed ? "Entrenamiento marcado como no completado" : "¡Entrenamiento completado!",
         description: todayHabits?.training_completed ? 
           "Has desmarcado el entrenamiento de hoy" : 
-          "¡Excelente trabajo! Has completado tu entrenamiento de hoy.",
+          "¡Excelente! Has completado tu sesión de entrenamiento.",
         variant: "default",
       });
     } catch (error) {
@@ -60,25 +57,8 @@ const TrainingPage: React.FC = () => {
     setShowPDFViewer(true);
   };
 
-  const getVideoEmbedUrl = (url: string) => {
-    // Convert YouTube watch URLs to embed URLs
-    if (url.includes('youtube.com/watch?v=')) {
-      const videoId = url.split('v=')[1];
-      const ampersandPosition = videoId.indexOf('&');
-      if (ampersandPosition !== -1) {
-        return `https://www.youtube.com/embed/${videoId.substring(0, ampersandPosition)}`;
-      }
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    
-    // Convert YouTube short URLs
-    if (url.includes('youtu.be/')) {
-      const videoId = url.split('youtu.be/')[1];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    
-    // For other URLs, return as is (assuming they're already embed-ready)
-    return url;
+  const handleOpenVideo = (videoUrl: string) => {
+    window.open(videoUrl, '_blank');
   };
 
   if (!hasTrainingAccess) {
@@ -118,11 +98,11 @@ const TrainingPage: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Entrenamiento</h1>
         <p className="text-muted-foreground">
-          Accede a tu rutina de entrenamiento, videos y planes personalizados
+          Accede a tu plan de entrenamiento personalizado y videos de ejercicios
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Training Completion Card */}
         <Card>
           <CardHeader>
@@ -130,6 +110,9 @@ const TrainingPage: React.FC = () => {
               <Dumbbell className="w-5 h-5" />
               Entrenamiento de Hoy
             </CardTitle>
+            <CardDescription>
+              Marca cuando hayas completado tu sesión de entrenamiento
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -137,12 +120,19 @@ const TrainingPage: React.FC = () => {
                 <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${
                   todayHabits?.training_completed ? 'bg-green-100' : 'bg-gray-100'
                 }`}>
-                  <Dumbbell className={`w-8 h-8 ${
-                    todayHabits?.training_completed ? 'text-green-600' : 'text-gray-400'
-                  }`} />
+                  {todayHabits?.training_completed ? (
+                    <CheckCircle className="w-10 h-10 text-green-600" />
+                  ) : (
+                    <Dumbbell className="w-10 h-10 text-gray-400" />
+                  )}
                 </div>
                 <p className="font-medium mb-2">
-                  {todayHabits?.training_completed ? '¡Completado!' : 'Pendiente'}
+                  {todayHabits?.training_completed ? '¡Entrenamiento completado!' : 'Entrenamiento pendiente'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {todayHabits?.training_completed ? 
+                    'Has completado tu sesión de entrenamiento de hoy' : 
+                    'Completa tu rutina de entrenamiento para mantenerte en forma'}
                 </p>
               </div>
               
@@ -150,8 +140,14 @@ const TrainingPage: React.FC = () => {
                 onClick={handleCompleteTraining}
                 className="w-full"
                 variant={todayHabits?.training_completed ? "outline" : "default"}
+                disabled={updateHabitMutation.isPending}
               >
-                {todayHabits?.training_completed ? 'Marcar como no hecho' : 'Marcar como completado'}
+                {updateHabitMutation.isPending 
+                  ? 'Actualizando...' 
+                  : todayHabits?.training_completed 
+                    ? 'Marcar como no completado' 
+                    : 'Marcar como completado'
+                }
               </Button>
             </div>
           </CardContent>
@@ -164,23 +160,26 @@ const TrainingPage: React.FC = () => {
               <FileText className="w-5 h-5" />
               Mi Plan de Entrenamiento
             </CardTitle>
+            <CardDescription>
+              Accede a tu plan de entrenamiento personalizado
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {filesLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p className="text-sm text-muted-foreground">Cargando plan...</p>
+              <div className="text-center py-8">
+                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-sm text-muted-foreground">Cargando plan de entrenamiento...</p>
               </div>
             ) : userFiles && userFiles.length > 0 ? (
               <div className="space-y-3">
                 {userFiles.map(file => (
-                  <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={file.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-blue-600" />
+                      <FileText className="w-6 h-6 text-blue-600" />
                       <div>
-                        <p className="font-medium text-sm">{file.filename}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(file.created_at).toLocaleDateString()}
+                        <p className="font-medium">{file.filename}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Plan de Entrenamiento • {new Date(file.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -196,123 +195,64 @@ const TrainingPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-4">
-                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No tienes planes asignados aún</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Workout of the Day Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Entrenamiento del Día</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {workoutLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p className="text-sm text-muted-foreground">Cargando entrenamiento...</p>
-              </div>
-            ) : workoutOfDay ? (
-              <div className="space-y-3">
-                <h3 className="font-medium">{workoutOfDay.title}</h3>
-                {workoutOfDay.description && (
-                  <p className="text-sm text-muted-foreground">{workoutOfDay.description}</p>
-                )}
-                <Button size="sm" className="w-full">
-                  <Play className="w-4 h-4 mr-2" />
-                  Ver Entrenamiento
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <Dumbbell className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No hay entrenamiento programado para hoy</p>
+              <div className="text-center py-8">
+                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-600 mb-2">No tienes planes asignados</h3>
+                <p className="text-muted-foreground">
+                  Tu plan de entrenamiento personalizado aparecerá aquí una vez que sea asignado por el administrador.
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Training Videos Section */}
-      <Card>
+      {/* Exercise Videos Section */}
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Videos de Entrenamiento</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <PlayCircle className="w-5 h-5" />
+            Videos de Entrenamiento
+          </CardTitle>
           <CardDescription>
-            Biblioteca completa de ejercicios y rutinas de entrenamiento
+            Explora nuestra biblioteca de videos de ejercicios y rutinas
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {contentLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-gray-200 aspect-video rounded-lg mb-3"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              ))}
+          {videosLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">Cargando videos...</p>
             </div>
-          ) : trainingContent && trainingContent.length > 0 ? (
+          ) : exerciseVideos && exerciseVideos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {trainingContent.map(content => (
-                <Card key={content.id} className="overflow-hidden">
-                  <div className="aspect-video bg-gray-100">
-                    {content.video_url ? (
-                      content.video_url.includes('youtube.com') || content.video_url.includes('youtu.be') ? (
-                        <iframe
-                          src={getVideoEmbedUrl(content.video_url)}
-                          className="w-full h-full"
-                          frameBorder="0"
-                          allowFullScreen
-                          title={content.title}
-                        />
-                      ) : (
-                        <video
-                          src={content.video_url}
-                          className="w-full h-full object-cover"
-                          controls
-                          preload="metadata"
-                        />
-                      )
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-12 h-12 text-gray-400" />
-                      </div>
-                    )}
+              {exerciseVideos.map(video => (
+                <div key={video.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-3 mb-3">
+                    <PlayCircle className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-lg mb-1 line-clamp-2">{video.title}</h3>
+                      {video.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {video.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold mb-2 line-clamp-2">{content.title}</h3>
-                    {content.description && (
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
-                        {content.description}
-                      </p>
-                    )}
-                    {content.subcategory && (
-                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full mb-3">
-                        {content.subcategory}
-                      </span>
-                    )}
-                    {content.video_url && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => window.open(content.video_url, '_blank')}
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Ver Completo
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+                  <Button 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => handleOpenVideo(video.video_url)}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Ver Video
+                  </Button>
+                </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <Dumbbell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <PlayCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-600 mb-2">No hay videos disponibles</h3>
               <p className="text-muted-foreground">
                 Los videos de entrenamiento aparecerán aquí una vez que sean agregados por el administrador.

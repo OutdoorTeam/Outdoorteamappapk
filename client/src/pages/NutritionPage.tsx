@@ -5,7 +5,7 @@ import { Apple, FileText, Eye, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useUserFiles } from '@/hooks/api/use-user-files';
-import { useDailyHabits } from '@/hooks/api/use-daily-habits';
+import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
 import PDFViewer from '@/components/PDFViewer';
 
 const NutritionPage: React.FC = () => {
@@ -21,11 +21,12 @@ const NutritionPage: React.FC = () => {
   const { data: userFiles, isLoading: filesLoading } = useUserFiles('nutrition');
   
   // Daily habits for completion tracking
-  const { data: todayHabits, mutate: updateHabits } = useDailyHabits();
+  const { data: todayHabits } = useTodayHabits();
+  const updateHabitMutation = useUpdateHabit();
 
   const handleCompleteNutrition = async () => {
     try {
-      await updateHabits({
+      await updateHabitMutation.mutateAsync({
         date: new Date().toISOString().split('T')[0],
         nutrition_completed: !todayHabits?.nutrition_completed
       });
@@ -131,8 +132,14 @@ const NutritionPage: React.FC = () => {
                 onClick={handleCompleteNutrition}
                 className="w-full"
                 variant={todayHabits?.nutrition_completed ? "outline" : "default"}
+                disabled={updateHabitMutation.isPending}
               >
-                {todayHabits?.nutrition_completed ? 'Marcar como no seguido' : 'Marcar como seguido'}
+                {updateHabitMutation.isPending 
+                  ? 'Actualizando...' 
+                  : todayHabits?.nutrition_completed 
+                    ? 'Marcar como no seguido' 
+                    : 'Marcar como seguido'
+                }
               </Button>
             </div>
           </CardContent>
@@ -261,3 +268,14 @@ const NutritionPage: React.FC = () => {
               </div>
               <h4 className="font-medium mb-2">Planificación</h4>
               <p className="text-sm text-muted-foreground">
+                Planifica tus comidas con anticipación para tomar mejores decisiones nutricionales
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default NutritionPage;

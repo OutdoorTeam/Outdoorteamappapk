@@ -1,6 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
 
+export interface MeditationSession {
+  id: number;
+  user_id: number;
+  duration_minutes: number;
+  meditation_type: 'guided' | 'free';
+  breathing_cycle_json: string | null;
+  comment: string | null;
+  completed_at: string;
+}
+
 // Query keys
 export const MEDITATION_KEYS = {
   all: ['meditation'] as const,
@@ -11,35 +21,29 @@ export const MEDITATION_KEYS = {
 export function useMeditationSessions() {
   return useQuery({
     queryKey: MEDITATION_KEYS.sessions(),
-    queryFn: () => apiRequest('/api/meditation-sessions'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryFn: () => apiRequest<MeditationSession[]>('/api/meditation-sessions'),
+    staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
   });
 }
 
-// Mutation for saving meditation session
+// Mutation for saving meditation sessions
 export function useSaveMeditationSession() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (data: {
       duration_minutes: number;
-      meditation_type: string;
+      meditation_type: 'guided' | 'free';
       comment?: string;
       breathing_cycle_json?: string;
     }) =>
-      apiRequest('/api/meditation-sessions', {
+      apiRequest<MeditationSession>('/api/meditation-sessions', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: (newSession) => {
-      // Add the new session to the existing sessions cache
-      queryClient.setQueryData(MEDITATION_KEYS.sessions(), (oldData: any[]) => 
-        oldData ? [newSession, ...oldData] : [newSession]
-      );
-
-      // Invalidate daily habits to reflect meditation completion
-      queryClient.invalidateQueries({ queryKey: ['daily-habits'] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MEDITATION_KEYS.sessions() });
     },
   });
 }
