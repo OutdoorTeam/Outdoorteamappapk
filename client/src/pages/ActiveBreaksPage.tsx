@@ -1,146 +1,18 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { Play, Clock, Target, Zap, Coffee, Activity, ChevronRight } from 'lucide-react';
-
-// Predefined exercises list
-const ACTIVE_BREAKS_EXERCISES = [
-  {
-    title: "Estiramiento de Glúteos",
-    description: "Libera la tensión en los músculos glúteos después de estar sentado",
-    duration: "30-60 segundos",
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example1",
-    instructions: "Siéntate en una silla, coloca el tobillo derecho sobre la rodilla izquierda y presiona suavemente la rodilla hacia abajo."
-  },
-  {
-    title: "Extensión de Hombros en Silla",
-    description: "Alivia la tensión en hombros y cuello por posturas prolongadas",
-    duration: "45 segundos",
-    difficulty: "Fácil", 
-    videoUrl: "https://youtube.com/watch?v=example2",
-    instructions: "Siéntate derecho, entrelaza los dedos por detrás de la cabeza y abre los codos hacia atrás."
-  },
-  {
-    title: "Estiramiento del Piriforme en Silla",
-    description: "Reduce la tensión en la cadera y mejora la movilidad",
-    duration: "60 segundos cada lado",
-    difficulty: "Moderado",
-    videoUrl: "https://youtube.com/watch?v=example3", 
-    instructions: "Cruza una pierna sobre la otra y inclínate hacia adelante manteniendo la espalda recta."
-  },
-  {
-    title: "Rotación Lateral del Tronco",
-    description: "Mejora la movilidad de la columna vertebral",
-    duration: "30 segundos cada lado",
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example4",
-    instructions: "Siéntate derecho y rota el tronco hacia un lado manteniendo las caderas fijas."
-  },
-  {
-    title: "Estiramiento Posterior de Cadera",
-    description: "Alivia la tensión en la parte posterior de la cadera",
-    duration: "45 segundos cada lado", 
-    difficulty: "Moderado",
-    videoUrl: "https://youtube.com/watch?v=example5",
-    instructions: "De pie, lleva una rodilla hacia el pecho y sostén con ambas manos."
-  },
-  {
-    title: "Estiramiento de Isquiotibiales",
-    description: "Estira los músculos posteriores de las piernas",
-    duration: "60 segundos cada pierna",
-    difficulty: "Moderado",
-    videoUrl: "https://youtube.com/watch?v=example6", 
-    instructions: "Extiende una pierna sobre una silla y inclínate hacia adelante desde la cadera."
-  },
-  {
-    title: "Sentadilla Profunda con Apertura de Pecho",
-    description: "Ejercicio completo que activa múltiples grupos musculares",
-    duration: "60-90 segundos",
-    difficulty: "Avanzado",
-    videoUrl: "https://youtube.com/watch?v=example7",
-    instructions: "Baja en sentadilla profunda y abre los brazos hacia los lados expandiendo el pecho."
-  },
-  {
-    title: "Movilidad del Cuello",
-    description: "Reduce la tensión cervical y mejora la flexibilidad del cuello", 
-    duration: "2-3 minutos",
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example8",
-    instructions: "Realiza movimientos suaves del cuello: adelante, atrás, y rotaciones lentas."
-  },
-  {
-    title: "Estiramiento de Psoas y Oblicuos",
-    description: "Estira los flexores de cadera y músculos laterales",
-    duration: "45 segundos cada lado",
-    difficulty: "Moderado",
-    videoUrl: "https://youtube.com/watch?v=example9", 
-    instructions: "Da un paso atrás en estocada y inclínate hacia el lado opuesto."
-  },
-  {
-    title: "Extensión de Rodilla",
-    description: "Fortalece el cuádriceps y mejora la movilidad de la rodilla",
-    duration: "30 segundos cada pierna",
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example10",
-    instructions: "Siéntate en una silla y extiende una pierna completamente, mantén la posición."
-  },
-  {
-    title: "Postura de la Vela",
-    description: "Estiramiento avanzado que mejora la circulación",
-    duration: "60-120 segundos",
-    difficulty: "Avanzado",
-    videoUrl: "https://youtube.com/watch?v=example11",
-    instructions: "Acuéstate boca arriba y eleva las piernas hacia el cielo, apoya la espalda baja con las manos."
-  },
-  {
-    title: "Apertura de Pecho",
-    description: "Contrarresta la postura encorvada y fortalece la espalda",
-    duration: "45-60 segundos", 
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example12",
-    instructions: "Entrelaza las manos por detrás de la espalda y levanta los brazos separándolos del cuerpo."
-  },
-  {
-    title: "Tracción de Rodillas",
-    description: "Alivia la tensión en la espalda baja",
-    duration: "60 segundos",
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example13",
-    instructions: "Acuéstate boca arriba y abraza ambas rodillas hacia el pecho."
-  },
-  {
-    title: "Extensión de Hombros",
-    description: "Mejora la movilidad y fuerza de los hombros",
-    duration: "30-45 segundos",
-    difficulty: "Fácil",
-    videoUrl: "https://youtube.com/watch?v=example14",
-    instructions: "Extiende los brazos hacia arriba y hacia atrás, sintiendo el estiramiento en los hombros."
-  }
-];
+import { Play, Coffee, Clock, Video, Zap, Stretch, Target, Heart } from 'lucide-react';
+import { useContentLibrary } from '@/hooks/api/use-content-library';
 
 const ActiveBreaksPage: React.FC = () => {
-  const { user } = useAuth();
-  const [selectedDifficulty, setSelectedDifficulty] = React.useState<string>('all');
-  const [isLoading, setIsLoading] = React.useState(false);
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Fácil': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Moderado': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Avanzado': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const filteredExercises = selectedDifficulty === 'all' 
-    ? ACTIVE_BREAKS_EXERCISES 
-    : ACTIVE_BREAKS_EXERCISES.filter(ex => ex.difficulty === selectedDifficulty);
+  const { data: activeBreakVideos = [], isLoading } = useContentLibrary('active_breaks');
 
   const openVideo = (videoUrl: string, title: string) => {
-    // In a real app, these would be actual YouTube URLs
-    alert(`Abriendo video instructivo para: ${title}\n\nEn la versión completa, este enlace te llevaría al video de YouTube correspondiente.`);
+    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+      window.open(videoUrl, '_blank');
+    } else {
+      window.open(videoUrl, '_blank');
+    }
   };
 
   if (isLoading) {
@@ -154,248 +26,176 @@ const ActiveBreaksPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Pausas Activas</h1>
-        <p className="text-muted-foreground">Ejercicios rápidos para mantenerte activo y saludable durante el día</p>
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+          <Coffee className="w-8 h-8 text-orange-600" />
+          Pausas Activas
+        </h1>
+        <p className="text-muted-foreground">
+          Ejercicios cortos y efectivos para romper la rutina sedentaria y reactivar tu energía
+        </p>
       </div>
 
-      <div className="space-y-8">
-        {/* Benefits of Active Breaks */}
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500">
-          <CardHeader>
-            <CardTitle className="text-blue-700 flex items-center gap-2">
-              <Target className="w-6 h-6" />
-              ¿Por qué hacer Pausas Activas?
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="text-center p-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Zap className="w-6 h-6 text-blue-600" />
-                </div>
-                <h4 className="font-semibold mb-2 text-blue-800">Mejora la Concentración</h4>
-                <p className="text-sm text-blue-700">
-                  Aumenta tu productividad y claridad mental con descansos activos regulares
-                </p>
-              </div>
-              
-              <div className="text-center p-4">
-                <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Coffee className="w-6 h-6 text-indigo-600" />
-                </div>
-                <h4 className="font-semibold mb-2 text-indigo-800">Reduce el Estrés</h4>
-                <p className="text-sm text-indigo-700">
-                  Libera tensiones acumuladas y mejora tu estado de ánimo naturalmente
-                </p>
-              </div>
-              
-              <div className="text-center p-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Activity className="w-6 h-6 text-purple-600" />
-                </div>
-                <h4 className="font-semibold mb-2 text-purple-800">Previene Lesiones</h4>
-                <p className="text-sm text-purple-700">
-                  Evita problemas posturales y molestias por estar sentado mucho tiempo
-                </p>
+      {/* Introduction Section */}
+      <Card className="mb-8 border-l-4 border-l-orange-500">
+        <CardHeader>
+          <CardTitle className="text-orange-600">¿Qué son las Pausas Activas?</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground">
+            Las pausas activas son breves sesiones de ejercicios físicos que se realizan durante 
+            la jornada laboral o de estudio para combatir el sedentarismo y mejorar el bienestar.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+              <Zap className="w-8 h-8 text-orange-600" />
+              <div>
+                <h4 className="font-semibold text-orange-800">Energiza</h4>
+                <p className="text-sm text-orange-600">Reactiva tu cuerpo</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Filter by difficulty */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtrar por Dificultad</CardTitle>
-            <CardDescription>Elige el nivel que mejor se adapte a tu experiencia actual</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedDifficulty === 'all' ? 'default' : 'outline'}
-                onClick={() => setSelectedDifficulty('all')}
-                size="sm"
-              >
-                Todos ({ACTIVE_BREAKS_EXERCISES.length})
-              </Button>
-              <Button
-                variant={selectedDifficulty === 'Fácil' ? 'default' : 'outline'}
-                onClick={() => setSelectedDifficulty('Fácil')}
-                size="sm"
-                className="border-green-300 text-green-700 hover:bg-green-50"
-              >
-                Fácil ({ACTIVE_BREAKS_EXERCISES.filter(ex => ex.difficulty === 'Fácil').length})
-              </Button>
-              <Button
-                variant={selectedDifficulty === 'Moderado' ? 'default' : 'outline'}
-                onClick={() => setSelectedDifficulty('Moderado')}
-                size="sm"
-                className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-              >
-                Moderado ({ACTIVE_BREAKS_EXERCISES.filter(ex => ex.difficulty === 'Moderado').length})
-              </Button>
-              <Button
-                variant={selectedDifficulty === 'Avanzado' ? 'default' : 'outline'}
-                onClick={() => setSelectedDifficulty('Avanzado')}
-                size="sm"
-                className="border-red-300 text-red-700 hover:bg-red-50"
-              >
-                Avanzado ({ACTIVE_BREAKS_EXERCISES.filter(ex => ex.difficulty === 'Avanzado').length})
-              </Button>
+            
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Stretch className="w-8 h-8 text-blue-600" />
+              <div>
+                <h4 className="font-semibold text-blue-800">Estira</h4>
+                <p className="text-sm text-blue-600">Relaja tensiones</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            
+            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+              <Target className="w-8 h-8 text-green-600" />
+              <div>
+                <h4 className="font-semibold text-green-800">Enfoca</h4>
+                <p className="text-sm text-green-600">Mejora concentración</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+              <Heart className="w-8 h-8 text-red-600" />
+              <div>
+                <h4 className="font-semibold text-red-800">Activa</h4>
+                <p className="text-sm text-red-600">Mejora circulación</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Exercise Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredExercises.map((exercise, index) => (
-            <Card 
-              key={index} 
-              className="hover:shadow-lg transition-all hover:scale-105 border-2 hover:border-primary group"
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg leading-tight pr-2">{exercise.title}</CardTitle>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium border shrink-0 ${getDifficultyColor(exercise.difficulty)}`}>
-                    {exercise.difficulty}
-                  </span>
-                </div>
-                <CardDescription className="text-sm">
-                  {exercise.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  <span>{exercise.duration}</span>
-                </div>
+      {/* Videos Section */}
+      <Card className="border-l-4 border-l-green-500">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Video className="w-5 h-5 text-green-500" />
+            <CardTitle className="text-green-500">Videos de Pausas Activas</CardTitle>
+          </div>
+          <CardDescription>
+            Rutinas cortas y efectivas que puedes hacer desde cualquier lugar
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activeBreakVideos.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {activeBreakVideos.map((video: any) => (
+                <Card key={video.id} className="hover:shadow-lg transition-all hover:scale-105 group">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-lg leading-tight pr-2">{video.title}</CardTitle>
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                        <Play className="w-5 h-5 text-green-600" />
+                      </div>
+                    </div>
+                    <CardDescription className="text-sm">
+                      {video.description || 'Rutina de pausa activa'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {video.duration_minutes && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        {video.duration_minutes} minutos
+                      </div>
+                    )}
+                    <Button 
+                      onClick={() => openVideo(video.video_url, video.title)}
+                      className="w-full group-hover:bg-green-600 group-hover:text-white transition-colors bg-green-50 text-green-600 border border-green-200 hover:bg-green-600"
+                      size="sm"
+                    >
+                      <Play size={16} className="mr-2" />
+                      Ver Rutina
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-600 mb-2">
+                Videos En Preparación
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                Estamos preparando una colección completa de pausas activas para ti.
+              </p>
+              
+              {/* Default exercises while videos are being added */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                <Card className="bg-orange-50 border border-orange-200">
+                  <CardContent className="p-4 text-center">
+                    <Stretch className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+                    <h4 className="font-semibold text-orange-800">Estiramiento de Cuello</h4>
+                    <p className="text-sm text-orange-600">2-3 minutos</p>
+                  </CardContent>
+                </Card>
                 
-                <div className="bg-gray-50 p-3 rounded-lg text-sm">
-                  <h5 className="font-medium mb-1">Instrucciones:</h5>
-                  <p className="text-muted-foreground">{exercise.instructions}</p>
-                </div>
+                <Card className="bg-blue-50 border border-blue-200">
+                  <CardContent className="p-4 text-center">
+                    <Zap className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                    <h4 className="font-semibold text-blue-800">Activación Postural</h4>
+                    <p className="text-sm text-blue-600">5 minutos</p>
+                  </CardContent>
+                </Card>
                 
-                <Button 
-                  onClick={() => openVideo(exercise.videoUrl, exercise.title)}
-                  className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                  size="sm"
-                >
-                  <Play size={16} className="mr-2" />
-                  Ver Video Instructivo
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Quick Tips */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Consejos para Pausas Activas Efectivas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">🕐 Cuándo Hacerlas</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• Cada 1-2 horas de trabajo sedentario</li>
-                  <li>• Al sentir tensión en cuello u hombros</li>
-                  <li>• Durante cambios de actividad</li>
-                  <li>• En momentos de baja energía</li>
-                  <li>• Antes y después de entrenamientos</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">💡 Cómo Maximizar Beneficios</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• Mantén una respiración profunda y controlada</li>
-                  <li>• Concéntrate en los músculos que trabajas</li>
-                  <li>• Realiza movimientos controlados y precisos</li>
-                  <li>• Adapta ejercicios según tu espacio disponible</li>
-                  <li>• Escucha a tu cuerpo y no fuerces</li>
-                </ul>
+                <Card className="bg-green-50 border border-green-200">
+                  <CardContent className="p-4 text-center">
+                    <Heart className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                    <h4 className="font-semibold text-green-800">Movilidad Articular</h4>
+                    <p className="text-sm text-green-600">3-4 minutos</p>
+                  </CardContent>
+                </Card>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Sample Routines */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Rutinas Rápidas Sugeridas</CardTitle>
-            <CardDescription>Secuencias de ejercicios para diferentes momentos del día</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-orange-50 to-yellow-50">
-                <h4 className="font-semibold mb-2 text-orange-800">🌅 Energizante Matutino</h4>
-                <p className="text-sm text-orange-700 mb-3">3-5 minutos para activar el cuerpo</p>
-                <ul className="text-xs text-orange-600 space-y-1">
-                  <li>• Movilidad del cuello</li>
-                  <li>• Extensión de hombros</li>
-                  <li>• Apertura de pecho</li>
-                  <li>• Respiraciones profundas</li>
-                </ul>
-              </div>
-              
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
-                <h4 className="font-semibold mb-2 text-blue-800">💼 Pausa de Oficina</h4>
-                <p className="text-sm text-blue-700 mb-3">2-3 minutos en tu escritorio</p>
-                <ul className="text-xs text-blue-600 space-y-1">
-                  <li>• Rotación lateral del tronco</li>
-                  <li>• Extensión de hombros en silla</li>
-                  <li>• Estiramiento de cuello</li>
-                  <li>• Extensión de rodilla</li>
-                </ul>
-              </div>
-              
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-green-50 to-emerald-50">
-                <h4 className="font-semibold mb-2 text-green-800">🌆 Descanso Vespertino</h4>
-                <p className="text-sm text-green-700 mb-3">5-7 minutos de relajación</p>
-                <ul className="text-xs text-green-600 space-y-1">
-                  <li>• Estiramiento de glúteos</li>
-                  <li>• Tracción de rodillas</li>
-                  <li>• Estiramiento de isquiotibiales</li>
-                  <li>• Respiración relajante</li>
-                </ul>
-              </div>
+      {/* Tips Section */}
+      <Card className="mt-8 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+        <CardHeader>
+          <CardTitle className="text-orange-700">💡 Tips para Pausas Activas Efectivas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <h4 className="font-semibold text-orange-800">Frecuencia</h4>
+              <ul className="text-sm text-orange-700 space-y-2">
+                <li>• Cada 1-2 horas durante tu jornada</li>
+                <li>• Mínimo 3-5 minutos por sesión</li>
+                <li>• Adapta según tu nivel de actividad</li>
+              </ul>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* When to Do Active Breaks */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Cuándo Realizar Pausas Activas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">Señales del Cuerpo</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• Sensación de rigidez en cuello o espalda</li>
-                  <li>• Fatiga mental o pérdida de concentración</li>
-                  <li>• Tensión en hombros o mandíbula</li>
-                  <li>• Sensación de pesadez en las piernas</li>
-                  <li>• Disminución de la productividad</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-3 text-primary">Horarios Recomendados</h4>
-                <ul className="text-sm space-y-2 text-muted-foreground">
-                  <li>• 9:00 AM - Energizante matutino</li>
-                  <li>• 11:30 AM - Pausa pre-almuerzo</li>
-                  <li>• 2:30 PM - Reactivación post-almuerzo</li>
-                  <li>• 4:30 PM - Estiramiento vespertino</li>
-                  <li>• 6:00 PM - Relajación de fin de jornada</li>
-                </ul>
-              </div>
+            
+            <div className="space-y-3">
+              <h4 className="font-semibold text-orange-800">Beneficios</h4>
+              <ul className="text-sm text-orange-700 space-y-2">
+                <li>• Reduce tensión muscular</li>
+                <li>• Mejora concentración y productividad</li>
+                <li>• Previene lesiones por posturas estáticas</li>
+              </ul>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

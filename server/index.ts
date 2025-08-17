@@ -44,7 +44,8 @@ import {
   fileUploadSchema,
   contentLibrarySchema,
   broadcastMessageSchema,
-  planAssignmentSchema
+  planAssignmentSchema,
+  toggleUserStatusSchema
 } from '../shared/validation-schemas.js';
 
 dotenv.config();
@@ -112,7 +113,7 @@ const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     const validation = validateFile(file, {
-      allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'video/mp4', 'text/csv'],
+      allowedMimeTypes: ['application/pdf'],
       maxSizeBytes: 10 * 1024 * 1024 // 10MB limit for PDFs
     });
 
@@ -167,6 +168,7 @@ const formatUserResponse = (user: any) => {
     role: user.role,
     plan_type: user.plan_type,
     created_at: user.created_at,
+    is_active: user.is_active,
     features: {
       habits: features.habits || false,
       training: features.training || false,
@@ -429,6 +431,48 @@ app.post('/api/users/:id/assign-plan',
       console.error('Error assigning plan:', error);
       await SystemLogger.logCriticalError('Plan assignment error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al asignar plan');
+    }
+  });
+
+// Toggle user status (admin only)
+app.put('/api/users/:id/toggle-status',
+  authenticateToken,
+  requireAdmin,
+  validateRequest(toggleUserStatusSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      const { is_active } = req.body;
+
+      console.log('Admin toggling user status:', id, 'to:', is_active);
+
+      // Update user status
+      const updatedUser = await db
+        .updateTable('users')
+        .set({
+          is_active: is_active ? 1 : 0,
+          updated_at: new Date().toISOString()
+        })
+        .where('id', '=', parseInt(id))
+        .returning(['id', 'email', 'full_name', 'is_active'])
+        .executeTakeFirst();
+
+      if (!updatedUser) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Usuario no encontrado');
+        return;
+      }
+
+      console.log('User status updated successfully:', updatedUser.email, 'Active:', updatedUser.is_active);
+      await SystemLogger.log('info', 'User status toggled', {
+        userId: req.user.id,
+        metadata: { target_user: updatedUser.email, new_status: is_active }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      await SystemLogger.logCriticalError('User status toggle error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al cambiar estado del usuario');
     }
   });
 
@@ -784,7 +828,7 @@ app.post('/api/content-library',
   validateRequest(contentLibrarySchema),
   async (req: any, res: express.Response) => {
     try {
-      const { title, description, video_url, category, subcategory } = req.body;
+      const { title, description, video_url, category, subcategory, is_active } = req.body;
       console.log('Admin creating content:', title, 'category:', category);
 
       const content = await db
@@ -795,7 +839,7 @@ app.post('/api/content-library',
           video_url: video_url || null,
           category,
           subcategory: subcategory || null,
-          is_active: 1,
+          is_active: is_active !== undefined ? (is_active ? 1 : 0) : 1,
           created_at: new Date().toISOString()
         })
         .returning(['id', 'title', 'category'])
@@ -811,6 +855,74 @@ app.post('/api/content-library',
       console.error('Error creating content:', error);
       await SystemLogger.logCriticalError('Content creation error', error as Error, { userId: req.user?.id });
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear contenido');
+    }
+  });
+
+app.put('/api/content-library/:id',
+  authenticateToken,
+  requireAdmin,
+  validateRequest(contentLibrarySchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      const { title, description, video_url, category, subcategory, is_active } = req.body;
+      console.log('Admin updating content:', id);
+
+      const content = await db
+        .updateTable('content_library')
+        .set({
+          title,
+          description: description || null,
+          video_url: video_url || null,
+          category,
+          subcategory: subcategory || null,
+          is_active: is_active !== undefined ? (is_active ? 1 : 0) : 1
+        })
+        .where('id', '=', parseInt(id))
+        .returning(['id', 'title', 'category'])
+        .executeTakeFirst();
+
+      if (!content) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Contenido no encontrado');
+        return;
+      }
+
+      await SystemLogger.log('info', 'Content updated', {
+        userId: req.user.id,
+        metadata: { content_id: content.id, title }
+      });
+
+      res.json(content);
+    } catch (error) {
+      console.error('Error updating content:', error);
+      await SystemLogger.logCriticalError('Content update error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar contenido');
+    }
+  });
+
+app.delete('/api/content-library/:id', 
+  authenticateToken, 
+  requireAdmin, 
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      console.log('Admin deleting content:', id);
+
+      await db
+        .deleteFrom('content_library')
+        .where('id', '=', parseInt(id))
+        .execute();
+
+      await SystemLogger.log('info', 'Content deleted', {
+        userId: req.user.id,
+        metadata: { content_id: parseInt(id) }
+      });
+
+      res.json({ message: 'Contenido eliminado exitosamente' });
+    } catch (error) {
+      console.error('Error deleting content:', error);
+      await SystemLogger.logCriticalError('Content deletion error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al eliminar contenido');
     }
   });
 
@@ -864,146 +976,221 @@ app.get('/api/user-files', authenticateToken, async (req: any, res: express.Resp
   }
 });
 
+// Admin user files route
+app.get('/api/admin/user-files', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all user files');
+    
+    const files = await db
+      .selectFrom('user_files')
+      .innerJoin('users', 'user_files.user_id', 'users.id')
+      .select([
+        'user_files.id',
+        'user_files.user_id',
+        'user_files.filename',
+        'user_files.file_type',
+        'user_files.file_path',
+        'user_files.created_at',
+        'users.email as user_email',
+        'users.full_name as user_name'
+      ])
+      .orderBy('user_files.created_at', 'desc')
+      .execute();
+
+    console.log('Admin user files fetched:', files.length);
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching admin user files:', error);
+    await SystemLogger.logCriticalError('Admin user files fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener archivos de usuarios');
+  }
+});
+
+// File upload route
+app.post('/api/upload-user-file',
+  authenticateToken,
+  requireAdmin,
+  upload.single('file'),
+  async (req: any, res: express.Response) => {
+    try {
+      const { user_id, file_type } = req.body;
+      const file = req.file;
+
+      console.log('Uploading file for user:', user_id, 'type:', file_type);
+
+      if (!file) {
+        sendErrorResponse(res, ERROR_CODES.FILE_UPLOAD_ERROR, 'No se proporcionó archivo');
+        return;
+      }
+
+      if (!user_id || !file_type) {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'user_id y file_type son requeridos');
+        return;
+      }
+
+      // Validate file type
+      if (!['training', 'nutrition'].includes(file_type)) {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'file_type debe ser training o nutrition');
+        return;
+      }
+
+      // Check if user exists
+      const user = await db
+        .selectFrom('users')
+        .select(['id', 'email'])
+        .where('id', '=', parseInt(user_id))
+        .executeTakeFirst();
+
+      if (!user) {
+        // Delete uploaded file if user doesn't exist
+        fs.unlinkSync(file.path);
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Usuario no encontrado');
+        return;
+      }
+
+      // Save file info to database
+      const savedFile = await db
+        .insertInto('user_files')
+        .values({
+          user_id: parseInt(user_id),
+          filename: file.filename,
+          file_type: file_type,
+          file_path: file.path,
+          uploaded_by: req.user.id,
+          created_at: new Date().toISOString()
+        })
+        .returning(['id', 'filename', 'file_type'])
+        .executeTakeFirst();
+
+      console.log('File uploaded successfully:', savedFile?.filename);
+      await SystemLogger.log('info', 'File uploaded', {
+        userId: req.user.id,
+        metadata: { 
+          file_id: savedFile?.id, 
+          target_user_id: parseInt(user_id),
+          file_type: file_type,
+          filename: file.filename 
+        }
+      });
+
+      res.status(201).json(savedFile);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      
+      // Clean up uploaded file on error
+      if (req.file?.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+
+      await SystemLogger.logCriticalError('File upload error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al subir archivo');
+    }
+  });
+
+// File serving route
+app.get('/api/files/:id', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    console.log('Serving file:', id, 'to user:', userId);
+
+    let query = db
+      .selectFrom('user_files')
+      .selectAll()
+      .where('id', '=', parseInt(id));
+
+    // Non-admin users can only access their own files
+    if (userRole !== 'admin') {
+      query = query.where('user_id', '=', userId);
+    }
+
+    const file = await query.executeTakeFirst();
+
+    if (!file) {
+      sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Archivo no encontrado');
+      return;
+    }
+
+    // Check if file exists on disk
+    if (!fs.existsSync(file.file_path)) {
+      console.error('File not found on disk:', file.file_path);
+      sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Archivo no encontrado en el sistema');
+      return;
+    }
+
+    // Set appropriate headers for PDF viewing
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
+
+    // Stream the file
+    const fileStream = fs.createReadStream(file.file_path);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (error) => {
+      console.error('Error streaming file:', error);
+      if (!res.headersSent) {
+        sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al cargar archivo');
+      }
+    });
+  } catch (error) {
+    console.error('Error serving file:', error);
+    await SystemLogger.logCriticalError('File serving error', error as Error, { userId: req.user?.id });
+    if (!res.headersSent) {
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al cargar archivo');
+    }
+  }
+});
+
+// Delete file route
+app.delete('/api/user-files/:id', 
+  authenticateToken, 
+  requireAdmin, 
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      console.log('Admin deleting user file:', id);
+
+      // Get file info first
+      const file = await db
+        .selectFrom('user_files')
+        .selectAll()
+        .where('id', '=', parseInt(id))
+        .executeTakeFirst();
+
+      if (!file) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Archivo no encontrado');
+        return;
+      }
+
+      // Delete from database
+      await db
+        .deleteFrom('user_files')
+        .where('id', '=', parseInt(id))
+        .execute();
+
+      // Delete from filesystem
+      if (fs.existsSync(file.file_path)) {
+        fs.unlinkSync(file.file_path);
+      }
+
+      await SystemLogger.log('info', 'File deleted', {
+        userId: req.user.id,
+        metadata: { file_id: parseInt(id), filename: file.filename }
+      });
+
+      res.json({ message: 'Archivo eliminado exitosamente' });
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      await SystemLogger.logCriticalError('File deletion error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al eliminar archivo');
+    }
+  });
+
 // Plans Routes
 app.get('/api/plans', async (req: express.Request, res: express.Response) => {
   try {
     console.log('Fetching all plans');
     const plans = await db.selectFrom('plans').selectAll().execute();
-    console.log('Plans fetched:', plans.length);
-
-    const formattedPlans = plans.map(plan => ({
-      ...plan,
-      services_included: JSON.parse(plan.services_included),
-      features: getUserFeatures(plan.features_json)
-    }));
-
-    res.json(formattedPlans);
-  } catch (error) {
-    console.error('Error fetching plans:', error);
-    await SystemLogger.logCriticalError('Plans fetch error', error as Error);
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
-  }
-});
-
-// Users Routes (Admin only)
-app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
-  try {
-    console.log('Admin fetching all users - requested by:', req.user.email);
-    const users = await db
-      .selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'features_json', 'created_at'])
-      .execute();
-    console.log('Users fetched:', users.length);
-
-    const formattedUsers = users.map(user => ({
-      ...user,
-      features: getUserFeatures(user.features_json)
-    }));
-
-    res.json(formattedUsers);
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
-  }
-});
-
-// Test endpoint to verify admin user setup
-app.get('/api/test/admin-user', async (req: express.Request, res: express.Response) => {
-  try {
-    const adminUser = await db
-      .selectFrom('users')
-      .select(['id', 'email', 'full_name', 'role', 'is_active', 'password_hash', 'plan_type', 'features_json'])
-      .where('email', '=', 'franciscodanielechs@gmail.com')
-      .executeTakeFirst();
-
-    if (adminUser) {
-      console.log('Admin user found:', { ...adminUser, password_hash: adminUser.password_hash ? '[HIDDEN]' : 'NULL' });
-      res.json({
-        message: 'Admin user exists',
-        user: {
-          id: adminUser.id,
-          email: adminUser.email,
-          full_name: adminUser.full_name,
-          role: adminUser.role,
-          is_active: adminUser.is_active,
-          plan_type: adminUser.plan_type,
-          features: getUserFeatures(adminUser.features_json)
-        },
-        password_hash_exists: adminUser.password_hash ? 'Yes' : 'No'
-      });
-    } else {
-      console.log('Admin user not found');
-      res.status(404).json({ message: 'Admin user not found' });
-    }
-  } catch (error) {
-    console.error('Error checking admin user:', error);
-    await SystemLogger.logCriticalError('Admin user check error', error as Error);
-    res.status(500).json({ error: 'Error checking admin user' });
-  }
-});
-
-// Daily Reset API Routes for Admin
-app.get('/api/admin/reset-history', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
-  try {
-    const history = await resetScheduler.getResetHistory(50);
-    res.json(history);
-  } catch (error) {
-    console.error('Error fetching reset history:', error);
-    await SystemLogger.logCriticalError('Reset history fetch error', error as Error, { userId: req.user?.id });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener historial de reset');
-  }
-});
-
-app.post('/api/admin/force-reset', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
-  try {
-    const { date } = req.body;
-    console.log('Admin forcing reset for date:', date || 'today');
-
-    await resetScheduler.forceReset(date);
-    res.json({ message: 'Reset ejecutado exitosamente' });
-  } catch (error) {
-    console.error('Error forcing reset:', error);
-    await SystemLogger.logCriticalError('Force reset error', error as Error, { userId: req.user?.id });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al ejecutar reset forzado');
-  }
-});
-
-// Export a function to start the server
-export async function startServer(port: number) {
-  try {
-    // Check VAPID configuration (single warning only)
-    const vapidConfigured = checkVapidConfiguration();
-
-    // Initialize the daily reset scheduler
-    resetScheduler = new DailyResetScheduler();
-
-    // Initialize the notification scheduler
-    notificationScheduler = new NotificationScheduler();
-
-    // Log CORS configuration in development
-    logCorsConfig();
-
-    if (process.env.NODE_ENV === 'production') {
-      // In production, serve static files from the Express server
-      setupStaticServing(app);
-    }
-
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`Data directory: ${DATA_DIRECTORY}`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Start the server if this file is run directly
-if (process.env.NODE_ENV === 'production') {
-  const port = parseInt(process.env.PORT || '3001');
-  startServer(port);
-}
-
-export default app;
+    console.log('

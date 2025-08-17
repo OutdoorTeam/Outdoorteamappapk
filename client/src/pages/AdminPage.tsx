@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import BroadcastNotifications from '@/components/admin/BroadcastNotifications';
@@ -27,7 +29,11 @@ import {
   Trash2,
   Eye,
   Send,
-  Shield
+  Shield,
+  Video,
+  Edit,
+  Plus,
+  PlayCircle
 } from 'lucide-react';
 
 interface User {
@@ -52,21 +58,43 @@ interface UserFile {
   user_name?: string;
 }
 
+interface ContentVideo {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  video_url: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 const AdminPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
   const [users, setUsers] = React.useState<User[]>([]);
   const [userFiles, setUserFiles] = React.useState<UserFile[]>([]);
-  const [broadcastMessage, setBroadcastMessage] = React.useState('');
+  const [contentVideos, setContentVideos] = React.useState<ContentVideo[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [uploadingFile, setUploadingFile] = React.useState(false);
   const [selectedUserId, setSelectedUserId] = React.useState<number | null>(null);
   const [selectedFileType, setSelectedFileType] = React.useState<'training' | 'nutrition'>('training');
+  
+  // Video form states
+  const [showVideoDialog, setShowVideoDialog] = React.useState(false);
+  const [editingVideo, setEditingVideo] = React.useState<ContentVideo | null>(null);
+  const [videoForm, setVideoForm] = React.useState({
+    title: '',
+    description: '',
+    category: '',
+    video_url: '',
+    is_active: true
+  });
 
   React.useEffect(() => {
     fetchUsers();
     fetchUserFiles();
+    fetchContentVideos();
   }, []);
 
   const fetchUsers = async () => {
@@ -110,6 +138,23 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const fetchContentVideos = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch('/api/content-library', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const videosData = await response.json();
+        console.log('Content videos fetched:', videosData.length);
+        setContentVideos(videosData);
+      }
+    } catch (error) {
+      console.error('Error fetching content videos:', error);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedUserId) return;
@@ -137,13 +182,14 @@ const AdminPage: React.FC = () => {
         });
         fetchUserFiles();
       } else {
-        throw new Error('Upload failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Upload failed');
       }
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({
         title: "Error de subida",
-        description: "No se pudo subir el archivo",
+        description: error instanceof Error ? error.message : "No se pudo subir el archivo",
         variant: "destructive",
       });
     } finally {
@@ -153,6 +199,8 @@ const AdminPage: React.FC = () => {
   };
 
   const handleDeleteFile = async (fileId: number) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este archivo?')) return;
+    
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(`/api/user-files/${fileId}`, {
@@ -208,6 +256,102 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleVideoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!videoForm.title || !videoForm.category || !videoForm.video_url) {
+      toast({
+        title: "Error de validación",
+        description: "Título, categoría y URL del video son requeridos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const method = editingVideo ? 'PUT' : 'POST';
+      const url = editingVideo ? `/api/content-library/${editingVideo.id}` : '/api/content-library';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(videoForm)
+      });
+
+      if (response.ok) {
+        toast({
+          title: editingVideo ? "Video actualizado" : "Video creado",
+          description: `El video se ${editingVideo ? 'actualizó' : 'creó'} exitosamente`,
+          variant: "success",
+        });
+        setShowVideoDialog(false);
+        setEditingVideo(null);
+        setVideoForm({ title: '', description: '', category: '', video_url: '', is_active: true });
+        fetchContentVideos();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Operation failed');
+      }
+    } catch (error) {
+      console.error('Error saving video:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo guardar el video",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteVideo = async (videoId: number) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este video?')) return;
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/content-library/${videoId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Video eliminado",
+          description: "El video se eliminó exitosamente",
+          variant: "success",
+        });
+        fetchContentVideos();
+      }
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el video",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditVideo = (video: ContentVideo) => {
+    setEditingVideo(video);
+    setVideoForm({
+      title: video.title,
+      description: video.description || '',
+      category: video.category,
+      video_url: video.video_url,
+      is_active: video.is_active
+    });
+    setShowVideoDialog(true);
+  };
+
+  const resetVideoForm = () => {
+    setEditingVideo(null);
+    setVideoForm({ title: '', description: '', category: '', video_url: '', is_active: true });
+    setShowVideoDialog(false);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -224,7 +368,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
@@ -232,6 +376,10 @@ const AdminPage: React.FC = () => {
           <TabsTrigger value="files" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Archivos
+          </TabsTrigger>
+          <TabsTrigger value="content" className="flex items-center gap-2">
+            <Video className="w-4 h-4" />
+            Contenido
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -340,37 +488,38 @@ const AdminPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Usuario</Label>
-                    <select
-                      value={selectedUserId || ''}
-                      onChange={(e) => setSelectedUserId(Number(e.target.value) || null)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Seleccionar usuario</option>
-                      {users.filter(u => u.role !== 'admin').map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.full_name} ({user.email})
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={selectedUserId?.toString() || ''} onValueChange={(value) => setSelectedUserId(Number(value) || null)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar usuario" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.filter(u => u.role !== 'admin').map(user => (
+                          <SelectItem key={user.id} value={user.id.toString()}>
+                            {user.full_name} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Tipo de Archivo</Label>
-                    <select
-                      value={selectedFileType}
-                      onChange={(e) => setSelectedFileType(e.target.value as 'training' | 'nutrition')}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="training">Plan de Entrenamiento</option>
-                      <option value="nutrition">Plan de Nutrición</option>
-                    </select>
+                    <Select value={selectedFileType} onValueChange={(value) => setSelectedFileType(value as 'training' | 'nutrition')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="training">Plan de Entrenamiento</SelectItem>
+                        <SelectItem value="nutrition">Plan de Nutrición</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Archivo</Label>
+                    <Label>Archivo (PDF)</Label>
                     <input
                       type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf"
                       onChange={handleFileUpload}
                       disabled={!selectedUserId || uploadingFile}
                       className="w-full p-2 border border-gray-300 rounded-md"
@@ -461,6 +610,213 @@ const AdminPage: React.FC = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="content">
+          <div className="space-y-6">
+            {/* Content Management Header */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gestión de Contenido</CardTitle>
+                    <CardDescription>
+                      Administra los videos y contenido multimedia de la plataforma
+                    </CardDescription>
+                  </div>
+                  <Dialog open={showVideoDialog} onOpenChange={setShowVideoDialog}>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => resetVideoForm()}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Agregar Video
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingVideo ? 'Editar Video' : 'Agregar Nuevo Video'}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {editingVideo ? 'Modifica los datos del video' : 'Completa la información para agregar un nuevo video'}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleVideoSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="title">Título *</Label>
+                          <Input
+                            id="title"
+                            value={videoForm.title}
+                            onChange={(e) => setVideoForm(prev => ({ ...prev, title: e.target.value }))}
+                            placeholder="Ej: Rutina de Calentamiento"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="description">Descripción</Label>
+                          <Textarea
+                            id="description"
+                            value={videoForm.description}
+                            onChange={(e) => setVideoForm(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Descripción del video..."
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="category">Categoría *</Label>
+                          <Select value={videoForm.category} onValueChange={(value) => setVideoForm(prev => ({ ...prev, category: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="exercise">Entrenamiento</SelectItem>
+                              <SelectItem value="active_breaks">Pausas Activas</SelectItem>
+                              <SelectItem value="meditation">Meditación</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="video_url">URL del Video *</Label>
+                          <Input
+                            id="video_url"
+                            value={videoForm.video_url}
+                            onChange={(e) => setVideoForm(prev => ({ ...prev, video_url: e.target.value }))}
+                            placeholder="https://www.youtube.com/watch?v=... o URL de archivo .mp4"
+                            required
+                          />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="is_active"
+                            checked={videoForm.is_active}
+                            onCheckedChange={(checked) => setVideoForm(prev => ({ ...prev, is_active: checked }))}
+                          />
+                          <Label htmlFor="is_active">Video activo (visible para usuarios)</Label>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4">
+                          <Button type="button" variant="outline" onClick={resetVideoForm}>
+                            Cancelar
+                          </Button>
+                          <Button type="submit">
+                            {editingVideo ? 'Actualizar' : 'Crear'} Video
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {/* Videos List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Videos ({contentVideos.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Video</TableHead>
+                        <TableHead>Categoría</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contentVideos.map(video => (
+                        <TableRow key={video.id}>
+                          <TableCell>
+                            <div className="flex items-start gap-3">
+                              <PlayCircle className="w-5 h-5 text-blue-600 mt-1" />
+                              <div>
+                                <div className="font-medium">{video.title}</div>
+                                {video.description && (
+                                  <div className="text-sm text-muted-foreground mt-1">
+                                    {video.description.substring(0, 100)}
+                                    {video.description.length > 100 && '...'}
+                                  </div>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {video.video_url}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              video.category === 'exercise' ? 'bg-blue-100 text-blue-800' :
+                              video.category === 'active_breaks' ? 'bg-orange-100 text-orange-800' :
+                              video.category === 'meditation' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {video.category === 'exercise' ? 'Entrenamiento' :
+                               video.category === 'active_breaks' ? 'Pausas Activas' :
+                               video.category === 'meditation' ? 'Meditación' :
+                               video.category}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              video.is_active 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {video.is_active ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(video.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(video.video_url, '_blank')}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditVideo(video)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDeleteVideo(video.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {contentVideos.length === 0 && (
+                  <div className="text-center py-12">
+                    <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-600 mb-2">No hay videos</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Agrega videos para que aparezcan en las secciones de usuarios
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="notifications">
           <BroadcastNotifications />
         </TabsContent>
@@ -491,6 +847,10 @@ const AdminPage: React.FC = () => {
                   <span className="font-bold text-red-600">
                     {users.filter(u => u.role === 'admin').length}
                   </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Videos:</span>
+                  <span className="font-bold text-blue-600">{contentVideos.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Archivos subidos:</span>
