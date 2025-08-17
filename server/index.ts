@@ -821,6 +821,177 @@ app.get('/api/content-library', authenticateToken, async (req: any, res: express
   }
 });
 
+// New content_videos routes
+app.get('/api/content-videos', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { category } = req.query;
+    const userRole = req.user.role;
+    
+    console.log('Fetching content videos for user:', req.user.email, 'category:', category, 'role:', userRole);
+
+    let query = db.selectFrom('content_videos').selectAll();
+
+    // Non-admin users can only see active videos
+    if (userRole !== 'admin') {
+      query = query.where('is_active', '=', 1);
+    }
+
+    if (category) {
+      query = query.where('category', '=', category as string);
+    }
+
+    const videos = await query
+      .orderBy('created_at', 'desc')
+      .execute();
+
+    console.log('Content videos fetched:', videos.length);
+    res.json(videos);
+  } catch (error) {
+    console.error('Error fetching content videos:', error);
+    await SystemLogger.logCriticalError('Content videos fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener videos de contenido');
+  }
+});
+
+// Admin content videos management
+app.post('/api/content-videos',
+  authenticateToken,
+  requireAdmin,
+  async (req: any, res: express.Response) => {
+    try {
+      const { title, description, category, video_url, is_active } = req.body;
+      console.log('Admin creating content video:', title, 'category:', category);
+
+      // Basic validation
+      if (!title || !category || !video_url) {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'Título, categoría y URL del video son requeridos');
+        return;
+      }
+
+      if (!['exercise', 'active_breaks', 'meditation'].includes(category)) {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'Categoría inválida');
+        return;
+      }
+
+      // Basic URL validation
+      try {
+        new URL(video_url);
+      } catch {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'La URL del video no es válida');
+        return;
+      }
+
+      const video = await db
+        .insertInto('content_videos')
+        .values({
+          title,
+          description: description || null,
+          category,
+          video_url,
+          is_active: is_active !== undefined ? (is_active ? 1 : 0) : 1,
+          created_at: new Date().toISOString()
+        })
+        .returning(['id', 'title', 'category'])
+        .executeTakeFirst();
+
+      await SystemLogger.log('info', 'Content video created', {
+        userId: req.user.id,
+        metadata: { video_id: video?.id, title, category }
+      });
+
+      res.status(201).json(video);
+    } catch (error) {
+      console.error('Error creating content video:', error);
+      await SystemLogger.logCriticalError('Content video creation error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear video');
+    }
+  });
+
+app.put('/api/content-videos/:id',
+  authenticateToken,
+  requireAdmin,
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      const { title, description, category, video_url, is_active } = req.body;
+      console.log('Admin updating content video:', id);
+
+      // Basic validation
+      if (!title || !category || !video_url) {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'Título, categoría y URL del video son requeridos');
+        return;
+      }
+
+      if (!['exercise', 'active_breaks', 'meditation'].includes(category)) {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'Categoría inválida');
+        return;
+      }
+
+      // Basic URL validation
+      try {
+        new URL(video_url);
+      } catch {
+        sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'La URL del video no es válida');
+        return;
+      }
+
+      const video = await db
+        .updateTable('content_videos')
+        .set({
+          title,
+          description: description || null,
+          category,
+          video_url,
+          is_active: is_active !== undefined ? (is_active ? 1 : 0) : 1
+        })
+        .where('id', '=', parseInt(id))
+        .returning(['id', 'title', 'category'])
+        .executeTakeFirst();
+
+      if (!video) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Video no encontrado');
+        return;
+      }
+
+      await SystemLogger.log('info', 'Content video updated', {
+        userId: req.user.id,
+        metadata: { video_id: video.id, title }
+      });
+
+      res.json(video);
+    } catch (error) {
+      console.error('Error updating content video:', error);
+      await SystemLogger.logCriticalError('Content video update error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar video');
+    }
+  });
+
+app.delete('/api/content-videos/:id', 
+  authenticateToken, 
+  requireAdmin, 
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      console.log('Admin deleting content video:', id);
+
+      await db
+        .deleteFrom('content_videos')
+        .where('id', '=', parseInt(id))
+        .execute();
+
+      await SystemLogger.log('info', 'Content video deleted', {
+        userId: req.user.id,
+        metadata: { video_id: parseInt(id) }
+      });
+
+      res.json({ message: 'Video eliminado exitosamente' });
+    } catch (error) {
+      console.error('Error deleting content video:', error);
+      await SystemLogger.logCriticalError('Content video deletion error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al eliminar video');
+    }
+  });
+
 // Admin content management (using existing content_library table)
 app.post('/api/content-library',
   authenticateToken,

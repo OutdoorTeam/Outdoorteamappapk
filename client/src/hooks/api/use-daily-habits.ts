@@ -72,3 +72,63 @@ export function useUpdateHabit() {
     },
   });
 }
+
+/**
+ * Composite hook that aggregates all daily habits related functionality.
+ * 
+ * ARCHITECTURE DECISION: Opción B - Wrapper Hook
+ * 
+ * Why this approach over refactoring all imports (Opción A)?
+ * 
+ * 1. BACKWARD COMPATIBILITY: Existing components importing useDailyHabits continue working
+ *    without breaking changes, following semantic versioning principles.
+ * 
+ * 2. DEVELOPER EXPERIENCE: Provides a single import for components that need multiple 
+ *    habits operations, reducing import complexity and cognitive load.
+ * 
+ * 3. CONSISTENCY: Matches the expected pattern where components expect a unified interface
+ *    for related operations (habits data + mutation in one place).
+ * 
+ * 4. COMPOSITION OVER FRAGMENTATION: Follows React Query best practices of composing
+ *    multiple queries/mutations into logical units while keeping individual hooks available
+ *    for granular use cases.
+ * 
+ * 5. FUTURE EXTENSIBILITY: Easy to add new habits-related functionality to this wrapper
+ *    without changing consumer components.
+ * 
+ * 6. SEPARATION OF CONCERNS: Maintains granular hooks (useTodayHabits, useWeeklyPoints, etc.)
+ *    for components that only need specific functionality, while providing a unified API
+ *    for complex use cases.
+ */
+export function useDailyHabits() {
+  const todayHabits = useTodayHabits();
+  const weeklyPoints = useWeeklyPoints();
+  const calendarData = useCalendarData();
+  const updateHabitMutation = useUpdateHabit();
+
+  return {
+    // Today's habits data and loading state
+    data: todayHabits.data,
+    isLoading: todayHabits.isLoading,
+    error: todayHabits.error,
+    
+    // Weekly summary
+    weeklyData: weeklyPoints.data,
+    weeklyLoading: weeklyPoints.isLoading,
+    
+    // Calendar view data
+    calendarData: calendarData.data,
+    calendarLoading: calendarData.isLoading,
+    
+    // Mutation function for updating habits
+    mutate: updateHabitMutation.mutateAsync,
+    updateHabit: updateHabitMutation.mutateAsync,
+    isPending: updateHabitMutation.isPending,
+    
+    // Individual hook access for advanced use cases
+    todayHabits,
+    weeklyPoints,
+    calendarData,
+    updateHabitMutation,
+  };
+}
