@@ -230,4 +230,4 @@ const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({
   );
 };
 
-export default TrainingPlanOverview;
+export default TrainingDayEditor;
