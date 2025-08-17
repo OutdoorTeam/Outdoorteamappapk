@@ -61,7 +61,7 @@ interface UserFile {
 interface ContentVideo {
   id: number;
   title: string;
-  description: string;
+  description: string | null;
   category: string;
   video_url: string;
   is_active: boolean;
@@ -141,7 +141,7 @@ const AdminPage: React.FC = () => {
   const fetchContentVideos = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/content-library', {
+      const response = await fetch('/api/content-videos', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -305,7 +305,7 @@ const AdminPage: React.FC = () => {
     try {
       const token = localStorage.getItem('auth_token');
       const method = editingVideo ? 'PUT' : 'POST';
-      const url = editingVideo ? `/api/content-library/${editingVideo.id}` : '/api/content-library';
+      const url = editingVideo ? `/api/content-videos/${editingVideo.id}` : '/api/content-videos';
       
       const response = await fetch(url, {
         method,
@@ -345,7 +345,7 @@ const AdminPage: React.FC = () => {
     
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/content-library/${videoId}`, {
+      const response = await fetch(`/api/content-videos/${videoId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -420,7 +420,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
@@ -800,8 +800,8 @@ const AdminPage: React.FC = () => {
                                   </div>
                                 )}
                                 <div className="text-xs text-muted-foreground mt-1 break-all">
-                                  {video.video_url.substring(0, 60)}
-                                  {video.video_url.length > 60 && '...'}
+                                  {video.video_url?.substring(0, 60) || ''}
+                                  {video.video_url && video.video_url.length > 60 && '...'}
                                 </div>
                               </div>
                             </div>
@@ -940,10 +940,10 @@ const AdminPage: React.FC = () => {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
-                  onClick={() => window.location.href = '/exercises'}
+                  onClick={() => window.location.href = '/training'}
                 >
                   <Activity className="w-4 h-4 mr-2" />
-                  Ver Biblioteca de Ejercicios
+                  Ver Entrenamiento
                 </Button>
                 
                 <Button 

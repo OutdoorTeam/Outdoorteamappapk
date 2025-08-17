@@ -116,8 +116,8 @@ export function useDailyHabits() {
     weeklyData: weeklyPoints.data,
     weeklyLoading: weeklyPoints.isLoading,
     
-    // Calendar view data
-    calendarData: calendarData.data,
+    // Calendar view data (fixed duplicate key)
+    calendarHabits: calendarData.data,
     calendarLoading: calendarData.isLoading,
     
     // Mutation function for updating habits
@@ -128,7 +128,6 @@ export function useDailyHabits() {
     // Individual hook access for advanced use cases
     todayHabits,
     weeklyPoints,
-    calendarData,
     updateHabitMutation,
   };
 }

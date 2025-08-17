@@ -21,7 +21,7 @@ export const CONTENT_VIDEOS_KEYS = {
 export function useContentVideos() {
   return useQuery({
     queryKey: CONTENT_VIDEOS_KEYS.all,
-    queryFn: () => apiRequest<ContentVideo[]>('/api/content-library'),
+    queryFn: () => apiRequest<ContentVideo[]>('/api/content-videos'),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -31,7 +31,7 @@ export function useContentVideos() {
 export function useContentVideosByCategory(category: string) {
   return useQuery({
     queryKey: CONTENT_VIDEOS_KEYS.byCategory(category),
-    queryFn: () => apiRequest<ContentVideo[]>(`/api/content-library?category=${category}`),
+    queryFn: () => apiRequest<ContentVideo[]>(`/api/content-videos?category=${category}`),
     enabled: !!category,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -44,7 +44,7 @@ export function useCreateContentVideo() {
 
   return useMutation({
     mutationFn: (video: Omit<ContentVideo, 'id' | 'created_at'>) =>
-      apiRequest<ContentVideo>('/api/content-library', {
+      apiRequest<ContentVideo>('/api/content-videos', {
         method: 'POST',
         body: JSON.stringify(video),
       }),
@@ -60,7 +60,7 @@ export function useUpdateContentVideo() {
 
   return useMutation({
     mutationFn: ({ id, ...video }: Partial<ContentVideo> & { id: number }) =>
-      apiRequest<ContentVideo>(`/api/content-library/${id}`, {
+      apiRequest<ContentVideo>(`/api/content-videos/${id}`, {
         method: 'PUT',
         body: JSON.stringify(video),
       }),
@@ -76,7 +76,7 @@ export function useDeleteContentVideo() {
 
   return useMutation({
     mutationFn: (id: number) =>
-      apiRequest(`/api/content-library/${id}`, {
+      apiRequest(`/api/content-videos/${id}`, {
         method: 'DELETE',
       }),
     onSuccess: () => {

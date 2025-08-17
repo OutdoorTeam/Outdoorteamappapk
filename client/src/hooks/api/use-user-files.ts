@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
 
 export interface UserFile {
@@ -12,20 +12,58 @@ export interface UserFile {
   file_size?: number;
   mime_type?: string;
   original_name?: string;
-  is_active?: number;
+  is_active?: boolean;
   updated_at?: string;
   description?: string;
 }
 
-// Get user files with optional type filter
-export const useUserFiles = (fileType?: string) => {
-  return useQuery({
-    queryKey: ['user-files', fileType],
-    queryFn: async () => {
-      const params = fileType ? `?file_type=${fileType}` : '';
-      return apiRequest<UserFile[]>(`/api/user-files${params}`);
-    },
-    retry: 2,
-    staleTime: 30000, // 30 seconds
-  });
+// Query keys
+export const USER_FILES_KEYS = {
+  all: ['user-files'] as const,
+  byType: (type: string) => [...USER_FILES_KEYS.all, 'type', type] as const,
 };
+
+// Hook to get user files by type
+export function useUserFiles(fileType?: string) {
+  return useQuery({
+    queryKey: fileType ? USER_FILES_KEYS.byType(fileType) : USER_FILES_KEYS.all,
+    queryFn: () => {
+      const url = fileType ? `/api/user-files?file_type=${fileType}` : '/api/user-files';
+      return apiRequest<UserFile[]>(url);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+// Upload file mutation
+export function useUploadUserFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (formData: FormData) =>
+      apiRequest<UserFile>('/api/upload-user-file', {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Don't set Content-Type for FormData
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USER_FILES_KEYS.all });
+    },
+  });
+}
+
+// Delete file mutation
+export function useDeleteUserFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (fileId: number) =>
+      apiRequest(`/api/user-files/${fileId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USER_FILES_KEYS.all });
+    },
+  });
+}

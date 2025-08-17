@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Coffee, Play, ExternalLink, Clock, Zap } from 'lucide-react';
+import { Coffee, Play, ExternalLink, Clock, Zap, PlayCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useContentLibrary } from '@/hooks/api/use-content-library';
-import { useDailyHabits } from '@/hooks/api/use-daily-habits';
+import { useContentVideosByCategory } from '@/hooks/api/use-content-videos';
+import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
 
 const ActiveBreaksPage: React.FC = () => {
   const { user } = useAuth();
@@ -14,15 +14,16 @@ const ActiveBreaksPage: React.FC = () => {
   // Check if user has access to active breaks features
   const hasActiveBreaksAccess = user?.features?.active_breaks || false;
   
-  // Fetch active breaks content
-  const { data: activeBreaksContent, isLoading: contentLoading } = useContentLibrary('active_breaks');
+  // Fetch active breaks content videos
+  const { data: activeBreaksVideos, isLoading: videosLoading } = useContentVideosByCategory('active_breaks');
   
   // Daily habits for completion tracking
-  const { data: todayHabits, mutate: updateHabits } = useDailyHabits();
+  const { data: todayHabits } = useTodayHabits();
+  const updateHabitMutation = useUpdateHabit();
 
   const handleCompleteActiveBreak = async () => {
     try {
-      await updateHabits({
+      await updateHabitMutation.mutateAsync({
         date: new Date().toISOString().split('T')[0],
         movement_completed: !todayHabits?.movement_completed
       });
@@ -44,51 +45,8 @@ const ActiveBreaksPage: React.FC = () => {
     }
   };
 
-  const getVideoEmbedUrl = (url: string) => {
-    // Convert YouTube watch URLs to embed URLs
-    if (url.includes('youtube.com/watch?v=')) {
-      const videoId = url.split('v=')[1];
-      const ampersandPosition = videoId.indexOf('&');
-      if (ampersandPosition !== -1) {
-        return `https://www.youtube.com/embed/${videoId.substring(0, ampersandPosition)}`;
-      }
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    
-    // Convert YouTube short URLs
-    if (url.includes('youtu.be/')) {
-      const videoId = url.split('youtu.be/')[1];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    
-    // For other URLs, return as is (assuming they're already embed-ready)
-    return url;
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return 'bg-green-100 text-green-800';
-      case 'intermediate':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'advanced':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getDifficultyLabel = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return 'Principiante';
-      case 'intermediate':
-        return 'Intermedio';
-      case 'advanced':
-        return 'Avanzado';
-      default:
-        return difficulty;
-    }
+  const handleOpenVideo = (videoUrl: string) => {
+    window.open(videoUrl, '_blank');
   };
 
   if (!hasActiveBreaksAccess) {
@@ -153,108 +111,66 @@ const ActiveBreaksPage: React.FC = () => {
             <Button 
               onClick={handleCompleteActiveBreak}
               variant={todayHabits?.movement_completed ? "outline" : "default"}
+              disabled={updateHabitMutation.isPending}
             >
               <Zap className="w-4 h-4 mr-2" />
-              {todayHabits?.movement_completed ? 'Marcar como no hecho' : 'Marcar como completado'}
+              {updateHabitMutation.isPending 
+                ? 'Actualizando...'
+                : todayHabits?.movement_completed 
+                  ? 'Marcar como no hecho' 
+                  : 'Marcar como completado'
+              }
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Active Breaks Videos Section */}
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Videos de Pausas Activas</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <PlayCircle className="w-5 h-5" />
+            Videos de Pausas Activas
+          </CardTitle>
           <CardDescription>
             Ejercicios rápidos y efectivos para hacer durante tus descansos laborales
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {contentLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-gray-200 aspect-video rounded-lg mb-3"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              ))}
+          {videosLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">Cargando videos...</p>
             </div>
-          ) : activeBreaksContent && activeBreaksContent.length > 0 ? (
+          ) : activeBreaksVideos && activeBreaksVideos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeBreaksContent.map(content => (
-                <Card key={content.id} className="overflow-hidden">
-                  <div className="aspect-video bg-gray-100">
-                    {content.video_url ? (
-                      content.video_url.includes('youtube.com') || content.video_url.includes('youtu.be') ? (
-                        <iframe
-                          src={getVideoEmbedUrl(content.video_url)}
-                          className="w-full h-full"
-                          frameBorder="0"
-                          allowFullScreen
-                          title={content.title}
-                        />
-                      ) : (
-                        <video
-                          src={content.video_url}
-                          className="w-full h-full object-cover"
-                          controls
-                          preload="metadata"
-                        />
-                      )
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-12 h-12 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold mb-2 line-clamp-2">{content.title}</h3>
-                    {content.description && (
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
-                        {content.description}
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center gap-2 mb-3">
-                      {content.duration_minutes && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                          <Clock className="w-3 h-3" />
-                          {content.duration_minutes} min
-                        </span>
-                      )}
-                      
-                      {content.difficulty_level && (
-                        <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(content.difficulty_level)}`}>
-                          {getDifficultyLabel(content.difficulty_level)}
-                        </span>
-                      )}
-                      
-                      {content.subcategory && (
-                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-                          {content.subcategory}
-                        </span>
+              {activeBreaksVideos.map(video => (
+                <div key={video.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-3 mb-3">
+                    <PlayCircle className="w-6 h-6 text-orange-600 mt-1 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-lg mb-1 line-clamp-2">{video.title}</h3>
+                      {video.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {video.description}
+                        </p>
                       )}
                     </div>
-                    
-                    {content.video_url && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => window.open(content.video_url, '_blank')}
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Ver Completo
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => handleOpenVideo(video.video_url)}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Ver Video
+                  </Button>
+                </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <Coffee className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <PlayCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-600 mb-2">No hay videos disponibles</h3>
               <p className="text-muted-foreground">
                 Los videos de pausas activas aparecerán aquí una vez que sean agregados por el administrador.
@@ -265,7 +181,7 @@ const ActiveBreaksPage: React.FC = () => {
       </Card>
 
       {/* Tips Section */}
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5" />

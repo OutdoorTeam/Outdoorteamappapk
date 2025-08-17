@@ -1,11 +1,12 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Brain, Play, ExternalLink, Clock, Sparkles } from 'lucide-react';
+import { Brain, Play, ExternalLink, Clock, Sparkles, PlayCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useContentLibrary } from '@/hooks/api/use-content-library';
-import { useDailyHabits } from '@/hooks/api/use-daily-habits';
+import { useContentVideosByCategory } from '@/hooks/api/use-content-videos';
+import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
+import { useSaveMeditationSession } from '@/hooks/api/use-meditation';
 import MeditationSession from '@/components/MeditationSession';
 
 const MeditationPage: React.FC = () => {
@@ -16,15 +17,17 @@ const MeditationPage: React.FC = () => {
   // Check if user has access to meditation features
   const hasMeditationAccess = user?.features?.meditation || false;
   
-  // Fetch meditation content
-  const { data: meditationContent, isLoading: contentLoading } = useContentLibrary('meditation');
+  // Fetch meditation content videos
+  const { data: meditationVideos, isLoading: videosLoading } = useContentVideosByCategory('meditation');
   
   // Daily habits for completion tracking
-  const { data: todayHabits, mutate: updateHabits } = useDailyHabits();
+  const { data: todayHabits } = useTodayHabits();
+  const updateHabitMutation = useUpdateHabit();
+  const saveMeditationMutation = useSaveMeditationSession();
 
   const handleCompleteMeditation = async () => {
     try {
-      await updateHabits({
+      await updateHabitMutation.mutateAsync({
         date: new Date().toISOString().split('T')[0],
         meditation_completed: !todayHabits?.meditation_completed
       });
@@ -46,51 +49,41 @@ const MeditationPage: React.FC = () => {
     }
   };
 
-  const getVideoEmbedUrl = (url: string) => {
-    // Convert YouTube watch URLs to embed URLs
-    if (url.includes('youtube.com/watch?v=')) {
-      const videoId = url.split('v=')[1];
-      const ampersandPosition = videoId.indexOf('&');
-      if (ampersandPosition !== -1) {
-        return `https://www.youtube.com/embed/${videoId.substring(0, ampersandPosition)}`;
-      }
-      return `https://www.youtube.com/embed/${videoId}`;
+  const handleMeditationSessionComplete = async (duration: number, type: string, comment: string) => {
+    try {
+      // Save the meditation session
+      await saveMeditationMutation.mutateAsync({
+        duration_minutes: duration,
+        meditation_type: type as 'guided' | 'free',
+        comment: comment || undefined
+      });
+
+      // Mark meditation as completed
+      await updateHabitMutation.mutateAsync({
+        date: new Date().toISOString().split('T')[0],
+        meditation_completed: true
+      });
+
+      toast({
+        title: "¡Meditación completada!",
+        description: `Has meditado por ${duration} minutos. ¡Excelente trabajo!`,
+        variant: "default",
+      });
+
+      setShowMeditationSession(false);
+    } catch (error) {
+      console.error('Error completing meditation session:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo completar la sesión de meditación",
+        variant: "destructive",
+      });
+      setShowMeditationSession(false);
     }
-    
-    // Convert YouTube short URLs
-    if (url.includes('youtu.be/')) {
-      const videoId = url.split('youtu.be/')[1];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-    
-    // For other URLs, return as is (assuming they're already embed-ready)
-    return url;
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return 'bg-green-100 text-green-800';
-      case 'intermediate':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'advanced':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getDifficultyLabel = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return 'Principiante';
-      case 'intermediate':
-        return 'Intermedio';
-      case 'advanced':
-        return 'Avanzado';
-      default:
-        return difficulty;
-    }
+  const handleOpenVideo = (videoUrl: string) => {
+    window.open(videoUrl, '_blank');
   };
 
   if (!hasMeditationAccess) {
@@ -114,11 +107,7 @@ const MeditationPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8">
         <MeditationSession
-          onComplete={() => {
-            setShowMeditationSession(false);
-            // Optionally mark as completed automatically
-            handleCompleteMeditation();
-          }}
+          onComplete={handleMeditationSessionComplete}
           onCancel={() => setShowMeditationSession(false)}
         />
       </div>
@@ -171,9 +160,15 @@ const MeditationPage: React.FC = () => {
               <Button 
                 onClick={handleCompleteMeditation}
                 variant={todayHabits?.meditation_completed ? "outline" : "default"}
+                disabled={updateHabitMutation.isPending}
               >
                 <Sparkles className="w-4 h-4 mr-2" />
-                {todayHabits?.meditation_completed ? 'Marcar como no hecho' : 'Marcar como completado'}
+                {updateHabitMutation.isPending 
+                  ? 'Actualizando...'
+                  : todayHabits?.meditation_completed 
+                    ? 'Marcar como no hecho' 
+                    : 'Marcar como completado'
+                }
               </Button>
             </div>
           </CardContent>
@@ -211,99 +206,51 @@ const MeditationPage: React.FC = () => {
       </div>
 
       {/* Meditation Videos Section */}
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Videos de Meditación</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <PlayCircle className="w-5 h-5" />
+            Videos de Meditación
+          </CardTitle>
           <CardDescription>
-            Meditaciones guiadas para diferentes necesidades y niveles de experiencia
+            Explora nuestra biblioteca de videos de meditación y mindfulness
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {contentLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-gray-200 aspect-video rounded-lg mb-3"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              ))}
+          {videosLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">Cargando videos...</p>
             </div>
-          ) : meditationContent && meditationContent.length > 0 ? (
+          ) : meditationVideos && meditationVideos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {meditationContent.map(content => (
-                <Card key={content.id} className="overflow-hidden">
-                  <div className="aspect-video bg-gray-100">
-                    {content.video_url ? (
-                      content.video_url.includes('youtube.com') || content.video_url.includes('youtu.be') ? (
-                        <iframe
-                          src={getVideoEmbedUrl(content.video_url)}
-                          className="w-full h-full"
-                          frameBorder="0"
-                          allowFullScreen
-                          title={content.title}
-                        />
-                      ) : (
-                        <video
-                          src={content.video_url}
-                          className="w-full h-full object-cover"
-                          controls
-                          preload="metadata"
-                        />
-                      )
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Play className="w-12 h-12 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold mb-2 line-clamp-2">{content.title}</h3>
-                    {content.description && (
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
-                        {content.description}
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center gap-2 mb-3">
-                      {content.duration_minutes && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                          <Clock className="w-3 h-3" />
-                          {content.duration_minutes} min
-                        </span>
-                      )}
-                      
-                      {content.difficulty_level && (
-                        <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(content.difficulty_level)}`}>
-                          {getDifficultyLabel(content.difficulty_level)}
-                        </span>
-                      )}
-                      
-                      {content.subcategory && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                          {content.subcategory}
-                        </span>
+              {meditationVideos.map(video => (
+                <div key={video.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-3 mb-3">
+                    <PlayCircle className="w-6 h-6 text-purple-600 mt-1 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-lg mb-1 line-clamp-2">{video.title}</h3>
+                      {video.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {video.description}
+                        </p>
                       )}
                     </div>
-                    
-                    {content.video_url && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => window.open(content.video_url, '_blank')}
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Ver Completo
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => handleOpenVideo(video.video_url)}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Ver Video
+                  </Button>
+                </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <PlayCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-600 mb-2">No hay videos disponibles</h3>
               <p className="text-muted-foreground">
                 Los videos de meditación aparecerán aquí una vez que sean agregados por el administrador.
@@ -314,7 +261,7 @@ const MeditationPage: React.FC = () => {
       </Card>
 
       {/* Benefits Section */}
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />

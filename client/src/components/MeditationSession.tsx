@@ -10,11 +10,12 @@ import { Play, Pause, Square } from 'lucide-react';
 
 interface MeditationSessionProps {
   onComplete: (duration: number, type: string, comment: string) => void;
+  onCancel?: () => void;
 }
 
 type MeditationPhase = 'inhale' | 'hold' | 'exhale' | 'pause';
 
-const MeditationSession: React.FC<MeditationSessionProps> = ({ onComplete }) => {
+const MeditationSession: React.FC<MeditationSessionProps> = ({ onComplete, onCancel }) => {
   const [sessionType, setSessionType] = React.useState<'guided' | 'free' | null>(null);
   const [duration, setDuration] = React.useState(5);
   const [inhaleTime, setInhaleTime] = React.useState(4);
@@ -183,6 +184,15 @@ const MeditationSession: React.FC<MeditationSessionProps> = ({ onComplete }) => 
     setSessionComment('');
   };
 
+  const cancelSession = () => {
+    setShowCommentDialog(false);
+    setSessionType(null);
+    setSessionComment('');
+    if (onCancel) {
+      onCancel();
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -225,10 +235,7 @@ const MeditationSession: React.FC<MeditationSessionProps> = ({ onComplete }) => 
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => {
-                setShowCommentDialog(false);
-                setSessionType(null);
-              }}
+              onClick={cancelSession}
               className="border-brand-gold text-brand-gold"
             >
               Cancelar
@@ -279,44 +286,59 @@ const MeditationSession: React.FC<MeditationSessionProps> = ({ onComplete }) => 
 
   if (!sessionType) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card 
-          className="bg-gray-900 border-gray-700 cursor-pointer hover:border-brand-gold transition-colors"
-          onClick={() => setSessionType('guided')}
-        >
-          <CardHeader>
-            <CardTitle className="text-brand-gold">Meditación Guiada</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-300 mb-4">
-              Ejercicios de respiración predefinidos con patrones optimizados
-            </p>
-            <div className="space-y-2 text-sm text-gray-400">
-              <div>• Patrón 4-4-4 (principiantes)</div>
-              <div>• Patrón 4-7-8 (relajación)</div>
-              <div>• Patrón 6-6-6 (avanzado)</div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-white mb-2">Elige tu tipo de meditación</h2>
+          <p className="text-gray-400">Selecciona la opción que mejor se adapte a tu experiencia</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card 
+            className="bg-gray-900 border-gray-700 cursor-pointer hover:border-brand-gold transition-colors"
+            onClick={() => setSessionType('guided')}
+          >
+            <CardHeader>
+              <CardTitle className="text-brand-gold">Meditación Guiada</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-300 mb-4">
+                Ejercicios de respiración predefinidos con patrones optimizados
+              </p>
+              <div className="space-y-2 text-sm text-gray-400">
+                <div>• Patrón 4-4-4 (principiantes)</div>
+                <div>• Patrón 4-7-8 (relajación)</div>
+                <div>• Patrón 6-6-6 (avanzado)</div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card 
-          className="bg-gray-900 border-gray-700 cursor-pointer hover:border-brand-gold transition-colors"
-          onClick={() => setSessionType('free')}
-        >
-          <CardHeader>
-            <CardTitle className="text-brand-gold">Meditación Libre</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-300 mb-4">
-              Personaliza completamente tu sesión de meditación
-            </p>
-            <div className="space-y-2 text-sm text-gray-400">
-              <div>• Duración personalizada</div>
-              <div>• Tiempos de respiración ajustables</div>
-              <div>• Opciones de sonido personalizables</div>
-            </div>
-          </CardContent>
-        </Card>
+          <Card 
+            className="bg-gray-900 border-gray-700 cursor-pointer hover:border-brand-gold transition-colors"
+            onClick={() => setSessionType('free')}
+          >
+            <CardHeader>
+              <CardTitle className="text-brand-gold">Meditación Libre</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-300 mb-4">
+                Personaliza completamente tu sesión de meditación
+              </p>
+              <div className="space-y-2 text-sm text-gray-400">
+                <div>• Duración personalizada</div>
+                <div>• Tiempos de respiración ajustables</div>
+                <div>• Opciones de sonido personalizables</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {onCancel && (
+          <div className="text-center">
+            <Button variant="outline" onClick={onCancel} className="border-gray-600 text-gray-400">
+              Volver
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
