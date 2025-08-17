@@ -4,14 +4,25 @@ import { z } from 'zod';
 export const registerSchema = z.object({
   full_name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
   email: z.string().email('Email inválido'),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres')
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  confirmPassword: z.string().min(1, 'Confirmar contraseña es requerido'),
+  acceptTos: z.boolean().refine(val => val === true, {
+    message: 'Debes aceptar los términos y condiciones'
+  })
+}).refine(data => data.password === data.confirmPassword, {
+  message: 'Las contraseñas no coinciden',
+  path: ['confirmPassword']
 });
+
+export type RegisterFormData = z.infer<typeof registerSchema>;
 
 // User login schema
 export const loginSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(1, 'Contraseña requerida')
 });
+
+export type LoginFormData = z.infer<typeof loginSchema>;
 
 // Daily habits update schema
 export const dailyHabitsUpdateSchema = z.object({
@@ -45,10 +56,13 @@ export const fileUploadSchema = z.object({
 
 // Content library schema
 export const contentLibrarySchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().max(1000).optional(),
-  video_url: z.string().url().optional(),
-  category: z.string().min(1).max(50),
+  title: z.string().min(1, 'El título es requerido').max(200, 'El título no puede exceder 200 caracteres'),
+  description: z.string().max(1000, 'La descripción no puede exceder 1000 caracteres').optional(),
+  video_url: z.string().url('URL del video inválida').optional(),
+  category: z.enum(['exercise', 'active_breaks', 'meditation'], {
+    required_error: 'La categoría es requerida',
+    invalid_type_error: 'Categoría inválida'
+  }),
   subcategory: z.string().max(50).optional(),
   is_active: z.boolean().optional()
 });

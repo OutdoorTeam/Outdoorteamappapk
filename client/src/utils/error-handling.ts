@@ -1,6 +1,5 @@
-import { z } from 'zod';
+// Error handling utilities for API calls and form validation
 
-// Error response interfaces matching backend
 export interface ApiError {
   code: string;
   message: string;
@@ -11,215 +10,178 @@ export interface ApiErrorResponse {
   error: ApiError;
 }
 
-// Error code constants
-export const ERROR_CODES = {
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
-  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
-  NOT_FOUND_ERROR: 'NOT_FOUND_ERROR',
-  DUPLICATE_ERROR: 'DUPLICATE_ERROR',
-  FILE_UPLOAD_ERROR: 'FILE_UPLOAD_ERROR',
-  RATE_LIMIT_ERROR: 'RATE_LIMIT_ERROR',
-  SERVER_ERROR: 'SERVER_ERROR'
-} as const;
-
-// User-friendly error messages
-const ERROR_MESSAGES: Record<string, string> = {
-  [ERROR_CODES.VALIDATION_ERROR]: 'Por favor revisa los datos ingresados',
-  [ERROR_CODES.AUTHENTICATION_ERROR]: 'Credenciales inválidas. Verifica tu email y contraseña',
-  [ERROR_CODES.AUTHORIZATION_ERROR]: 'No tienes permisos para realizar esta acción',
-  [ERROR_CODES.NOT_FOUND_ERROR]: 'El recurso solicitado no fue encontrado',
-  [ERROR_CODES.DUPLICATE_ERROR]: 'Los datos ingresados ya existen en el sistema',
-  [ERROR_CODES.FILE_UPLOAD_ERROR]: 'Error al subir el archivo. Verifica el formato y tamaño',
-  [ERROR_CODES.RATE_LIMIT_ERROR]: 'Demasiadas solicitudes. Intenta nuevamente en unos momentos',
-  [ERROR_CODES.SERVER_ERROR]: 'Error interno del servidor. Intenta nuevamente más tarde'
-};
-
-// Parse API error from response
-export function parseApiError(error: unknown): ApiError {
-  // Handle fetch errors
-  if (error instanceof TypeError && error.message === 'Failed to fetch') {
-    return {
-      code: ERROR_CODES.SERVER_ERROR,
-      message: 'Error de conexión. Verifica tu conexión a internet'
-    };
-  }
-
-  // Handle timeout errors
-  if (error instanceof Error && error.name === 'TimeoutError') {
-    return {
-      code: ERROR_CODES.SERVER_ERROR,
-      message: 'La solicitud tardó demasiado tiempo. Intenta nuevamente'
-    };
-  }
-
-  // Try to parse as API error response
-  try {
-    if (typeof error === 'object' && error !== null && 'error' in error) {
-      const apiError = error as ApiErrorResponse;
-      return apiError.error;
-    }
-  } catch {
-    // Fall through to default error
-  }
-
-  // Handle string errors
-  if (typeof error === 'string') {
-    return {
-      code: ERROR_CODES.SERVER_ERROR,
-      message: error
-    };
-  }
-
-  // Handle Error objects
-  if (error instanceof Error) {
-    return {
-      code: ERROR_CODES.SERVER_ERROR,
-      message: error.message
-    };
-  }
-
-  // Default error
-  return {
-    code: ERROR_CODES.SERVER_ERROR,
-    message: 'Ocurrió un error inesperado'
-  };
-}
-
-// Get user-friendly error message
-export function getErrorMessage(error: ApiError): string {
-  // Use custom message if it's user-friendly (not technical)
-  if (error.message && !error.message.includes('Error:') && error.message.length < 200) {
-    return error.message;
-  }
-
-  // Use predefined message for error code
-  return ERROR_MESSAGES[error.code] || ERROR_MESSAGES[ERROR_CODES.SERVER_ERROR];
-}
-
-// Get field errors for form validation
-export function getFieldErrors(error: ApiError): Record<string, string> {
-  return error.fieldErrors || {};
-}
-
-// Check if error is a validation error
-export function isValidationError(error: ApiError): boolean {
-  return error.code === ERROR_CODES.VALIDATION_ERROR;
-}
-
-// Check if error is an authentication error
-export function isAuthError(error: ApiError): boolean {
-  return error.code === ERROR_CODES.AUTHENTICATION_ERROR;
-}
-
-// Utility to make API requests with error handling
+// Generic API request function with error handling
 export async function apiRequest<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
-  try {
-    const token = localStorage.getItem('auth_token');
-    
-    const defaultHeaders: Record<string, string> = {
+  const token = localStorage.getItem('auth_token');
+  
+  const defaultOptions: RequestInit = {
+    headers: {
       'Content-Type': 'application/json',
-    };
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  };
 
-    if (token) {
-      defaultHeaders['Authorization'] = `Bearer ${token}`;
-    }
+  const config = { ...defaultOptions, ...options };
+  
+  // Merge headers properly
+  config.headers = { ...defaultOptions.headers, ...options.headers };
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-    });
-
-    // Handle non-JSON responses (like file downloads)
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response as T;
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw data; // This will be caught and parsed as an API error
-    }
-
-    return data;
-  } catch (error) {
-    console.error('API Request Error:', error);
-    throw error;
-  }
-}
-
-// Utility for handling async operations with error handling
-export async function handleAsyncOperation<T>(
-  operation: () => Promise<T>,
-  onError?: (error: ApiError) => void
-): Promise<{ success: boolean; data?: T; error?: ApiError }> {
   try {
-    const data = await operation();
-    return { success: true, data };
-  } catch (error) {
-    const apiError = parseApiError(error);
+    const response = await fetch(url, config);
     
-    if (onError) {
-      onError(apiError);
+    // Handle non-JSON responses
+    const contentType = response.headers.get('content-type');
+    
+    if (!response.ok) {
+      // Try to parse error as JSON
+      if (contentType?.includes('application/json')) {
+        const errorData: ApiErrorResponse = await response.json();
+        throw new ApiError(errorData.error?.code || 'UNKNOWN_ERROR', errorData.error?.message || 'An error occurred', errorData.error?.fieldErrors);
+      } else {
+        // Fallback for non-JSON errors
+        const textError = await response.text();
+        throw new ApiError('HTTP_ERROR', textError || `HTTP ${response.status}: ${response.statusText}`);
+      }
     }
     
-    return { success: false, error: apiError };
+    // Handle successful responses
+    if (contentType?.includes('application/json')) {
+      return await response.json();
+    } else {
+      // For non-JSON responses, return the response itself
+      return response as unknown as T;
+    }
+  } catch (error) {
+    // Re-throw ApiError instances
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    // Handle network errors, timeout, etc.
+    if (error instanceof TypeError) {
+      throw new ApiError('NETWORK_ERROR', 'No se pudo conectar al servidor. Verifica tu conexión a internet.');
+    }
+    
+    // Handle other errors
+    throw new ApiError('UNKNOWN_ERROR', error instanceof Error ? error.message : 'Error desconocido');
   }
 }
 
-// React Hook Form error setter utility
-export function setFormErrors<T extends Record<string, any>>(
-  setError: (name: keyof T, error: { message: string }) => void,
+// Custom ApiError class
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public fieldErrors?: Record<string, string>
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Parse API error from various sources
+export function parseApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) {
+    return error;
+  }
+  
+  if (error instanceof Error) {
+    return new ApiError('UNKNOWN_ERROR', error.message);
+  }
+  
+  return new ApiError('UNKNOWN_ERROR', 'Error desconocido');
+}
+
+// Extract user-friendly error message
+export function getErrorMessage(error: ApiError): string {
+  // Map common error codes to user-friendly messages
+  const errorMessages: Record<string, string> = {
+    'VALIDATION_ERROR': 'Los datos proporcionados no son válidos.',
+    'AUTHENTICATION_ERROR': 'Credenciales inválidas. Por favor, verifica tu email y contraseña.',
+    'AUTHORIZATION_ERROR': 'No tienes permisos para realizar esta acción.',
+    'NOT_FOUND_ERROR': 'El recurso solicitado no fue encontrado.',
+    'DUPLICATE_ERROR': 'Ya existe un registro con esta información.',
+    'RATE_LIMIT_ERROR': 'Demasiadas solicitudes. Por favor, espera un momento.',
+    'NETWORK_ERROR': 'Error de conexión. Verifica tu internet.',
+    'FILE_UPLOAD_ERROR': 'Error al subir el archivo.',
+    'SERVER_ERROR': 'Error interno del servidor. Intenta nuevamente.',
+  };
+  
+  return errorMessages[error.code] || error.message || 'Error desconocido';
+}
+
+// Extract field errors for forms
+export function getFieldErrors(error: ApiError): Record<string, string> {
+  return error.fieldErrors || {};
+}
+
+// Check if error is authentication related
+export function isAuthError(error: ApiError): boolean {
+  return error.code === 'AUTHENTICATION_ERROR' || error.code === 'AUTHORIZATION_ERROR';
+}
+
+// Check if error is validation related
+export function isValidationError(error: ApiError): boolean {
+  return error.code === 'VALIDATION_ERROR';
+}
+
+// Helper for setting form errors in react-hook-form
+export function setFormErrors(
+  setError: (name: string, error: { message: string }) => void,
   fieldErrors: Record<string, string>
 ): void {
   Object.entries(fieldErrors).forEach(([field, message]) => {
-    setError(field as keyof T, { message });
+    setError(field, { message });
   });
 }
 
-// Focus first invalid field utility
-export function focusFirstInvalidField(container?: HTMLElement): void {
-  const firstInvalid = (container || document).querySelector('[aria-invalid="true"]') as HTMLElement;
-  if (firstInvalid) {
-    firstInvalid.focus();
-    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
+// Helper to focus first invalid field
+export function focusFirstInvalidField(): void {
+  setTimeout(() => {
+    const firstErrorElement = document.querySelector('[aria-invalid="true"]') as HTMLElement;
+    if (firstErrorElement) {
+      firstErrorElement.focus();
+    }
+  }, 100);
 }
 
-// Validation error announcer for screen readers
-export function announceValidationErrors(errors: Record<string, string>): void {
-  const errorCount = Object.keys(errors).length;
-  if (errorCount === 0) return;
-
-  const message = errorCount === 1 
-    ? 'Se encontró 1 error en el formulario'
-    : `Se encontraron ${errorCount} errores en el formulario`;
-
-  // Create temporary live region for announcement
-  const liveRegion = document.createElement('div');
-  liveRegion.setAttribute('aria-live', 'assertive');
-  liveRegion.setAttribute('aria-atomic', 'true');
-  liveRegion.style.position = 'absolute';
-  liveRegion.style.left = '-10000px';
-  liveRegion.style.width = '1px';
-  liveRegion.style.height = '1px';
-  liveRegion.style.overflow = 'hidden';
+// Retry logic for API calls
+export async function retryApiCall<T>(
+  apiCall: () => Promise<T>,
+  maxRetries: number = 3,
+  delay: number = 1000
+): Promise<T> {
+  let lastError: ApiError;
   
-  document.body.appendChild(liveRegion);
-  liveRegion.textContent = message;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      lastError = parseApiError(error);
+      
+      // Don't retry on validation or authentication errors
+      if (isValidationError(lastError) || isAuthError(lastError)) {
+        throw lastError;
+      }
+      
+      // If this was the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  
+  throw lastError!;
+}
 
-  // Clean up after announcement
-  setTimeout(() => {
-    document.body.removeChild(liveRegion);
-  }, 1000);
+// Handle logout on auth errors
+export function handleAuthError(): void {
+  localStorage.removeItem('auth_token');
+  window.location.href = '/login';
 }

@@ -99,6 +99,15 @@ export interface DatabaseSchema {
     is_active: number;
     created_at: string;
   };
+  content_videos: {
+    id: number;
+    title: string;
+    description: string | null;
+    category: string;
+    video_url: string;
+    is_active: number;
+    created_at: string;
+  };
   workout_of_day: {
     id: number;
     title: string;

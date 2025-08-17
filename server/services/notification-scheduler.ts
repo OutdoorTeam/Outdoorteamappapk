@@ -38,8 +38,7 @@ class NotificationScheduler {
     }
 
     try {
-      // Dynamically import node-cron and web-push
-      const cronModule = await import('node-cron');
+      // Dynamically import web-push
       const webPushModule = await import('web-push');
       
       this.webPush = webPushModule.default;

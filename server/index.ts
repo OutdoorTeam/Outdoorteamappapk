@@ -795,7 +795,7 @@ app.post('/api/meditation-sessions',
     }
   });
 
-// Content Library Routes
+// Content Library Routes (using existing content_library table)
 app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const { category } = req.query;
@@ -821,7 +821,7 @@ app.get('/api/content-library', authenticateToken, async (req: any, res: express
   }
 });
 
-// Admin content management
+// Admin content management (using existing content_library table)
 app.post('/api/content-library',
   authenticateToken,
   requireAdmin,
@@ -1193,4 +1193,132 @@ app.get('/api/plans', async (req: express.Request, res: express.Response) => {
   try {
     console.log('Fetching all plans');
     const plans = await db.selectFrom('plans').selectAll().execute();
-    console.log('
+    console.log('Plans fetched:', plans.length);
+    res.json(plans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error);
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
+  }
+});
+
+// Admin Users Route
+app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all users');
+    
+    const users = await db
+      .selectFrom('users')
+      .select([
+        'id', 'email', 'full_name', 'role', 'plan_type', 
+        'is_active', 'features_json', 'created_at'
+      ])
+      .orderBy('created_at', 'desc')
+      .execute();
+
+    // Format users with parsed features
+    const formattedUsers = users.map(formatUserResponse);
+    
+    console.log('Users fetched by admin:', formattedUsers.length);
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    await SystemLogger.logCriticalError('Admin users fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
+  }
+});
+
+// Server initialization and static serving
+export const startServer = async (port = 3001) => {
+  try {
+    // Check database connection
+    await db.selectFrom('users').select('id').limit(1).execute();
+    console.log('✅ Database connection established');
+
+    // Check VAPID configuration
+    checkVapidConfiguration();
+
+    // Initialize schedulers AFTER database is ready
+    console.log('🔄 Initializing daily reset scheduler...');
+    resetScheduler = new DailyResetScheduler(db);
+    await resetScheduler.initialize();
+
+    console.log('🔔 Initializing notification scheduler...');
+    notificationScheduler = new NotificationScheduler();
+
+    // Setup static serving for production
+    if (process.env.NODE_ENV === 'production') {
+      setupStaticServing(app);
+      console.log('📁 Static file serving configured for production');
+    }
+
+    // Start server
+    const server = app.listen(port, () => {
+      console.log(`🚀 Server running on port ${port}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`🌐 Frontend dev server: http://localhost:3000`);
+        console.log(`🔌 API server: http://localhost:${port}`);
+      }
+      
+      // Log CORS configuration
+      logCorsConfig();
+    });
+
+    // Graceful shutdown handling
+    const gracefulShutdown = async (signal: string) => {
+      console.log(`\n🛑 ${signal} received. Starting graceful shutdown...`);
+      
+      try {
+        // Stop accepting new connections
+        server.close(async () => {
+          console.log('🔌 HTTP server closed');
+          
+          // Stop schedulers
+          if (resetScheduler) {
+            resetScheduler.stop();
+            console.log('⏹️  Daily reset scheduler stopped');
+          }
+          
+          // Close database connection
+          try {
+            await db.destroy();
+            console.log('🗄️  Database connection closed');
+          } catch (dbError) {
+            console.error('Error closing database:', dbError);
+          }
+          
+          console.log('✅ Graceful shutdown complete');
+          process.exit(0);
+        });
+        
+        // Force close after 30 seconds
+        setTimeout(() => {
+          console.error('❌ Could not close connections in time, forcefully shutting down');
+          process.exit(1);
+        }, 30000);
+        
+      } catch (error) {
+        console.error('Error during graceful shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    // Register shutdown handlers
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+    return server;
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Start server if running directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const port = parseInt(process.env.PORT || '3001', 10);
+  startServer(port);
+}
+
+export default app;

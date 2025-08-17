@@ -1,42 +1,99 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dumbbell, Play, ExternalLink, FileText, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Play, Calendar, User, FileText, Clock, Video, Eye, Download } from 'lucide-react';
-import { useWorkoutOfDay } from '@/hooks/api/use-workout';
-import { useUserFiles } from '@/hooks/api/use-user-files';
+import { useToast } from '@/hooks/use-toast';
 import { useContentLibrary } from '@/hooks/api/use-content-library';
+import { useUserFiles } from '@/hooks/api/use-user-files';
+import { useDailyHabits } from '@/hooks/api/use-daily-habits';
+import { useWorkoutOfDay } from '@/hooks/api/use-workout';
 import PDFViewer from '@/components/PDFViewer';
 
 const TrainingPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [showPDFViewer, setShowPDFViewer] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<any>(null);
   
-  // Use React Query hooks
+  // Check if user has access to training features
+  const hasTrainingAccess = user?.features?.training || false;
+  
+  // Fetch training content
+  const { data: trainingContent, isLoading: contentLoading } = useContentLibrary('exercise');
+  
+  // Fetch user's training files
+  const { data: userFiles, isLoading: filesLoading } = useUserFiles('training');
+  
+  // Daily habits for completion tracking
+  const { data: todayHabits, mutate: updateHabits } = useDailyHabits();
+  
+  // Workout of the day
   const { data: workoutOfDay, isLoading: workoutLoading } = useWorkoutOfDay();
-  const { data: userFiles = [], isLoading: filesLoading } = useUserFiles('training');
-  const { data: trainingVideos = [], isLoading: videosLoading } = useContentLibrary('exercise');
 
-  const isLoading = workoutLoading || filesLoading || videosLoading;
+  const handleCompleteTraining = async () => {
+    try {
+      await updateHabits({
+        date: new Date().toISOString().split('T')[0],
+        training_completed: !todayHabits?.training_completed
+      });
+      
+      toast({
+        title: todayHabits?.training_completed ? "Entrenamiento marcado como no completado" : "¡Entrenamiento completado!",
+        description: todayHabits?.training_completed ? 
+          "Has desmarcado el entrenamiento de hoy" : 
+          "¡Excelente trabajo! Has completado tu entrenamiento de hoy.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error updating training completion:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del entrenamiento",
+        variant: "destructive",
+      });
+    }
+  };
 
-  const handleViewPDF = (file: any) => {
+  const handleViewPlan = (file: any) => {
     setSelectedFile(file);
     setShowPDFViewer(true);
   };
 
-  const openVideo = (videoUrl: string, title: string) => {
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      window.open(videoUrl, '_blank');
-    } else {
-      window.open(videoUrl, '_blank');
+  const getVideoEmbedUrl = (url: string) => {
+    // Convert YouTube watch URLs to embed URLs
+    if (url.includes('youtube.com/watch?v=')) {
+      const videoId = url.split('v=')[1];
+      const ampersandPosition = videoId.indexOf('&');
+      if (ampersandPosition !== -1) {
+        return `https://www.youtube.com/embed/${videoId.substring(0, ampersandPosition)}`;
+      }
+      return `https://www.youtube.com/embed/${videoId}`;
     }
+    
+    // Convert YouTube short URLs
+    if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // For other URLs, return as is (assuming they're already embed-ready)
+    return url;
   };
 
-  if (isLoading) {
+  if (!hasTrainingAccess) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Cargando área de entrenamiento...</div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <Dumbbell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-600 mb-4">Acceso a Entrenamiento</h2>
+          <p className="text-muted-foreground mb-6">
+            Tu plan actual no incluye acceso a la sección de entrenamiento.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Contacta al administrador para actualizar tu plan y acceder a esta funcionalidad.
+          </p>
+        </div>
       </div>
     );
   }
@@ -44,10 +101,13 @@ const TrainingPage: React.FC = () => {
   if (showPDFViewer && selectedFile) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <PDFViewer 
-          fileId={selectedFile.id} 
+        <PDFViewer
+          fileId={selectedFile.id}
           filename={selectedFile.filename}
-          onClose={() => setShowPDFViewer(false)}
+          onClose={() => {
+            setShowPDFViewer(false);
+            setSelectedFile(null);
+          }}
         />
       </div>
     );
@@ -56,230 +116,211 @@ const TrainingPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Área de Entrenamiento</h1>
-        <p className="text-muted-foreground">Tu espacio completo para entrenar y alcanzar tus objetivos</p>
+        <h1 className="text-3xl font-bold mb-2">Entrenamiento</h1>
+        <p className="text-muted-foreground">
+          Accede a tu rutina de entrenamiento, videos y planes personalizados
+        </p>
       </div>
 
-      <div className="space-y-8">
-        {/* Section 1: Training of the Day - Common for all users */}
-        <Card className="border-l-4 border-l-primary">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Training Completion Card */}
+        <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              <CardTitle className="text-primary">Entrenamiento del Día</CardTitle>
-            </div>
-            <CardDescription>Rutina diaria diseñada para todos los usuarios de Outdoor Team</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Dumbbell className="w-5 h-5" />
+              Entrenamiento de Hoy
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {workoutOfDay ? (
-              <div className="space-y-6">
-                <div className="bg-primary/5 p-4 rounded-lg">
-                  <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
-                    <Play className="w-5 h-5" />
-                    {workoutOfDay.title}
-                  </h3>
-                  <p className="text-muted-foreground mb-4">{workoutOfDay.description}</p>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {new Date(workoutOfDay.date).toLocaleDateString()}
-                    </span>
-                  </div>
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${
+                  todayHabits?.training_completed ? 'bg-green-100' : 'bg-gray-100'
+                }`}>
+                  <Dumbbell className={`w-8 h-8 ${
+                    todayHabits?.training_completed ? 'text-green-600' : 'text-gray-400'
+                  }`} />
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {JSON.parse(workoutOfDay.exercises_json || '[]').map((exercise: any, index: number) => (
-                    <Card key={index} className="hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-lg flex items-center justify-between">
-                          {exercise.name}
-                          <span className="text-sm bg-primary/10 text-primary px-2 py-1 rounded-full">
-                            #{index + 1}
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-3">{exercise.description}</p>
-                        {exercise.sets && exercise.reps && (
-                          <div className="text-sm font-medium mb-3 bg-gray-50 p-2 rounded">
-                            <strong>{exercise.sets}</strong> series × <strong>{exercise.reps}</strong> repeticiones
-                          </div>
-                        )}
-                        {exercise.duration && (
-                          <div className="text-sm font-medium mb-3 bg-blue-50 p-2 rounded text-blue-700">
-                            Duración: <strong>{exercise.duration}</strong>
-                          </div>
-                        )}
-                        {exercise.video_url && (
-                          <Button 
-                            size="sm" 
-                            className="w-full"
-                            onClick={() => openVideo(exercise.video_url, exercise.name)}
-                          >
-                            <Play size={16} className="mr-2" />
-                            Ver Video Instructivo
-                          </Button>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <p className="font-medium mb-2">
+                  {todayHabits?.training_completed ? '¡Completado!' : 'Pendiente'}
+                </p>
+              </div>
+              
+              <Button 
+                onClick={handleCompleteTraining}
+                className="w-full"
+                variant={todayHabits?.training_completed ? "outline" : "default"}
+              >
+                {todayHabits?.training_completed ? 'Marcar como no hecho' : 'Marcar como completado'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-                {JSON.parse(workoutOfDay.exercises_json || '[]').length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      Los ejercicios específicos se cargarán pronto. ¡Mantente activo!
-                    </p>
+        {/* Training Plan Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Mi Plan de Entrenamiento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filesLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-sm text-muted-foreground">Cargando plan...</p>
+              </div>
+            ) : userFiles && userFiles.length > 0 ? (
+              <div className="space-y-3">
+                {userFiles.map(file => (
+                  <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium text-sm">{file.filename}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(file.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleViewPlan(file)}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Ver Plan
+                    </Button>
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No tienes planes asignados aún</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Workout of the Day Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Entrenamiento del Día</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {workoutLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-sm text-muted-foreground">Cargando entrenamiento...</p>
+              </div>
+            ) : workoutOfDay ? (
+              <div className="space-y-3">
+                <h3 className="font-medium">{workoutOfDay.title}</h3>
+                {workoutOfDay.description && (
+                  <p className="text-sm text-muted-foreground">{workoutOfDay.description}</p>
                 )}
+                <Button size="sm" className="w-full">
+                  <Play className="w-4 h-4 mr-2" />
+                  Ver Entrenamiento
+                </Button>
               </div>
             ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-600 mb-2">No hay entrenamiento programado</h3>
-                <p className="text-muted-foreground">
-                  El entrenamiento del día se actualizará pronto. ¡Vuelve más tarde!
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Section 2: Training Videos */}
-        <Card className="border-l-4 border-l-orange-500">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Video className="w-5 h-5 text-orange-500" />
-              <CardTitle className="text-orange-500">Videos de Entrenamiento</CardTitle>
-            </div>
-            <CardDescription>
-              Videos instructivos y rutinas de ejercicios para complementar tu entrenamiento
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {trainingVideos.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {trainingVideos.map((video: any) => (
-                  <Card key={video.id} className="hover:shadow-lg transition-all hover:scale-105 group">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-lg leading-tight pr-2">{video.title}</CardTitle>
-                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
-                          <Play className="w-5 h-5 text-orange-600" />
-                        </div>
-                      </div>
-                      <CardDescription className="text-sm">
-                        {video.description || 'Video de entrenamiento'}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <Button 
-                        onClick={() => openVideo(video.video_url, video.title)}
-                        className="w-full group-hover:bg-orange-600 group-hover:text-white transition-colors bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-600"
-                        size="sm"
-                      >
-                        <Play size={16} className="mr-2" />
-                        Ver Video
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Video className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  No hay videos de entrenamiento disponibles en este momento.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Section 3: Personalized Training Plan */}
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <User className="w-5 h-5 text-blue-500" />
-              <CardTitle className="text-blue-500">Tu Plan de Entrenamiento Personalizado</CardTitle>
-            </div>
-            <CardDescription>
-              Plan diseñado específicamente para tus objetivos, nivel y disponibilidad
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {userFiles.length > 0 ? (
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                  <h4 className="font-semibold text-blue-800 mb-2">Plan Personalizado Disponible</h4>
-                  <p className="text-blue-700 text-sm mb-3">
-                    Tu entrenador ha creado un plan específico basado en tu evaluación inicial, 
-                    objetivos y disponibilidad de tiempo.
-                  </p>
-                </div>
-                
-                {userFiles.map((file: any) => (
-                  <Card key={file.id} className="border-blue-200 hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-blue-800">Plan de Entrenamiento</h4>
-                            <p className="text-sm text-blue-600">
-                              Subido el {new Date(file.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleViewPDF(file)}
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            Ver Mi Plan
-                          </Button>
-                          <Button
-                            onClick={() => window.open(`/api/files/${file.id}`, '_blank')}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Descargar
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-blue-50 rounded-lg border border-blue-200">
-                <User className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-blue-600 mb-2">
-                  Plan Personalizado En Proceso
-                </h3>
-                <p className="text-blue-600 mb-6 max-w-md mx-auto">
-                  Nuestros entrenadores están preparando tu plan personalizado. 
-                  Te notificaremos cuando esté listo.
-                </p>
-                <div className="bg-blue-100 p-4 rounded-lg max-w-md mx-auto">
-                  <h4 className="font-semibold text-blue-800 mb-2">Mientras tanto:</h4>
-                  <ul className="text-sm text-blue-700 text-left space-y-1">
-                    <li>✓ Practica el entrenamiento del día</li>
-                    <li>✓ Explora los videos de ejercicios</li>
-                    <li>✓ Mantén consistencia con tus hábitos diarios</li>
-                  </ul>
-                </div>
+              <div className="text-center py-4">
+                <Dumbbell className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No hay entrenamiento programado para hoy</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Training Videos Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Videos de Entrenamiento</CardTitle>
+          <CardDescription>
+            Biblioteca completa de ejercicios y rutinas de entrenamiento
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {contentLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 aspect-video rounded-lg mb-3"></div>
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              ))}
+            </div>
+          ) : trainingContent && trainingContent.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {trainingContent.map(content => (
+                <Card key={content.id} className="overflow-hidden">
+                  <div className="aspect-video bg-gray-100">
+                    {content.video_url ? (
+                      content.video_url.includes('youtube.com') || content.video_url.includes('youtu.be') ? (
+                        <iframe
+                          src={getVideoEmbedUrl(content.video_url)}
+                          className="w-full h-full"
+                          frameBorder="0"
+                          allowFullScreen
+                          title={content.title}
+                        />
+                      ) : (
+                        <video
+                          src={content.video_url}
+                          className="w-full h-full object-cover"
+                          controls
+                          preload="metadata"
+                        />
+                      )
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-12 h-12 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold mb-2 line-clamp-2">{content.title}</h3>
+                    {content.description && (
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                        {content.description}
+                      </p>
+                    )}
+                    {content.subcategory && (
+                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full mb-3">
+                        {content.subcategory}
+                      </span>
+                    )}
+                    {content.video_url && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => window.open(content.video_url, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Ver Completo
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Dumbbell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-600 mb-2">No hay videos disponibles</h3>
+              <p className="text-muted-foreground">
+                Los videos de entrenamiento aparecerán aquí una vez que sean agregados por el administrador.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

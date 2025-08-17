@@ -159,6 +159,28 @@ const AdminPage: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file || !selectedUserId) return;
 
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: "Error de archivo",
+        description: "Solo se permiten archivos PDF",
+        variant: "destructive",
+      });
+      event.target.value = '';
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Error de archivo",
+        description: "El archivo no puede superar los 10MB",
+        variant: "destructive",
+      });
+      event.target.value = '';
+      return;
+    }
+
     setUploadingFile(true);
 
     try {
@@ -178,7 +200,7 @@ const AdminPage: React.FC = () => {
         toast({
           title: "Archivo subido",
           description: "El archivo se subió exitosamente",
-          variant: "success",
+          variant: "default",
         });
         fetchUserFiles();
       } else {
@@ -212,7 +234,7 @@ const AdminPage: React.FC = () => {
         toast({
           title: "Archivo eliminado",
           description: "El archivo se eliminó exitosamente",
-          variant: "success",
+          variant: "default",
         });
         fetchUserFiles();
       }
@@ -242,7 +264,7 @@ const AdminPage: React.FC = () => {
         toast({
           title: "Estado actualizado",
           description: `Usuario ${!currentStatus ? 'activado' : 'desactivado'} exitosamente`,
-          variant: "success",
+          variant: "default",
         });
         fetchUsers();
       }
@@ -268,6 +290,18 @@ const AdminPage: React.FC = () => {
       return;
     }
 
+    // Basic URL validation
+    try {
+      new URL(videoForm.video_url);
+    } catch {
+      toast({
+        title: "Error de validación",
+        description: "La URL del video no es válida",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem('auth_token');
       const method = editingVideo ? 'PUT' : 'POST';
@@ -286,7 +320,7 @@ const AdminPage: React.FC = () => {
         toast({
           title: editingVideo ? "Video actualizado" : "Video creado",
           description: `El video se ${editingVideo ? 'actualizó' : 'creó'} exitosamente`,
-          variant: "success",
+          variant: "default",
         });
         setShowVideoDialog(false);
         setEditingVideo(null);
@@ -320,7 +354,7 @@ const AdminPage: React.FC = () => {
         toast({
           title: "Video eliminado",
           description: "El video se eliminó exitosamente",
-          variant: "success",
+          variant: "default",
         });
         fetchContentVideos();
       }
@@ -352,6 +386,24 @@ const AdminPage: React.FC = () => {
     setShowVideoDialog(false);
   };
 
+  const getCategoryDisplayName = (category: string) => {
+    const categoryMap: Record<string, string> = {
+      'exercise': 'Entrenamiento',
+      'active_breaks': 'Pausas Activas',
+      'meditation': 'Meditación'
+    };
+    return categoryMap[category] || category;
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colorMap: Record<string, string> = {
+      'exercise': 'bg-blue-100 text-blue-800',
+      'active_breaks': 'bg-orange-100 text-orange-800',
+      'meditation': 'bg-purple-100 text-purple-800'
+    };
+    return colorMap[category] || 'bg-gray-100 text-gray-800';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -368,7 +420,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
@@ -481,7 +533,7 @@ const AdminPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Subir Archivo de Usuario</CardTitle>
                 <CardDescription>
-                  Sube planes de entrenamiento o nutrición para usuarios específicos
+                  Sube planes de entrenamiento o nutrición para usuarios específicos (Solo archivos PDF)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -516,13 +568,13 @@ const AdminPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Archivo (PDF)</Label>
+                    <Label>Archivo (Solo PDF, máx. 10MB)</Label>
                     <input
                       type="file"
-                      accept=".pdf"
+                      accept=".pdf,application/pdf"
                       onChange={handleFileUpload}
                       disabled={!selectedUserId || uploadingFile}
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                      className="w-full p-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -684,6 +736,9 @@ const AdminPage: React.FC = () => {
                             placeholder="https://www.youtube.com/watch?v=... o URL de archivo .mp4"
                             required
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Acepta URLs de YouTube, Vimeo, o archivos MP4 directos
+                          </p>
                         </div>
 
                         <div className="flex items-center space-x-2">
@@ -714,6 +769,9 @@ const AdminPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Videos ({contentVideos.length})</CardTitle>
+                <CardDescription>
+                  Gestiona todos los videos de la plataforma por categoría
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -733,7 +791,7 @@ const AdminPage: React.FC = () => {
                           <TableCell>
                             <div className="flex items-start gap-3">
                               <PlayCircle className="w-5 h-5 text-blue-600 mt-1" />
-                              <div>
+                              <div className="min-w-0">
                                 <div className="font-medium">{video.title}</div>
                                 {video.description && (
                                   <div className="text-sm text-muted-foreground mt-1">
@@ -741,23 +799,16 @@ const AdminPage: React.FC = () => {
                                     {video.description.length > 100 && '...'}
                                   </div>
                                 )}
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {video.video_url}
+                                <div className="text-xs text-muted-foreground mt-1 break-all">
+                                  {video.video_url.substring(0, 60)}
+                                  {video.video_url.length > 60 && '...'}
                                 </div>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              video.category === 'exercise' ? 'bg-blue-100 text-blue-800' :
-                              video.category === 'active_breaks' ? 'bg-orange-100 text-orange-800' :
-                              video.category === 'meditation' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {video.category === 'exercise' ? 'Entrenamiento' :
-                               video.category === 'active_breaks' ? 'Pausas Activas' :
-                               video.category === 'meditation' ? 'Meditación' :
-                               video.category}
+                            <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(video.category)}`}>
+                              {getCategoryDisplayName(video.category)}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -778,6 +829,7 @@ const AdminPage: React.FC = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => window.open(video.video_url, '_blank')}
+                                title="Ver video"
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
@@ -785,6 +837,7 @@ const AdminPage: React.FC = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleEditVideo(video)}
+                                title="Editar video"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -792,6 +845,7 @@ const AdminPage: React.FC = () => {
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => handleDeleteVideo(video.id)}
+                                title="Eliminar video"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>

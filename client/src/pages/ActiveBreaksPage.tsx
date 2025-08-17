@@ -1,24 +1,109 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Coffee, Clock, Video, Zap, Stretch, Target, Heart } from 'lucide-react';
+import { Coffee, Play, ExternalLink, Clock, Zap } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { useContentLibrary } from '@/hooks/api/use-content-library';
+import { useDailyHabits } from '@/hooks/api/use-daily-habits';
 
 const ActiveBreaksPage: React.FC = () => {
-  const { data: activeBreakVideos = [], isLoading } = useContentLibrary('active_breaks');
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // Check if user has access to active breaks features
+  const hasActiveBreaksAccess = user?.features?.active_breaks || false;
+  
+  // Fetch active breaks content
+  const { data: activeBreaksContent, isLoading: contentLoading } = useContentLibrary('active_breaks');
+  
+  // Daily habits for completion tracking
+  const { data: todayHabits, mutate: updateHabits } = useDailyHabits();
 
-  const openVideo = (videoUrl: string, title: string) => {
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      window.open(videoUrl, '_blank');
-    } else {
-      window.open(videoUrl, '_blank');
+  const handleCompleteActiveBreak = async () => {
+    try {
+      await updateHabits({
+        date: new Date().toISOString().split('T')[0],
+        movement_completed: !todayHabits?.movement_completed
+      });
+      
+      toast({
+        title: todayHabits?.movement_completed ? "Pausa activa marcada como no completada" : "¡Pausa activa completada!",
+        description: todayHabits?.movement_completed ? 
+          "Has desmarcado la pausa activa de hoy" : 
+          "¡Excelente! Has completado tu pausa activa de hoy.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error updating active break completion:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado de la pausa activa",
+        variant: "destructive",
+      });
     }
   };
 
-  if (isLoading) {
+  const getVideoEmbedUrl = (url: string) => {
+    // Convert YouTube watch URLs to embed URLs
+    if (url.includes('youtube.com/watch?v=')) {
+      const videoId = url.split('v=')[1];
+      const ampersandPosition = videoId.indexOf('&');
+      if (ampersandPosition !== -1) {
+        return `https://www.youtube.com/embed/${videoId.substring(0, ampersandPosition)}`;
+      }
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // Convert YouTube short URLs
+    if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // For other URLs, return as is (assuming they're already embed-ready)
+    return url;
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'beginner':
+        return 'bg-green-100 text-green-800';
+      case 'intermediate':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'advanced':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getDifficultyLabel = (difficulty: string) => {
+    switch (difficulty) {
+      case 'beginner':
+        return 'Principiante';
+      case 'intermediate':
+        return 'Intermedio';
+      case 'advanced':
+        return 'Avanzado';
+      default:
+        return difficulty;
+    }
+  };
+
+  if (!hasActiveBreaksAccess) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Cargando pausas activas...</div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <Coffee className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-600 mb-4">Acceso a Pausas Activas</h2>
+          <p className="text-muted-foreground mb-6">
+            Tu plan actual no incluye acceso a la sección de pausas activas.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Contacta al administrador para actualizar tu plan y acceder a esta funcionalidad.
+          </p>
+        </div>
       </div>
     );
   }
@@ -26,171 +111,186 @@ const ActiveBreaksPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <Coffee className="w-8 h-8 text-orange-600" />
-          Pausas Activas
-        </h1>
+        <h1 className="text-3xl font-bold mb-2">Pausas Activas</h1>
         <p className="text-muted-foreground">
-          Ejercicios cortos y efectivos para romper la rutina sedentaria y reactivar tu energía
+          Rompe con la rutina del trabajo con ejercicios cortos y energizantes
         </p>
       </div>
 
-      {/* Introduction Section */}
-      <Card className="mb-8 border-l-4 border-l-orange-500">
+      {/* Active Break Completion Card */}
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="text-orange-600">¿Qué son las Pausas Activas?</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Coffee className="w-5 h-5" />
+            Pausa Activa de Hoy
+          </CardTitle>
+          <CardDescription>
+            Mantente activo durante tu jornada laboral con ejercicios de estiramiento y movimiento
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            Las pausas activas son breves sesiones de ejercicios físicos que se realizan durante 
-            la jornada laboral o de estudio para combatir el sedentarismo y mejorar el bienestar.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-              <Zap className="w-8 h-8 text-orange-600" />
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                todayHabits?.movement_completed ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
+                <Coffee className={`w-8 h-8 ${
+                  todayHabits?.movement_completed ? 'text-green-600' : 'text-gray-400'
+                }`} />
+              </div>
               <div>
-                <h4 className="font-semibold text-orange-800">Energiza</h4>
-                <p className="text-sm text-orange-600">Reactiva tu cuerpo</p>
+                <p className="font-medium">
+                  {todayHabits?.movement_completed ? '¡Pausa activa completada!' : 'Pausa activa pendiente'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {todayHabits?.movement_completed ? 
+                    'Excelente trabajo manteniendo tu cuerpo activo' : 
+                    'Toma un descanso activo para energizar tu día'}
+                </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <Stretch className="w-8 h-8 text-blue-600" />
-              <div>
-                <h4 className="font-semibold text-blue-800">Estira</h4>
-                <p className="text-sm text-blue-600">Relaja tensiones</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-              <Target className="w-8 h-8 text-green-600" />
-              <div>
-                <h4 className="font-semibold text-green-800">Enfoca</h4>
-                <p className="text-sm text-green-600">Mejora concentración</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
-              <Heart className="w-8 h-8 text-red-600" />
-              <div>
-                <h4 className="font-semibold text-red-800">Activa</h4>
-                <p className="text-sm text-red-600">Mejora circulación</p>
-              </div>
-            </div>
+            <Button 
+              onClick={handleCompleteActiveBreak}
+              variant={todayHabits?.movement_completed ? "outline" : "default"}
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              {todayHabits?.movement_completed ? 'Marcar como no hecho' : 'Marcar como completado'}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Videos Section */}
-      <Card className="border-l-4 border-l-green-500">
+      {/* Active Breaks Videos Section */}
+      <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Video className="w-5 h-5 text-green-500" />
-            <CardTitle className="text-green-500">Videos de Pausas Activas</CardTitle>
-          </div>
+          <CardTitle>Videos de Pausas Activas</CardTitle>
           <CardDescription>
-            Rutinas cortas y efectivas que puedes hacer desde cualquier lugar
+            Ejercicios rápidos y efectivos para hacer durante tus descansos laborales
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {activeBreakVideos.length > 0 ? (
+          {contentLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeBreakVideos.map((video: any) => (
-                <Card key={video.id} className="hover:shadow-lg transition-all hover:scale-105 group">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg leading-tight pr-2">{video.title}</CardTitle>
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center shrink-0">
-                        <Play className="w-5 h-5 text-green-600" />
-                      </div>
-                    </div>
-                    <CardDescription className="text-sm">
-                      {video.description || 'Rutina de pausa activa'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {video.duration_minutes && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        {video.duration_minutes} minutos
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 aspect-video rounded-lg mb-3"></div>
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              ))}
+            </div>
+          ) : activeBreaksContent && activeBreaksContent.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {activeBreaksContent.map(content => (
+                <Card key={content.id} className="overflow-hidden">
+                  <div className="aspect-video bg-gray-100">
+                    {content.video_url ? (
+                      content.video_url.includes('youtube.com') || content.video_url.includes('youtu.be') ? (
+                        <iframe
+                          src={getVideoEmbedUrl(content.video_url)}
+                          className="w-full h-full"
+                          frameBorder="0"
+                          allowFullScreen
+                          title={content.title}
+                        />
+                      ) : (
+                        <video
+                          src={content.video_url}
+                          className="w-full h-full object-cover"
+                          controls
+                          preload="metadata"
+                        />
+                      )
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play className="w-12 h-12 text-gray-400" />
                       </div>
                     )}
-                    <Button 
-                      onClick={() => openVideo(video.video_url, video.title)}
-                      className="w-full group-hover:bg-green-600 group-hover:text-white transition-colors bg-green-50 text-green-600 border border-green-200 hover:bg-green-600"
-                      size="sm"
-                    >
-                      <Play size={16} className="mr-2" />
-                      Ver Rutina
-                    </Button>
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold mb-2 line-clamp-2">{content.title}</h3>
+                    {content.description && (
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                        {content.description}
+                      </p>
+                    )}
+                    
+                    <div className="flex items-center gap-2 mb-3">
+                      {content.duration_minutes && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                          <Clock className="w-3 h-3" />
+                          {content.duration_minutes} min
+                        </span>
+                      )}
+                      
+                      {content.difficulty_level && (
+                        <span className={`px-2 py-1 text-xs rounded-full ${getDifficultyColor(content.difficulty_level)}`}>
+                          {getDifficultyLabel(content.difficulty_level)}
+                        </span>
+                      )}
+                      
+                      {content.subcategory && (
+                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                          {content.subcategory}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {content.video_url && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => window.open(content.video_url, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Ver Completo
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">
-                Videos En Preparación
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Estamos preparando una colección completa de pausas activas para ti.
+              <Coffee className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-600 mb-2">No hay videos disponibles</h3>
+              <p className="text-muted-foreground">
+                Los videos de pausas activas aparecerán aquí una vez que sean agregados por el administrador.
               </p>
-              
-              {/* Default exercises while videos are being added */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-                <Card className="bg-orange-50 border border-orange-200">
-                  <CardContent className="p-4 text-center">
-                    <Stretch className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                    <h4 className="font-semibold text-orange-800">Estiramiento de Cuello</h4>
-                    <p className="text-sm text-orange-600">2-3 minutos</p>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-blue-50 border border-blue-200">
-                  <CardContent className="p-4 text-center">
-                    <Zap className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                    <h4 className="font-semibold text-blue-800">Activación Postural</h4>
-                    <p className="text-sm text-blue-600">5 minutos</p>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-green-50 border border-green-200">
-                  <CardContent className="p-4 text-center">
-                    <Heart className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                    <h4 className="font-semibold text-green-800">Movilidad Articular</h4>
-                    <p className="text-sm text-green-600">3-4 minutos</p>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Tips Section */}
-      <Card className="mt-8 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+      <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-orange-700">💡 Tips para Pausas Activas Efectivas</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="w-5 h-5" />
+            Consejos para Pausas Activas Efectivas
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
-              <h4 className="font-semibold text-orange-800">Frecuencia</h4>
-              <ul className="text-sm text-orange-700 space-y-2">
-                <li>• Cada 1-2 horas durante tu jornada</li>
-                <li>• Mínimo 3-5 minutos por sesión</li>
-                <li>• Adapta según tu nivel de actividad</li>
+              <h4 className="font-medium">¿Cuándo hacer pausas activas?</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Cada 1-2 horas de trabajo</li>
+                <li>• Cuando sientes tensión muscular</li>
+                <li>• Al iniciar o finalizar el día laboral</li>
+                <li>• Durante reuniones largas (si es posible)</li>
               </ul>
             </div>
             
             <div className="space-y-3">
-              <h4 className="font-semibold text-orange-800">Beneficios</h4>
-              <ul className="text-sm text-orange-700 space-y-2">
-                <li>• Reduce tensión muscular</li>
-                <li>• Mejora concentración y productividad</li>
-                <li>• Previene lesiones por posturas estáticas</li>
+              <h4 className="font-medium">Beneficios</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Reduce la tensión muscular</li>
+                <li>• Mejora la circulación sanguínea</li>
+                <li>• Aumenta la concentración</li>
+                <li>• Previene lesiones por posturas repetitivas</li>
               </ul>
             </div>
           </div>

@@ -11,10 +11,16 @@ interface DailyResetStats {
 class DailyResetScheduler {
   private isRunning = false;
   private cronJob: cron.ScheduledTask | null = null;
+  private database: any;
 
-  constructor() {
+  constructor(database: any) {
+    this.database = database;
+  }
+
+  async initialize() {
     this.initializeScheduler();
-    this.checkMissedReset();
+    await this.checkMissedReset();
+    console.log('✅ Daily reset scheduler initialized');
   }
 
   private initializeScheduler() {
@@ -37,7 +43,7 @@ class DailyResetScheduler {
       console.log('Checking for missed reset. Today:', today, 'Yesterday:', yesterday);
 
       // Check if yesterday's reset was executed
-      const yesterdayReset = await db
+      const yesterdayReset = await this.database
         .selectFrom('daily_reset_log')
         .select(['reset_date', 'status'])
         .where('reset_date', '=', yesterday)
@@ -56,7 +62,7 @@ class DailyResetScheduler {
       });
       
       if (parseInt(currentHour) >= 1) { // After 01:00 AM
-        const todayReset = await db
+        const todayReset = await this.database
           .selectFrom('daily_reset_log')
           .select(['reset_date', 'status'])
           .where('reset_date', '=', today)
@@ -106,7 +112,7 @@ class DailyResetScheduler {
 
     try {
       // Check if reset already exists for this date
-      const existingReset = await db
+      const existingReset = await this.database
         .selectFrom('daily_reset_log')
         .select(['reset_date', 'status'])
         .where('reset_date', '=', resetDate)
@@ -118,11 +124,11 @@ class DailyResetScheduler {
       }
 
       // Start transaction for atomic operation
-      await db.transaction().execute(async (trx) => {
+      await this.database.transaction().execute(async (trx: any) => {
         // Step 1: Archive current daily data to history
         const dailyData = await trx
           .selectFrom('daily_habits')
-          .leftJoin('user_notes', (join) => join
+          .leftJoin('user_notes', (join: any) => join
             .onRef('daily_habits.user_id', '=', 'user_notes.user_id')
             .on('user_notes.date', '=', resetDate)
           )
@@ -159,7 +165,7 @@ class DailyResetScheduler {
               notes_content: record.notes_content || null,
               archived_at: new Date().toISOString()
             })
-            .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({
+            .onConflict((oc: any) => oc.columns(['user_id', 'date']).doUpdateSet({
               daily_points: record.daily_points || 0,
               steps: record.steps || 0,
               training_completed: record.training_completed || 0,
@@ -237,7 +243,7 @@ class DailyResetScheduler {
     executionTime: number
   ): Promise<void> {
     try {
-      await db
+      await this.database
         .insertInto('daily_reset_log')
         .values({
           reset_date: resetDate,
@@ -250,7 +256,7 @@ class DailyResetScheduler {
           error_message: errorMessage,
           execution_time_ms: executionTime
         })
-        .onConflict((oc) => oc.column('reset_date').doUpdateSet({
+        .onConflict((oc: any) => oc.column('reset_date').doUpdateSet({
           executed_at: new Date().toISOString(),
           users_processed: stats.usersProcessed,
           total_daily_points: stats.totalDailyPoints,
@@ -267,7 +273,7 @@ class DailyResetScheduler {
   }
 
   public async getResetHistory(limit: number = 30): Promise<any[]> {
-    return await db
+    return await this.database
       .selectFrom('daily_reset_log')
       .selectAll()
       .orderBy('reset_date', 'desc')
@@ -276,7 +282,7 @@ class DailyResetScheduler {
   }
 
   public async getResetStatus(date: string): Promise<any | null> {
-    return await db
+    return await this.database
       .selectFrom('daily_reset_log')
       .selectAll()
       .where('reset_date', '=', date)
