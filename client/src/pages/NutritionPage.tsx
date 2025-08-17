@@ -37,7 +37,7 @@ const NutritionPage: React.FC = () => {
         description: todayHabits?.nutrition_completed ? 
           "Has desmarcado la nutrición de hoy" : 
           "¡Excelente! Has seguido tu plan nutricional hoy.",
-        variant: "success",
+        variant: "default",
       });
     } catch (error) {
       console.error('Error updating nutrition completion:', error);

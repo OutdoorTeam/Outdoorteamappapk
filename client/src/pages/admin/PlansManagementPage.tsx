@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Apple, Dumbbell, FileText } from 'lucide-react';
+import { Apple, Dumbbell } from 'lucide-react';
 import { NutritionPlanAdmin } from './nutrition/NutritionPlanAdmin';
 import { TrainingPlanAdmin } from './training/TrainingPlanAdmin';
 
 const PlansManagementPage: React.FC = () => {
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="space-y-6">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Gestión de Planes</h1>
         <p className="text-muted-foreground">

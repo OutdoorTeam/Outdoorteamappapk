@@ -1,87 +1,77 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
 
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  plan_type: string | null;
+  is_active: boolean;
+  features: {
+    habits: boolean;
+    training: boolean;
+    nutrition: boolean;
+    meditation: boolean;
+    active_breaks: boolean;
+  };
+  created_at: string;
+}
+
 // Query keys
 export const USERS_KEYS = {
   all: ['users'] as const,
-  detail: (id: number) => [...USERS_KEYS.all, id] as const,
+  detail: (id: number) => [...USERS_KEYS.all, 'detail', id] as const,
 };
 
-// Hook for all users (admin only)
+// Hook to get all users (admin only)
 export function useUsers() {
   return useQuery({
     queryKey: USERS_KEYS.all,
-    queryFn: () => apiRequest('/api/users'),
+    queryFn: () => apiRequest<User[]>('/api/users'),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
-// Hook for single user
-export function useUser(id: number) {
+// Hook to get user by ID
+export function useUser(userId: number) {
   return useQuery({
-    queryKey: USERS_KEYS.detail(id),
-    queryFn: () => apiRequest(`/api/users/${id}`),
+    queryKey: USERS_KEYS.detail(userId),
+    queryFn: () => apiRequest<User>(`/api/users/${userId}`),
+    enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: false,
-    enabled: !!id, // Only run if id is provided
   });
 }
 
-// Mutation for toggling user status (admin only)
+// Mutation to toggle user status
 export function useToggleUserStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ userId, isActive }: { userId: number; isActive: boolean }) =>
+    mutationFn: ({ userId, is_active }: { userId: number; is_active: boolean }) =>
       apiRequest(`/api/users/${userId}/toggle-status`, {
         method: 'PUT',
-        body: JSON.stringify({ is_active: isActive }),
+        body: JSON.stringify({ is_active }),
       }),
-    onSuccess: (updatedUser, variables) => {
-      // Update user in cache
-      queryClient.setQueryData(USERS_KEYS.detail(variables.userId), updatedUser);
-      
-      // Update user in the users list cache
-      queryClient.setQueryData(USERS_KEYS.all, (oldData: any[]) =>
-        oldData?.map(user => 
-          user.id === variables.userId 
-            ? { ...user, is_active: updatedUser.is_active }
-            : user
-        )
-      );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_KEYS.all });
     },
   });
 }
 
-// Mutation for updating user features (admin only)
-export function useUpdateUserFeatures() {
+// Mutation to assign plan to user
+export function useAssignPlan() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ 
-      userId, 
-      features, 
-      planType 
-    }: { 
-      userId: number; 
-      features: Record<string, boolean>; 
-      planType?: string; 
-    }) =>
-      apiRequest(`/api/users/${userId}/features`, {
-        method: 'PUT',
-        body: JSON.stringify({ features, plan_type: planType }),
+    mutationFn: ({ userId, planId }: { userId: number; planId: number }) =>
+      apiRequest(`/api/users/${userId}/assign-plan`, {
+        method: 'POST',
+        body: JSON.stringify({ planId }),
       }),
-    onSuccess: (updatedUser, variables) => {
-      // Update user in cache
-      queryClient.setQueryData(USERS_KEYS.detail(variables.userId), updatedUser);
-      
-      // Update user in the users list cache
-      queryClient.setQueryData(USERS_KEYS.all, (oldData: any[]) =>
-        oldData?.map(user => 
-          user.id === variables.userId ? updatedUser : user
-        )
-      );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_KEYS.all });
     },
   });
 }
