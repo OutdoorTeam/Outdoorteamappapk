@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Apple, FileText, Eye, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useUserFiles } from '@/hooks/api/use-user-files';
 import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
+import { useNutritionPlan } from '@/hooks/api/use-nutrition-plan';
+import { markdownToSafeHtml } from '@/utils/markdown';
 import PDFViewer from '@/components/PDFViewer';
 
 const NutritionPage: React.FC = () => {
@@ -17,8 +18,8 @@ const NutritionPage: React.FC = () => {
   // Check if user has access to nutrition features
   const hasNutritionAccess = user?.features?.nutrition || false;
   
-  // Fetch user's nutrition files
-  const { data: userFiles, isLoading: filesLoading } = useUserFiles('nutrition');
+  // Fetch user's nutrition plan
+  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(user?.id || 0);
   
   // Daily habits for completion tracking
   const { data: todayHabits } = useTodayHabits();
@@ -36,7 +37,7 @@ const NutritionPage: React.FC = () => {
         description: todayHabits?.nutrition_completed ? 
           "Has desmarcado la nutrición de hoy" : 
           "¡Excelente! Has seguido tu plan nutricional hoy.",
-        variant: "default",
+        variant: "success",
       });
     } catch (error) {
       console.error('Error updating nutrition completion:', error);
@@ -58,13 +59,28 @@ const NutritionPage: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center py-12">
           <Apple className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-600 mb-4">Acceso a Nutrición</h2>
-          <p className="text-muted-foreground mb-6">
-            Tu plan actual no incluye acceso a la sección de nutrición.
+          <h2 className="text-2xl font-bold text-gray-600 mb-4">Acceso a Nutrición No Disponible</h2>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            La función de nutrición no está incluida en tu plan actual. 
+            Actualiza tu plan para acceder a esta funcionalidad.
           </p>
-          <p className="text-sm text-muted-foreground">
-            Contacta al administrador para actualizar tu plan y acceder a esta funcionalidad.
-          </p>
+          <Button 
+            onClick={() => window.location.href = '/plans'}
+            className="bg-[#D3B869] hover:bg-[#D3B869]/90 text-black"
+          >
+            Ver Planes Disponibles
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (planLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando tu plan nutricional...</p>
         </div>
       </div>
     );
@@ -73,202 +89,160 @@ const NutritionPage: React.FC = () => {
   if (showPDFViewer && selectedFile) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <PDFViewer
+        <div className="mb-6">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowPDFViewer(false)}
+            className="mb-4"
+          >
+            ← Volver al Plan
+          </Button>
+        </div>
+        <PDFViewer 
           fileId={selectedFile.id}
           filename={selectedFile.filename}
-          onClose={() => {
-            setShowPDFViewer(false);
-            setSelectedFile(null);
-          }}
+          onClose={() => setShowPDFViewer(false)}
         />
       </div>
     );
   }
 
+  const nutritionPlan = nutritionData?.plan;
+  const legacyPdf = nutritionData?.legacyPdf;
+  const hasMarkdownContent = nutritionPlan?.content_md && nutritionPlan.content_md.trim();
+
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Nutrición</h1>
-        <p className="text-muted-foreground">
-          Accede a tu plan nutricional personalizado y controla tu alimentación diaria
-        </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Apple className="w-8 h-8 text-[#D3B869]" />
+            <div>
+              <h1 className="text-3xl font-bold">Nutrición</h1>
+              <p className="text-muted-foreground">Tu plan nutricional personalizado</p>
+            </div>
+          </div>
+          
+          {/* Completion Toggle */}
+          <Button
+            onClick={handleCompleteNutrition}
+            variant={todayHabits?.nutrition_completed ? "default" : "outline"}
+            className={
+              todayHabits?.nutrition_completed
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+            }
+            disabled={updateHabitMutation.isPending}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            {todayHabits?.nutrition_completed ? "Completado Hoy" : "Marcar Completado"}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Nutrition Completion Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Apple className="w-5 h-5" />
-              Nutrición de Hoy
-            </CardTitle>
-            <CardDescription>
-              Marca cuando hayas seguido tu plan nutricional del día
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${
-                  todayHabits?.nutrition_completed ? 'bg-green-100' : 'bg-gray-100'
-                }`}>
-                  {todayHabits?.nutrition_completed ? (
-                    <CheckCircle className="w-10 h-10 text-green-600" />
-                  ) : (
-                    <Apple className="w-10 h-10 text-gray-400" />
-                  )}
-                </div>
-                <p className="font-medium mb-2">
-                  {todayHabits?.nutrition_completed ? '¡Plan seguido!' : 'Plan pendiente'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {todayHabits?.nutrition_completed ? 
-                    'Has seguido tu plan nutricional correctamente' : 
-                    'Sigue tu plan nutricional para mantener una alimentación saludable'}
-                </p>
-              </div>
-              
-              <Button 
-                onClick={handleCompleteNutrition}
-                className="w-full"
-                variant={todayHabits?.nutrition_completed ? "outline" : "default"}
-                disabled={updateHabitMutation.isPending}
-              >
-                {updateHabitMutation.isPending 
-                  ? 'Actualizando...' 
-                  : todayHabits?.nutrition_completed 
-                    ? 'Marcar como no seguido' 
-                    : 'Marcar como seguido'
-                }
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Nutrition Plan Card */}
+      {/* Main Content */}
+      {hasMarkdownContent ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Mi Plan de Nutrición
+              Mi Plan Nutricional
             </CardTitle>
             <CardDescription>
-              Accede a tu plan nutricional personalizado
+              Plan personalizado - Versión {nutritionPlan.version} • {nutritionPlan.status === 'published' ? 'Publicado' : 'Borrador'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {filesLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-sm text-muted-foreground">Cargando plan nutricional...</p>
-              </div>
-            ) : userFiles && userFiles.length > 0 ? (
-              <div className="space-y-3">
-                {userFiles.map(file => (
-                  <div key={file.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <FileText className="w-6 h-6 text-green-600" />
-                      <div>
-                        <p className="font-medium">{file.filename}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Plan de Nutrición • {new Date(file.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleViewPlan(file)}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Ver Plan
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-600 mb-2">No tienes planes asignados</h3>
-                <p className="text-muted-foreground">
-                  Tu plan nutricional personalizado aparecerá aquí una vez que sea asignado por el administrador.
-                </p>
-              </div>
-            )}
+            <div 
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ 
+                __html: markdownToSafeHtml(nutritionPlan.content_md) 
+              }}
+            />
           </CardContent>
         </Card>
-      </div>
+      ) : legacyPdf ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Mi Plan Nutricional (PDF)
+            </CardTitle>
+            <CardDescription>
+              Plan en formato PDF subido por tu entrenador
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+              <FileText className="w-12 h-12 text-red-600" />
+              <div className="flex-1">
+                <h3 className="font-medium">{legacyPdf.filename}</h3>
+                <p className="text-sm text-muted-foreground">
+                  Subido el {new Date(legacyPdf.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Button 
+                onClick={() => handleViewPlan(legacyPdf)}
+                className="bg-[#D3B869] hover:bg-[#D3B869]/90 text-black"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Ver Plan
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Apple className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-600 mb-2">
+              No hay plan nutricional disponible
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Tu entrenador aún no ha creado tu plan nutricional personalizado.
+            </p>
+            <div className="text-sm text-muted-foreground">
+              <p>Mientras tanto, puedes:</p>
+              <ul className="mt-2 space-y-1">
+                <li>• Mantener hábitos alimentarios saludables</li>
+                <li>• Beber suficiente agua durante el día</li>
+                <li>• Contactar a tu entrenador si tienes dudas</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Nutrition Tips Section */}
-      <Card>
+      {/* Tips Card */}
+      <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Apple className="w-5 h-5" />
-            Consejos Nutricionales
-          </CardTitle>
-          <CardDescription>
-            Recomendaciones generales para mantener una alimentación saludable
-          </CardDescription>
+          <CardTitle className="text-lg">💡 Consejos de Nutrición</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Apple className="w-6 h-6 text-blue-600" />
-              </div>
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <div>
               <h4 className="font-medium mb-2">Hidratación</h4>
-              <p className="text-sm text-muted-foreground">
-                Bebe al menos 8 vasos de agua al día para mantener tu cuerpo hidratado
+              <p className="text-muted-foreground">
+                Bebe al menos 2-3 litros de agua al día, especialmente antes, durante y después del ejercicio.
               </p>
             </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Apple className="w-6 h-6 text-green-600" />
-              </div>
-              <h4 className="font-medium mb-2">Porciones</h4>
-              <p className="text-sm text-muted-foreground">
-                Controla las porciones para mantener un equilibrio calórico adecuado
+            <div>
+              <h4 className="font-medium mb-2">Timing</h4>
+              <p className="text-muted-foreground">
+                Come una comida balanceada 2-3 horas antes del entrenamiento y un snack ligero después.
               </p>
             </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Apple className="w-6 h-6 text-orange-600" />
-              </div>
+            <div>
+              <h4 className="font-medium mb-2">Proteínas</h4>
+              <p className="text-muted-foreground">
+                Incluye proteínas en cada comida para mantener la masa muscular y acelerar la recuperación.
+              </p>
+            </div>
+            <div>
               <h4 className="font-medium mb-2">Variedad</h4>
-              <p className="text-sm text-muted-foreground">
-                Incluye diferentes grupos de alimentos para obtener todos los nutrientes
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Apple className="w-6 h-6 text-purple-600" />
-              </div>
-              <h4 className="font-medium mb-2">Horarios</h4>
-              <p className="text-sm text-muted-foreground">
-                Mantén horarios regulares de comida para regular tu metabolismo
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Apple className="w-6 h-6 text-red-600" />
-              </div>
-              <h4 className="font-medium mb-2">Procesados</h4>
-              <p className="text-sm text-muted-foreground">
-                Limita el consumo de alimentos ultraprocesados y azúcares añadidos
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Apple className="w-6 h-6 text-yellow-600" />
-              </div>
-              <h4 className="font-medium mb-2">Planificación</h4>
-              <p className="text-sm text-muted-foreground">
-                Planifica tus comidas con anticipación para tomar mejores decisiones nutricionales
+              <p className="text-muted-foreground">
+                Come una variedad de colores en frutas y verduras para obtener todos los nutrientes.
               </p>
             </div>
           </div>

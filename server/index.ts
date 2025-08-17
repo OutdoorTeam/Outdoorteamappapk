@@ -12,6 +12,8 @@ import DailyResetScheduler from './scheduler.js';
 import NotificationScheduler from './services/notification-scheduler.js';
 import statsRoutes from './routes/stats-routes.js';
 import notificationRoutes from './routes/notification-routes.js';
+import nutritionPlanRoutes from './routes/nutrition-plan-routes.js';
+import trainingPlanRoutes from './routes/training-plan-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -182,6 +184,8 @@ const formatUserResponse = (user: any) => {
 // Mount routes
 app.use('/api/', statsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/', nutritionPlanRoutes);
+app.use('/api/', trainingPlanRoutes);
 
 // Auth Routes with Rate Limiting (CORRECT ORDER)
 app.post('/api/auth/register',

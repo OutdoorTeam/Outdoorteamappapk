@@ -171,6 +171,48 @@ export interface DatabaseSchema {
     next_send_at: string;
     created_at: string;
   };
+  nutrition_plans: {
+    id: number;
+    user_id: number;
+    content_md: string | null;
+    version: number;
+    status: string;
+    created_by: number | null;
+    created_at: string;
+    updated_at: string;
+  };
+  training_plans: {
+    id: number;
+    user_id: number;
+    title: string | null;
+    version: number;
+    status: string;
+    created_by: number | null;
+    created_at: string;
+    updated_at: string;
+  };
+  training_plan_days: {
+    id: number;
+    plan_id: number;
+    day_index: number;
+    title: string | null;
+    notes: string | null;
+    sort_order: number;
+  };
+  training_exercises: {
+    id: number;
+    day_id: number;
+    sort_order: number;
+    exercise_name: string;
+    content_library_id: number | null;
+    youtube_url: string | null;
+    sets: number | null;
+    reps: string | null;
+    intensity: string | null;
+    rest_seconds: number | null;
+    tempo: string | null;
+    notes: string | null;
+  };
 }
 
 const dataDirectory = process.env.DATA_DIRECTORY || './data';
