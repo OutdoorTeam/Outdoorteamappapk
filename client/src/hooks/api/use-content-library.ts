@@ -34,6 +34,11 @@ export function useContentLibrary(category?: string) {
   });
 }
 
+// Alias for exercises specifically
+export function useExercises() {
+  return useContentLibrary('exercise');
+}
+
 // Hook to create content library item (admin only)
 export function useCreateContentLibraryItem() {
   const queryClient = useQueryClient();
