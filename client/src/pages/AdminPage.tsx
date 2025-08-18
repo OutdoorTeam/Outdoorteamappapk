@@ -9,6 +9,8 @@ import { useUsers, useToggleUserStatus } from '@/hooks/api/use-users';
 import { useToast } from '@/hooks/use-toast';
 import { usePlans } from '@/hooks/api/use-plans';
 import BroadcastNotifications from '@/components/admin/BroadcastNotifications';
+import UserDetailPanel from '@/components/admin/UserDetailPanel';
+import ContentManagement from '@/components/admin/ContentManagement';
 import PlansManagementPage from '@/pages/admin/PlansManagementPage';
 import { 
   Users, 
@@ -19,12 +21,15 @@ import {
   UserX,
   Bell,
   Dumbbell,
-  Mail
+  Mail,
+  Play,
+  Eye
 } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [selectedUser, setSelectedUser] = React.useState<any>(null);
   
   const { data: users, isLoading: usersLoading } = useUsers();
   const { data: plans } = usePlans();
@@ -52,6 +57,10 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleUserClick = (clickedUser: any) => {
+    setSelectedUser(clickedUser);
+  };
+
   if (user?.role !== 'admin') {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -66,6 +75,16 @@ const AdminPage: React.FC = () => {
     );
   }
 
+  // Show user detail panel if a user is selected
+  if (selectedUser) {
+    return (
+      <UserDetailPanel 
+        user={selectedUser} 
+        onClose={() => setSelectedUser(null)} 
+      />
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -76,10 +95,14 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="content" className="flex items-center gap-2">
+            <Play className="w-4 h-4" />
+            Contenido
           </TabsTrigger>
           <TabsTrigger value="plans" className="flex items-center gap-2">
             <Dumbbell className="w-4 h-4" />
@@ -159,6 +182,15 @@ const AdminPage: React.FC = () => {
                         </div>
                         
                         <div className="flex items-center gap-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUserClick(userItem)}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Ver Detalles
+                          </Button>
+                          
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={userItem.is_active}
@@ -189,6 +221,24 @@ const AdminPage: React.FC = () => {
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Content Management Tab */}
+        <TabsContent value="content">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Play className="w-5 h-5" />
+                Gestión de Contenido
+              </CardTitle>
+              <CardDescription>
+                Administra la biblioteca de videos para entrenamientos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ContentManagement />
             </CardContent>
           </Card>
         </TabsContent>

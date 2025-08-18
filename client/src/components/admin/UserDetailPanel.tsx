@@ -16,6 +16,7 @@ import {
   useUserStepHistory
 } from '@/hooks/api/use-user-management';
 import { useUserStats } from '@/hooks/api/use-user-stats';
+import UserTrainingPlanEditor from './UserTrainingPlanEditor';
 import WeeklyPointsChart from '@/components/profile/WeeklyPointsChart';
 import MonthlyHabitsChart from '@/components/profile/MonthlyHabitsChart';
 import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
@@ -217,7 +218,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, onClose }) => {
 
         <div className="p-6">
           <Tabs defaultValue="permissions" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="permissions" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
                 Permisos
@@ -229,6 +230,10 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, onClose }) => {
               <TabsTrigger value="activity" className="flex items-center gap-2">
                 <Activity className="w-4 h-4" />
                 Actividad
+              </TabsTrigger>
+              <TabsTrigger value="training" className="flex items-center gap-2">
+                <Dumbbell className="w-4 h-4" />
+                Plan de Entrenamiento
               </TabsTrigger>
               <TabsTrigger value="statistics" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
@@ -284,130 +289,4 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, onClose }) => {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            {/* Goals Tab */}
-            <TabsContent value="goals">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Metas Personalizadas</CardTitle>
-                  <CardDescription>
-                    Configura metas específicas para este usuario
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {goalsLoading ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                      <p className="text-sm text-muted-foreground">Cargando metas...</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="stepGoal">Meta Diaria de Pasos</Label>
-                          <Input
-                            id="stepGoal"
-                            type="number"
-                            value={stepGoal}
-                            onChange={(e) => setStepGoal(parseInt(e.target.value) || 8000)}
-                            min={1000}
-                            max={50000}
-                            step={1000}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            Pasos recomendados por día (1,000 - 50,000)
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="weeklyGoal">Meta Semanal de Puntos</Label>
-                          <Input
-                            id="weeklyGoal"
-                            type="number"
-                            value={weeklyGoal}
-                            onChange={(e) => setWeeklyGoal(parseInt(e.target.value) || 28)}
-                            min={7}
-                            max={100}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            Puntos objetivo por semana (7 - 100)
-                          </p>
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={handleGoalUpdate}
-                        disabled={updateGoalsMutation.isPending}
-                        className="w-full md:w-auto"
-                      >
-                        {updateGoalsMutation.isPending ? 'Guardando...' : 'Actualizar Metas'}
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Activity Tab */}
-            <TabsContent value="activity">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Today's Habits */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5" />
-                      Hábitos de Hoy
-                    </CardTitle>
-                    <CardDescription>
-                      Estado actual de los hábitos diarios
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {habitsLoading ? (
-                      <div className="text-center py-8">
-                        <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                        <p className="text-sm text-muted-foreground">Cargando hábitos...</p>
-                      </div>
-                    ) : todayHabits ? (
-                      <div className="space-y-4">
-                        <div className="text-center mb-6">
-                          <div className="text-3xl font-bold text-primary">
-                            {todayHabits.daily_points}
-                          </div>
-                          <div className="text-sm text-muted-foreground">Puntos de hoy</div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          {[
-                            { key: 'training_completed', type: 'training' },
-                            { key: 'nutrition_completed', type: 'nutrition' },
-                            { key: 'movement_completed', type: 'movement' },
-                            { key: 'meditation_completed', type: 'meditation' }
-                          ].map(({ key, type }) => {
-                            const completed = Boolean(todayHabits[key as keyof typeof todayHabits]);
-                            return (
-                              <div key={key} className="flex items-center gap-3 p-3 border rounded-lg">
-                                {getHabitIcon(type)}
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{getHabitName(type)}</p>
-                                  <div className="flex items-center gap-1 mt-1">
-                                    {completed ? (
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4 text-gray-400" />
-                                    )}
-                                    <span className={`text-xs ${completed ? 'text-green-600' : 'text-gray-500'}`}>
-                                      {completed ? 'Completado' : 'Pendiente'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Footprints className="w-4 
+            

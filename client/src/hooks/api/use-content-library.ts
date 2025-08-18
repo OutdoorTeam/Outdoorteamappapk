@@ -8,56 +8,46 @@ export interface ContentLibraryItem {
   video_url: string | null;
   category: string;
   subcategory: string | null;
-  is_active: boolean;
+  is_active: number;
   created_at: string;
 }
 
 // Query keys
 export const CONTENT_LIBRARY_KEYS = {
   all: ['content-library'] as const,
-  byCategory: (category: string) => [...CONTENT_LIBRARY_KEYS.all, 'category', category] as const,
+  byCategory: (category?: string) => [...CONTENT_LIBRARY_KEYS.all, 'category', category] as const,
 };
 
 // Hook to get content library items
-export function useContentLibrary() {
-  return useQuery({
-    queryKey: CONTENT_LIBRARY_KEYS.all,
-    queryFn: () => apiRequest<ContentLibraryItem[]>('/api/content-library'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
-}
-
-// Hook to get exercises (content library items with category 'exercise')
-export function useExercises() {
-  return useQuery({
-    queryKey: CONTENT_LIBRARY_KEYS.byCategory('exercise'),
-    queryFn: () => apiRequest<ContentLibraryItem[]>('/api/content-library?category=exercise'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
-}
-
-// Hook to get content library by category
-export function useContentLibraryByCategory(category: string) {
+export function useContentLibrary(category?: string) {
   return useQuery({
     queryKey: CONTENT_LIBRARY_KEYS.byCategory(category),
-    queryFn: () => apiRequest<ContentLibraryItem[]>(`/api/content-library?category=${category}`),
-    enabled: !!category,
+    queryFn: () => {
+      const url = category 
+        ? `/api/content-library?category=${category}`
+        : '/api/content-library';
+      return apiRequest<ContentLibraryItem[]>(url);
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
-// Create content mutation
+// Hook to create content library item (admin only)
 export function useCreateContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (item: Omit<ContentLibraryItem, 'id' | 'created_at'>) =>
+    mutationFn: (data: {
+      title: string;
+      description?: string | null;
+      video_url?: string | null;
+      category: string;
+      subcategory?: string | null;
+      is_active?: boolean;
+    }) =>
       apiRequest<ContentLibraryItem>('/api/content-library', {
         method: 'POST',
-        body: JSON.stringify(item),
+        body: JSON.stringify(data),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });
@@ -65,15 +55,26 @@ export function useCreateContentLibraryItem() {
   });
 }
 
-// Update content mutation
+// Hook to update content library item (admin only)
 export function useUpdateContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...item }: Partial<ContentLibraryItem> & { id: number }) =>
+    mutationFn: ({ 
+      id, 
+      ...data 
+    }: {
+      id: number;
+      title: string;
+      description?: string | null;
+      video_url?: string | null;
+      category: string;
+      subcategory?: string | null;
+      is_active?: boolean;
+    }) =>
       apiRequest<ContentLibraryItem>(`/api/content-library/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(item),
+        body: JSON.stringify(data),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });
@@ -81,13 +82,13 @@ export function useUpdateContentLibraryItem() {
   });
 }
 
-// Delete content mutation
+// Hook to delete content library item (admin only)
 export function useDeleteContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: number) =>
-      apiRequest(`/api/content-library/${id}`, {
+      apiRequest<{ message: string }>(`/api/content-library/${id}`, {
         method: 'DELETE',
       }),
     onSuccess: () => {
