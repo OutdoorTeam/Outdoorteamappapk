@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Brain, Play, ExternalLink, Clock, Sparkles, PlayCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useContentVideosByCategory } from '@/hooks/api/use-content-videos';
+import { useContentLibrary } from '@/hooks/api/use-content-library';
 import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
 import { useSaveMeditationSession } from '@/hooks/api/use-meditation';
 import MeditationSession from '@/components/MeditationSession';
@@ -17,8 +17,8 @@ const MeditationPage: React.FC = () => {
   // Check if user has access to meditation features
   const hasMeditationAccess = user?.features?.meditation || false;
   
-  // Fetch meditation content videos
-  const { data: meditationVideos, isLoading: videosLoading } = useContentVideosByCategory('meditation');
+  // Fetch meditation content videos using the correct hook
+  const { data: meditationVideos, isLoading: videosLoading } = useContentLibrary('meditation');
   
   // Daily habits for completion tracking
   const { data: todayHabits } = useTodayHabits();
@@ -237,14 +237,16 @@ const MeditationPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleOpenVideo(video.video_url)}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Ver Video
-                  </Button>
+                  {video.video_url && (
+                    <Button 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handleOpenVideo(video.video_url)}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Ver Video
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

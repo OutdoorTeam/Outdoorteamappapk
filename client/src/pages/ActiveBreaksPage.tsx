@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Coffee, Play, ExternalLink, Clock, Zap, PlayCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useContentVideosByCategory } from '@/hooks/api/use-content-videos';
+import { useContentLibrary } from '@/hooks/api/use-content-library';
 import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
 
 const ActiveBreaksPage: React.FC = () => {
@@ -14,8 +14,8 @@ const ActiveBreaksPage: React.FC = () => {
   // Check if user has access to active breaks features
   const hasActiveBreaksAccess = user?.features?.active_breaks || false;
   
-  // Fetch active breaks content videos
-  const { data: activeBreaksVideos, isLoading: videosLoading } = useContentVideosByCategory('active_breaks');
+  // Fetch active breaks content videos using the correct hook
+  const { data: activeBreaksVideos, isLoading: videosLoading } = useContentLibrary('active_breaks');
   
   // Daily habits for completion tracking
   const { data: todayHabits } = useTodayHabits();
@@ -157,14 +157,16 @@ const ActiveBreaksPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleOpenVideo(video.video_url)}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Ver Video
-                  </Button>
+                  {video.video_url && (
+                    <Button 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handleOpenVideo(video.video_url)}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Ver Video
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
