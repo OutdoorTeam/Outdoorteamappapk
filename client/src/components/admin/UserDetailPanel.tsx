@@ -289,4 +289,303 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, onClose }) => {
                   )}
                 </CardContent>
               </Card>
-            
+            </TabsContent>
+
+            {/* Goals Tab */}
+            <TabsContent value="goals">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Metas Personalizadas</CardTitle>
+                  <CardDescription>
+                    Configura metas específicas para este usuario
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {goalsLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                      <p className="text-sm text-muted-foreground">Cargando metas...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="stepGoal">Meta Diaria de Pasos</Label>
+                          <Input
+                            id="stepGoal"
+                            type="number"
+                            value={stepGoal}
+                            onChange={(e) => setStepGoal(parseInt(e.target.value) || 8000)}
+                            min={1000}
+                            max={50000}
+                            step={1000}
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Pasos recomendados por día (1,000 - 50,000)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="weeklyGoal">Meta Semanal de Puntos</Label>
+                          <Input
+                            id="weeklyGoal"
+                            type="number"
+                            value={weeklyGoal}
+                            onChange={(e) => setWeeklyGoal(parseInt(e.target.value) || 28)}
+                            min={7}
+                            max={100}
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Puntos objetivo por semana (7 - 100)
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={handleGoalUpdate}
+                        disabled={updateGoalsMutation.isPending}
+                        className="w-full md:w-auto"
+                      >
+                        {updateGoalsMutation.isPending ? 'Guardando...' : 'Actualizar Metas'}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Activity Tab */}
+            <TabsContent value="activity">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Today's Habits */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      Hábitos de Hoy
+                    </CardTitle>
+                    <CardDescription>
+                      Estado actual de los hábitos diarios
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {habitsLoading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                        <p className="text-sm text-muted-foreground">Cargando hábitos...</p>
+                      </div>
+                    ) : todayHabits ? (
+                      <div className="space-y-4">
+                        <div className="text-center mb-6">
+                          <div className="text-3xl font-bold text-primary">
+                            {todayHabits.daily_points}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Puntos de hoy</div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { key: 'training_completed', type: 'training' },
+                            { key: 'nutrition_completed', type: 'nutrition' },
+                            { key: 'movement_completed', type: 'movement' },
+                            { key: 'meditation_completed', type: 'meditation' }
+                          ].map(({ key, type }) => {
+                            const completed = Boolean(todayHabits[key as keyof typeof todayHabits]);
+                            return (
+                              <div key={key} className="flex items-center gap-3 p-3 border rounded-lg">
+                                {getHabitIcon(type)}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{getHabitName(type)}</p>
+                                  <div className="flex items-center gap-1 mt-1">
+                                    {completed ? (
+                                      <CheckCircle className="w-4 h-4 text-green-600" />
+                                    ) : (
+                                      <XCircle className="w-4 h-4 text-gray-400" />
+                                    )}
+                                    <span className={`text-xs ${completed ? 'text-green-600' : 'text-gray-500'}`}>
+                                      {completed ? 'Completado' : 'Pendiente'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Footprints className="w-4 h-4 text-purple-600" />
+                              <span className="text-sm font-medium">Pasos de hoy</span>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold">{todayHabits.steps.toLocaleString()}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Meta: {stepGoal?.toLocaleString() || '8,000'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground">Error al cargar hábitos</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Step History */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Footprints className="w-5 h-5" />
+                      Historial de Pasos (7 días)
+                    </CardTitle>
+                    <CardDescription>
+                      Progreso de pasos en los últimos días
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {stepHistoryLoading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                        <p className="text-sm text-muted-foreground">Cargando historial...</p>
+                      </div>
+                    ) : stepHistory && stepHistory.length > 0 ? (
+                      <div className="space-y-3">
+                        {formatStepHistory().map((day, index) => (
+                          <div key={day.date} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <p className="text-sm font-medium">
+                                {new Date(day.date).toLocaleDateString('es-ES', { 
+                                  weekday: 'short', 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                })}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {day.points} puntos
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold">{day.steps.toLocaleString()}</div>
+                              <div className="flex items-center gap-1 mt-1">
+                                {day.completed ? (
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                ) : (
+                                  <XCircle className="w-3 h-3 text-gray-400" />
+                                )}
+                                <span className={`text-xs ${day.completed ? 'text-green-600' : 'text-gray-500'}`}>
+                                  {day.completed ? 'Meta alcanzada' : 'Pendiente'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">
+                        Sin datos de pasos disponibles
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Training Tab */}
+            <TabsContent value="training">
+              <UserTrainingPlanEditor user={user} />
+            </TabsContent>
+
+            {/* Statistics Tab */}
+            <TabsContent value="statistics">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Estadísticas del Usuario</CardTitle>
+                    <CardDescription>
+                      Vista completa del progreso y rendimiento
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {statsLoading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                        <p className="text-sm text-muted-foreground">Cargando estadísticas...</p>
+                      </div>
+                    ) : userStats ? (
+                      <div className="space-y-6">
+                        <StatsSummary 
+                          weeklyStats={{
+                            totalPoints: userStats.weekly_points,
+                            totalSteps: userStats.average_steps * 7, // Estimated weekly steps
+                            totalMeditationSessions: 0, // Would need to add this to stats
+                            totalMeditationMinutes: 0, // Would need to add this to stats
+                            averageDailyPoints: userStats.average_daily_points
+                          }}
+                          monthlyStats={{
+                            totalPoints: userStats.weekly_points * 4, // Estimated monthly points
+                            totalSteps: userStats.average_steps * 30, // Estimated monthly steps
+                            totalMeditationSessions: 0, // Would need to add this to stats
+                            totalMeditationMinutes: 0 // Would need to add this to stats
+                          }}
+                        />
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <WeeklyPointsChart 
+                            data={userStats.weekly_data.map(day => ({
+                              ...day,
+                              steps: userStats.average_steps,
+                              meditationSessions: 0,
+                              meditationMinutes: 0
+                            }))}
+                          />
+                          <HabitCompletionDonut 
+                            data={userStats.habit_completion}
+                          />
+                        </div>
+
+                        <MonthlyHabitsChart 
+                          data={[
+                            { 
+                              name: 'Entrenamiento', 
+                              completed: Math.round((userStats.habit_completion.training / 100) * userStats.total_active_days),
+                              total: userStats.total_active_days,
+                              percentage: Math.round(userStats.habit_completion.training)
+                            },
+                            { 
+                              name: 'Nutrición', 
+                              completed: Math.round((userStats.habit_completion.nutrition / 100) * userStats.total_active_days),
+                              total: userStats.total_active_days,
+                              percentage: Math.round(userStats.habit_completion.nutrition)
+                            },
+                            { 
+                              name: 'Movimiento', 
+                              completed: Math.round((userStats.habit_completion.movement / 100) * userStats.total_active_days),
+                              total: userStats.total_active_days,
+                              percentage: Math.round(userStats.habit_completion.movement)
+                            },
+                            { 
+                              name: 'Meditación', 
+                              completed: Math.round((userStats.habit_completion.meditation / 100) * userStats.total_active_days),
+                              total: userStats.total_active_days,
+                              percentage: Math.round(userStats.habit_completion.meditation)
+                            }
+                          ]}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground">Error al cargar estadísticas</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UserDetailPanel;

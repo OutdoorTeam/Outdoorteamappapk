@@ -20,11 +20,13 @@ export const CONTENT_LIBRARY_KEYS = {
 
 // Hook to get content library items
 export function useContentLibrary(category?: string) {
+  const queryKey = category ? CONTENT_LIBRARY_KEYS.byCategory(category) : CONTENT_LIBRARY_KEYS.all;
+  
   return useQuery({
-    queryKey: CONTENT_LIBRARY_KEYS.byCategory(category),
+    queryKey,
     queryFn: () => {
       const url = category 
-        ? `/api/content-library?category=${category}`
+        ? `/api/content-library?category=${encodeURIComponent(category)}`
         : '/api/content-library';
       return apiRequest<ContentLibraryItem[]>(url);
     },
@@ -37,17 +39,10 @@ export function useCreateContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: {
-      title: string;
-      description?: string | null;
-      video_url?: string | null;
-      category: string;
-      subcategory?: string | null;
-      is_active?: boolean;
-    }) =>
+    mutationFn: (itemData: Omit<ContentLibraryItem, 'id' | 'created_at'>) =>
       apiRequest<ContentLibraryItem>('/api/content-library', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify(itemData),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });
@@ -60,21 +55,10 @@ export function useUpdateContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ 
-      id, 
-      ...data 
-    }: {
-      id: number;
-      title: string;
-      description?: string | null;
-      video_url?: string | null;
-      category: string;
-      subcategory?: string | null;
-      is_active?: boolean;
-    }) =>
+    mutationFn: ({ id, ...itemData }: Partial<ContentLibraryItem> & { id: number }) =>
       apiRequest<ContentLibraryItem>(`/api/content-library/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(data),
+        body: JSON.stringify(itemData),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });
@@ -88,7 +72,7 @@ export function useDeleteContentLibraryItem() {
 
   return useMutation({
     mutationFn: (id: number) =>
-      apiRequest<{ message: string }>(`/api/content-library/${id}`, {
+      apiRequest(`/api/content-library/${id}`, {
         method: 'DELETE',
       }),
     onSuccess: () => {
