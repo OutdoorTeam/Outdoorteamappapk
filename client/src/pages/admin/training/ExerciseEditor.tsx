@@ -41,10 +41,22 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ dayId, userId, exercise
   };
 
   const handleSave = async () => {
+    // Validate required fields
     if (!formData.exercise_name.trim()) {
       toast({
         title: "Error",
         description: "El nombre del ejercicio es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate dayId
+    if (!dayId || dayId <= 0) {
+      console.error('Invalid dayId in ExerciseEditor:', dayId);
+      toast({
+        title: "Error",
+        description: "ID de día inválido. Por favor, recarga la página.",
         variant: "destructive",
       });
       return;
@@ -63,6 +75,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ dayId, userId, exercise
         exerciseData.id = exercise.id;
       }
 
+      console.log('Saving exercise with dayId:', dayId, 'data:', exerciseData);
+
       await addOrUpdateMutation.mutateAsync({
         dayId,
         exerciseData
@@ -75,11 +89,13 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ dayId, userId, exercise
       });
 
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving exercise:', error);
+      
+      const errorMessage = error?.message || 'No se pudo guardar el ejercicio';
       toast({
         title: "Error",
-        description: "No se pudo guardar el ejercicio",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -123,12 +139,16 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ dayId, userId, exercise
     { value: 'RPE10', label: 'RPE 10' }
   ];
 
+  // Debug information
+  console.log('ExerciseEditor props:', { dayId, userId, exercise: exercise?.id });
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Dumbbell className="w-5 h-5" />
           {exercise ? 'Editar Ejercicio' : 'Agregar Ejercicio'}
+          {dayId && <span className="text-sm text-muted-foreground">(Día ID: {dayId})</span>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -265,7 +285,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ dayId, userId, exercise
         <div className="flex items-center gap-3 pt-4">
           <Button 
             onClick={handleSave}
-            disabled={addOrUpdateMutation.isPending}
+            disabled={addOrUpdateMutation.isPending || !dayId}
           >
             <Save className="w-4 h-4 mr-2" />
             {addOrUpdateMutation.isPending ? 'Guardando...' : 'Guardar Ejercicio'}
@@ -289,6 +309,13 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ dayId, userId, exercise
             Cancelar
           </Button>
         </div>
+
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+            <strong>Debug info:</strong> dayId={dayId}, userId={userId}, exerciseId={exercise?.id || 'new'}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

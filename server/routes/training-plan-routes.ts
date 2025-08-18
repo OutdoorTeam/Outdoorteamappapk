@@ -354,7 +354,29 @@ router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAd
       sort_order = 0
     } = req.body;
 
-    console.log('Adding/updating exercise for day:', dayId);
+    console.log('Adding/updating exercise for day:', dayId, 'body:', req.body);
+
+    // CRITICAL: Validate dayId is present and valid
+    if (!dayId || isNaN(parseInt(dayId))) {
+      console.error('Invalid or missing dayId:', dayId);
+      sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'ID de día inválido o faltante');
+      return;
+    }
+
+    const parsedDayId = parseInt(dayId);
+    
+    // Verify the day exists
+    const dayExists = await db
+      .selectFrom('training_plan_days')
+      .select(['id'])
+      .where('id', '=', parsedDayId)
+      .executeTakeFirst();
+
+    if (!dayExists) {
+      console.error('Day not found with ID:', parsedDayId);
+      sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Día del plan no encontrado');
+      return;
+    }
 
     // Validate inputs
     if (!exercise_name?.trim()) {
@@ -376,7 +398,7 @@ router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAd
     }
 
     const exerciseData = {
-      day_id: parseInt(dayId),
+      day_id: parsedDayId, // Ensure this is a valid integer
       exercise_name: exercise_name.trim(),
       content_library_id: content_library_id || null,
       youtube_url: youtube_url || null,
@@ -386,8 +408,10 @@ router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAd
       rest_seconds: rest_seconds || null,
       tempo: tempo || null,
       notes: notes || null,
-      sort_order
+      sort_order: sort_order || 0
     };
+
+    console.log('Exercise data to save:', exerciseData);
 
     let result;
     if (id) {
@@ -395,7 +419,7 @@ router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAd
       result = await db
         .updateTable('training_exercises')
         .set(exerciseData)
-        .where('id', '=', id)
+        .where('id', '=', parseInt(id))
         .returning([
           'id', 'exercise_name', 'content_library_id', 'youtube_url',
           'sets', 'reps', 'intensity', 'rest_seconds', 'tempo', 'notes', 'sort_order'
@@ -413,6 +437,7 @@ router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAd
         .executeTakeFirst();
     }
 
+    console.log('Exercise saved successfully:', result);
     res.json(result);
   } catch (error) {
     console.error('Error adding/updating exercise:', error);
