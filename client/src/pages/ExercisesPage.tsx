@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { Play, Filter, Clock, Target, Dumbbell, Heart, Zap } from 'lucide-react';
-import { useExercises } from '@/hooks/api/use-content-library';
+import { useContentLibrary } from '@/hooks/api/use-content-library';
 
 interface Exercise {
   id: number;
@@ -22,61 +22,54 @@ const ExercisesPage: React.FC = () => {
   const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = React.useState('all');
   
-  // Use React Query hook
-  const { data: exercises = [], isLoading, error } = useExercises();
-  
-  const [filteredExercises, setFilteredExercises] = React.useState<Exercise[]>([]);
+  // Use React Query hook for exercise category
+  const { data: exercises = [], isLoading, error } = useContentLibrary('exercise');
 
-  React.useEffect(() => {
-    filterExercises();
+  // Filter exercises based on selected category
+  const filteredExercises = React.useMemo(() => {
+    if (selectedCategory === 'all') {
+      return exercises;
+    }
+    return exercises.filter((ex: Exercise) => ex.subcategory === selectedCategory);
   }, [exercises, selectedCategory]);
 
-  const filterExercises = () => {
-    let filtered = exercises;
-
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter((ex: Exercise) => ex.subcategory === selectedCategory);
-    }
-
-    setFilteredExercises(filtered);
-  };
-
-  const getUniqueCategories = () => {
+  // Get unique categories from exercises
+  const uniqueCategories = React.useMemo(() => {
     const categories = [...new Set(exercises.map((ex: Exercise) => ex.subcategory).filter(Boolean))];
     return categories;
-  };
+  }, [exercises]);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category?.toLowerCase()) {
-      case 'warm-up':
-      case 'calentamiento':
-        return <Zap className="w-5 h-5 text-orange-500" />;
-      case 'strength':
-      case 'fuerza':
-        return <Dumbbell className="w-5 h-5 text-red-500" />;
-      case 'flexibility':
-      case 'flexibilidad':
-        return <Heart className="w-5 h-5 text-purple-500" />;
-      case 'cardio':
-        return <Target className="w-5 h-5 text-blue-500" />;
-      default:
-        return <Play className="w-5 h-5 text-gray-500" />;
-    }
-  };
-
-  const getExercisesByCategory = () => {
-    const categories = getUniqueCategories();
+  // Group exercises by category
+  const groupedExercises = React.useMemo(() => {
     const grouped: {[key: string]: Exercise[]} = {};
     
-    categories.forEach(category => {
+    uniqueCategories.forEach(category => {
       grouped[category] = exercises.filter((ex: Exercise) => ex.subcategory === category);
     });
 
     return grouped;
+  }, [exercises, uniqueCategories]);
+
+  const getCategoryIcon = (category: string) => {
+    const lowerCategory = category?.toLowerCase() || '';
+    
+    if (lowerCategory.includes('warm') || lowerCategory.includes('calentamiento')) {
+      return <Zap className="w-5 h-5 text-orange-500" />;
+    }
+    if (lowerCategory.includes('strength') || lowerCategory.includes('fuerza')) {
+      return <Dumbbell className="w-5 h-5 text-red-500" />;
+    }
+    if (lowerCategory.includes('flex') || lowerCategory.includes('stretch')) {
+      return <Heart className="w-5 h-5 text-purple-500" />;
+    }
+    if (lowerCategory.includes('cardio')) {
+      return <Target className="w-5 h-5 text-blue-500" />;
+    }
+    return <Play className="w-5 h-5 text-gray-500" />;
   };
 
   const openVideo = (videoUrl: string, title: string) => {
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+    if (videoUrl && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))) {
       window.open(videoUrl, '_blank');
     } else {
       alert(`Video: ${title}\n\nEn la versión completa, esto abriría el video instructivo.`);
@@ -98,8 +91,6 @@ const ExercisesPage: React.FC = () => {
       </div>
     );
   }
-
-  const groupedExercises = getExercisesByCategory();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -127,7 +118,7 @@ const ExercisesPage: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las Categorías</SelectItem>
-                    {getUniqueCategories().map(category => (
+                    {uniqueCategories.map(category => (
                       <SelectItem key={category} value={category}>
                         {category.charAt(0).toUpperCase() + category.slice(1)}
                       </SelectItem>
@@ -175,9 +166,11 @@ const ExercisesPage: React.FC = () => {
                             <Play className="w-5 h-5 text-red-600" />
                           </div>
                         </div>
-                        <CardDescription className="text-sm">
-                          {exercise.description}
-                        </CardDescription>
+                        {exercise.description && (
+                          <CardDescription className="text-sm">
+                            {exercise.description}
+                          </CardDescription>
+                        )}
                       </CardHeader>
                       <CardContent className="space-y-4">
                         {exercise.duration && (

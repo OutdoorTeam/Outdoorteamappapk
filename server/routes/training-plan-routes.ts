@@ -174,6 +174,65 @@ router.post('/training-plan/:userId/draft', authenticateToken, requireAdmin, asy
   }
 });
 
+// Ensure draft training plan exists (admin only) - NEW ROUTE
+router.post('/training-plan/user/:userId/ensure-draft', authenticateToken, requireAdmin, async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const adminId = req.user.id;
+
+    console.log('Ensuring draft training plan exists for user:', userId);
+
+    // Check if draft already exists
+    const existingDraft = await db
+      .selectFrom('training_plans')
+      .selectAll()
+      .where('user_id', '=', parseInt(userId))
+      .where('status', '=', 'draft')
+      .executeTakeFirst();
+
+    if (existingDraft) {
+      res.json(existingDraft);
+      return;
+    }
+
+    // Get latest version number
+    const latestPlan = await db
+      .selectFrom('training_plans')
+      .selectAll()
+      .where('user_id', '=', parseInt(userId))
+      .orderBy('version', 'desc')
+      .executeTakeFirst();
+
+    const now = new Date().toISOString();
+    const newVersion = (latestPlan ? latestPlan.version : 0) + 1;
+
+    const newDraft = await db
+      .insertInto('training_plans')
+      .values({
+        user_id: parseInt(userId),
+        title: `Plan de Entrenamiento v${newVersion}`,
+        version: newVersion,
+        status: 'draft',
+        created_by: adminId,
+        created_at: now,
+        updated_at: now
+      })
+      .returning(['id', 'title', 'version', 'status'])
+      .executeTakeFirst();
+
+    await SystemLogger.log('info', 'Training plan draft ensured', {
+      userId: adminId,
+      metadata: { target_user_id: parseInt(userId), plan_id: newDraft?.id }
+    });
+
+    res.json(newDraft);
+  } catch (error) {
+    console.error('Error ensuring draft training plan:', error);
+    await SystemLogger.logCriticalError('Training plan draft ensure error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al asegurar borrador del plan');
+  }
+});
+
 // Update training plan metadata (admin only)
 router.put('/training-plan/:planId', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
@@ -220,7 +279,7 @@ router.put('/training-plan/:planId', authenticateToken, requireAdmin, async (req
 });
 
 // Add or update training plan day (admin only)
-router.post('/training-plan/:planId/day', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/:planId/days', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { planId } = req.params;
     const { day_index, title, notes, sort_order = 0 } = req.body;
@@ -278,7 +337,7 @@ router.post('/training-plan/:planId/day', authenticateToken, requireAdmin, async
 });
 
 // Add or update exercise (admin only)
-router.post('/training-plan/day/:dayId/exercise', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { dayId } = req.params;
     const {
@@ -410,7 +469,7 @@ router.post('/training-plan/:planId/publish', authenticateToken, requireAdmin, a
 });
 
 // Delete exercise (admin only)
-router.delete('/training-plan/exercise/:exerciseId', authenticateToken, requireAdmin, async (req: any, res) => {
+router.delete('/training-plan/exercises/:exerciseId', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { exerciseId } = req.params;
 

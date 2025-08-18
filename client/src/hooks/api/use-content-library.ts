@@ -10,20 +10,24 @@ export interface ContentLibraryItem {
   subcategory: string | null;
   is_active: number;
   created_at: string;
+  video_type?: string;
+  duration_minutes?: number;
+  difficulty_level?: string;
+  tags?: string;
 }
 
 // Query keys
 export const CONTENT_LIBRARY_KEYS = {
   all: ['content-library'] as const,
-  byCategory: (category?: string) => [...CONTENT_LIBRARY_KEYS.all, 'category', category] as const,
+  byCategory: (category?: string) => category 
+    ? [...CONTENT_LIBRARY_KEYS.all, 'category', category] 
+    : CONTENT_LIBRARY_KEYS.all,
 };
 
 // Hook to get content library items
 export function useContentLibrary(category?: string) {
-  const queryKey = category ? CONTENT_LIBRARY_KEYS.byCategory(category) : CONTENT_LIBRARY_KEYS.all;
-  
   return useQuery({
-    queryKey,
+    queryKey: CONTENT_LIBRARY_KEYS.byCategory(category),
     queryFn: () => {
       const url = category 
         ? `/api/content-library?category=${encodeURIComponent(category)}`
@@ -34,7 +38,7 @@ export function useContentLibrary(category?: string) {
   });
 }
 
-// Alias for exercises specifically
+// Alias for exercises (exercise category)
 export function useExercises() {
   return useContentLibrary('exercise');
 }
@@ -44,10 +48,10 @@ export function useCreateContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (itemData: Omit<ContentLibraryItem, 'id' | 'created_at'>) =>
+    mutationFn: (item: Omit<ContentLibraryItem, 'id' | 'created_at'>) =>
       apiRequest<ContentLibraryItem>('/api/content-library', {
         method: 'POST',
-        body: JSON.stringify(itemData),
+        body: JSON.stringify(item),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });
@@ -60,10 +64,10 @@ export function useUpdateContentLibraryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...itemData }: Partial<ContentLibraryItem> & { id: number }) =>
+    mutationFn: ({ id, ...item }: Partial<ContentLibraryItem> & { id: number }) =>
       apiRequest<ContentLibraryItem>(`/api/content-library/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(itemData),
+        body: JSON.stringify(item),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });

@@ -41,6 +41,7 @@ export interface TrainingExercise {
 export interface TrainingPlanData {
   plan: TrainingPlan | null;
   days: (TrainingPlanDay & { exercises: TrainingExercise[] })[];
+  legacyPdf?: any;
 }
 
 // Query keys
@@ -54,7 +55,7 @@ export const TRAINING_PLAN_KEYS = {
 export function useTrainingPlan(userId: number) {
   return useQuery({
     queryKey: TRAINING_PLAN_KEYS.user(userId),
-    queryFn: () => apiRequest<TrainingPlanData>(`/api/training-plan/user/${userId}`),
+    queryFn: () => apiRequest<TrainingPlanData>(`/api/training-plan/${userId}`),
     enabled: !!userId,
     staleTime: 60 * 1000, // 1 minute
   });

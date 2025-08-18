@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -11,20 +10,19 @@ import { useToast } from '@/hooks/use-toast';
 import { useUsers } from '@/hooks/api/use-users';
 import { useNutritionPlan, useUpsertNutritionPlan } from '@/hooks/api/use-nutrition-plan';
 import { markdownToSafeHtml } from '@/utils/markdown';
-import { Eye, Save, Send, FileText, User, Clock } from 'lucide-react';
+import { Eye, Save, Send, FileText, User } from 'lucide-react';
 
 const NutritionPlanAdmin: React.FC = () => {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = React.useState<number | null>(null);
   const [markdownContent, setMarkdownContent] = React.useState('');
-  const [previewMode, setPreviewMode] = React.useState(false);
 
   // Fetch users and nutrition plan data
   const { data: users } = useUsers();
   const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(selectedUserId || 0);
   const upsertPlanMutation = useUpsertNutritionPlan(selectedUserId || 0);
 
-  // Update content when plan data changes
+  // Update content when plan data changes - fixed dependency array
   React.useEffect(() => {
     if (nutritionData?.plan?.content_md) {
       setMarkdownContent(nutritionData.plan.content_md);
@@ -150,20 +148,20 @@ const NutritionPlanAdmin: React.FC = () => {
                   <div>
                     <h3 className="font-medium">{selectedUser.full_name}</h3>
                     <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
-                    <p className="text-sm">
+                    <span className="text-sm">
                       Plan: <Badge variant="outline">{selectedUser.plan_type || 'Sin plan'}</Badge>
-                    </p>
+                    </span>
                   </div>
                   {nutritionData?.plan && (
                     <div className="ml-auto text-right">
-                      <p className="text-sm font-medium">
+                      <span className="text-sm font-medium">
                         Estado: <Badge variant={nutritionData.plan.status === 'published' ? 'default' : 'secondary'}>
                           {nutritionData.plan.status === 'published' ? 'Publicado' : 'Borrador'}
                         </Badge>
-                      </p>
-                      <p className="text-sm text-muted-foreground">
+                      </span>
+                      <div className="text-sm text-muted-foreground">
                         Versión {nutritionData.plan.version}
-                      </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -180,16 +178,6 @@ const NutritionPlanAdmin: React.FC = () => {
               <FileText className="w-5 h-5" />
               Editor de Plan Nutricional
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPreviewMode(!previewMode)}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                {previewMode ? 'Editor' : 'Vista previa'}
-              </Button>
-            </div>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="editor" className="space-y-4">
@@ -227,7 +215,7 @@ const NutritionPlanAdmin: React.FC = () => {
                   ) : (
                     <div className="text-center text-muted-foreground py-12">
                       <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Escribe contenido en el editor para ver la vista previa</p>
+                      <span>Escribe contenido en el editor para ver la vista previa</span>
                     </div>
                   )}
                 </div>
@@ -265,10 +253,10 @@ const NutritionPlanAdmin: React.FC = () => {
             <div className="flex items-center gap-4">
               <FileText className="w-8 h-8 text-blue-600" />
               <div>
-                <p className="font-medium text-blue-800">{nutritionData.legacyPdf.filename}</p>
-                <p className="text-sm text-blue-600">
+                <div className="font-medium text-blue-800">{nutritionData.legacyPdf.filename}</div>
+                <div className="text-sm text-blue-600">
                   Subido el {new Date(nutritionData.legacyPdf.created_at).toLocaleDateString()}
-                </p>
+                </div>
               </div>
               <Button
                 variant="outline"

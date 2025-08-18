@@ -21,19 +21,19 @@ export interface BroadcastNotificationResult {
   message?: string;
 }
 
-// Get user notification preferences
+// Get user notification preferences (always disabled)
 export const useNotificationPreferences = () => {
   return useQuery({
     queryKey: ['notification-preferences'],
     queryFn: async () => {
       return apiRequest<NotificationPreferences>('/api/notifications/preferences');
     },
-    retry: 2,
+    retry: 1,
     staleTime: 30000, // 30 seconds
   });
 };
 
-// Update notification preferences
+// Update notification preferences (always returns disabled)
 export const useUpdateNotificationPreferences = () => {
   const queryClient = useQueryClient();
   
@@ -54,7 +54,7 @@ export const useUpdateNotificationPreferences = () => {
   });
 };
 
-// Subscribe to push notifications
+// Subscribe to push notifications (disabled)
 export const useSubscribeToPushNotifications = () => {
   const queryClient = useQueryClient();
   
@@ -89,7 +89,7 @@ export const useUnsubscribeFromPushNotifications = () => {
   });
 };
 
-// Send test notification
+// Send test notification (disabled)
 export const useSendTestNotification = () => {
   return useMutation({
     mutationFn: async () => {
@@ -100,7 +100,7 @@ export const useSendTestNotification = () => {
   });
 };
 
-// Send broadcast notification (admin only)
+// Send broadcast notification (disabled)
 export const useSendBroadcastNotification = () => {
   return useMutation({
     mutationFn: async (data: BroadcastNotificationData) => {
@@ -112,7 +112,7 @@ export const useSendBroadcastNotification = () => {
   });
 };
 
-// Get VAPID public key
+// Get VAPID public key (disabled)
 export const useVapidPublicKey = () => {
   return useQuery({
     queryKey: ['vapid-public-key'],
@@ -121,6 +121,6 @@ export const useVapidPublicKey = () => {
       return response.publicKey;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
+    retry: 1,
   });
 };
