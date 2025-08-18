@@ -168,7 +168,7 @@ const ProfilePage: React.FC = () => {
                   <div className="mt-6">
                     <Label className="text-sm font-medium mb-3 block">Características Activas</Label>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {Object.entries(user.features).map(([key, enabled]) => (
+                      {Object.entries(user.features || {}).map(([key, enabled]) => (
                         <div
                           key={key}
                           className={`p-2 rounded-lg text-sm text-center border ${
@@ -220,22 +220,22 @@ const ProfilePage: React.FC = () => {
                     <div className="text-center py-4">
                       <div className="text-sm text-red-600">Error al cargar estadísticas</div>
                     </div>
-                  ) : userStats ? (
+                  ) : userStats?.weekly ? (
                     <>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-primary">{userStats.weekly.totalPoints}</div>
+                        <div className="text-3xl font-bold text-primary">{userStats.weekly.totalPoints || 0}</div>
                         <div className="text-sm text-muted-foreground">Puntos esta semana</div>
                       </div>
                       
-                      {userStats.weekly.totalMeditationSessions > 0 && (
+                      {(userStats.weekly.totalMeditationSessions || 0) > 0 && (
                         <>
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{userStats.weekly.totalMeditationSessions}</div>
+                            <div className="text-2xl font-bold text-green-600">{userStats.weekly.totalMeditationSessions || 0}</div>
                             <div className="text-sm text-muted-foreground">Sesiones de meditación</div>
                           </div>
                           
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{userStats.weekly.totalMeditationMinutes}</div>
+                            <div className="text-2xl font-bold text-blue-600">{userStats.weekly.totalMeditationMinutes || 0}</div>
                             <div className="text-sm text-muted-foreground">Minutos meditando</div>
                           </div>
                         </>
@@ -354,14 +354,14 @@ const ProfilePage: React.FC = () => {
               {/* Charts Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Weekly Points Chart */}
-                <WeeklyPointsChart data={userStats.weekly.dailyData} />
+                <WeeklyPointsChart data={userStats.weekly.dailyData || []} />
 
                 {/* Habit Completion Donut */}
-                <HabitCompletionDonut data={userStats.monthly.habitCompletionRates} />
+                <HabitCompletionDonut data={userStats.monthly.habitCompletionRates || {}} />
               </div>
 
               {/* Monthly Habits Chart - Full Width */}
-              <MonthlyHabitsChart data={userStats.monthly.habitCompletionData} />
+              <MonthlyHabitsChart data={userStats.monthly.habitCompletionData || []} />
 
               {/* Additional Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -370,7 +370,7 @@ const ProfilePage: React.FC = () => {
                     <CardTitle className="text-sm">Puntos Totales</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary">{userStats.monthly.totalPoints}</div>
+                    <div className="text-2xl font-bold text-primary">{userStats.monthly.totalPoints || 0}</div>
                     <div className="text-xs text-muted-foreground">Últimos 30 días</div>
                   </CardContent>
                 </Card>
@@ -381,7 +381,7 @@ const ProfilePage: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                      {userStats.monthly.totalSteps.toLocaleString()}
+                      {(userStats.monthly.totalSteps || 0).toLocaleString()}
                     </div>
                     <div className="text-xs text-muted-foreground">Últimos 30 días</div>
                   </CardContent>
@@ -393,7 +393,7 @@ const ProfilePage: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-purple-600">
-                      {userStats.monthly.totalMeditationSessions}
+                      {userStats.monthly.totalMeditationSessions || 0}
                     </div>
                     <div className="text-xs text-muted-foreground">Meditación</div>
                   </CardContent>
@@ -405,7 +405,7 @@ const ProfilePage: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-green-600">
-                      {userStats.monthly.totalMeditationMinutes}
+                      {userStats.monthly.totalMeditationMinutes || 0}
                     </div>
                     <div className="text-xs text-muted-foreground">Meditación</div>
                   </CardContent>

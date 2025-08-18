@@ -129,10 +129,10 @@ const TrainingPlanAdmin: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium">{selectedUser.full_name}</h3>
-                    <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
-                    <p className="text-sm">
+                    <div className="text-sm text-muted-foreground">{selectedUser.email}</div>
+                    <div className="text-sm">
                       Plan: <Badge variant="outline">{selectedUser.plan_type || 'Sin plan'}</Badge>
-                    </p>
+                    </div>
                   </div>
                   
                   {!plan ? (
@@ -142,14 +142,14 @@ const TrainingPlanAdmin: React.FC = () => {
                     </Button>
                   ) : (
                     <div className="text-right">
-                      <p className="text-sm font-medium">
+                      <div className="text-sm font-medium">
                         Estado: <Badge variant={plan.status === 'published' ? 'default' : 'secondary'}>
                           {plan.status === 'published' ? 'Publicado' : 'Borrador'}
                         </Badge>
-                      </p>
-                      <p className="text-sm text-muted-foreground">
+                      </div>
+                      <div className="text-sm text-muted-foreground">
                         Versión {plan.version}
-                      </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -178,9 +178,9 @@ const TrainingPlanAdmin: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium">Publicar Plan</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         Una vez publicado, el usuario podrá ver este plan de entrenamiento
-                      </p>
+                      </div>
                     </div>
                     <Button 
                       onClick={handlePublishPlan}
@@ -213,10 +213,10 @@ const TrainingPlanAdmin: React.FC = () => {
             <div className="flex items-center gap-4">
               <FileText className="w-8 h-8 text-blue-600" />
               <div>
-                <p className="font-medium text-blue-800">{trainingData.legacyPdf.filename}</p>
-                <p className="text-sm text-blue-600">
+                <div className="font-medium text-blue-800">{trainingData.legacyPdf.filename}</div>
+                <div className="text-sm text-blue-600">
                   Subido el {new Date(trainingData.legacyPdf.created_at).toLocaleDateString()}
-                </p>
+                </div>
               </div>
               <Button
                 variant="outline"

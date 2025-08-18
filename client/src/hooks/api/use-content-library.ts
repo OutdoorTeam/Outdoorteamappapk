@@ -38,6 +38,16 @@ export function useContentLibrary(category?: string) {
   });
 }
 
+// Hook to get videos for active breaks (active_breaks category)
+export function useActiveBreaksVideos() {
+  return useContentLibrary('active_breaks');
+}
+
+// Hook to get meditation videos
+export function useMeditationVideos() {
+  return useContentLibrary('meditation');
+}
+
 // Alias for exercises (exercise category)
 export function useExercises() {
   return useContentLibrary('exercise');
