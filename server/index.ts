@@ -14,6 +14,7 @@ import statsRoutes from './routes/stats-routes.js';
 import notificationRoutes from './routes/notification-routes.js';
 import nutritionPlanRoutes from './routes/nutrition-plan-routes.js';
 import trainingPlanRoutes from './routes/training-plan-routes.js';
+import userManagementRoutes from './routes/user-management-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -186,6 +187,7 @@ app.use('/api/', statsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/', nutritionPlanRoutes);
 app.use('/api/', trainingPlanRoutes);
+app.use('/api/admin', userManagementRoutes);
 
 // Auth Routes with Rate Limiting (CORRECT ORDER)
 app.post('/api/auth/register',
@@ -242,6 +244,34 @@ app.post('/api/auth/register',
         sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear el usuario');
         return;
       }
+
+      // Create default permissions for new user
+      await db
+        .insertInto('user_permissions')
+        .values({
+          user_id: newUser.id,
+          dashboard_enabled: 1,
+          training_enabled: 1,
+          nutrition_enabled: 1,
+          meditation_enabled: 1,
+          active_breaks_enabled: 1,
+          exercises_enabled: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .execute();
+
+      // Create default goals for new user
+      await db
+        .insertInto('user_goals')
+        .values({
+          user_id: newUser.id,
+          daily_steps_goal: 8000,
+          weekly_points_goal: 28,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .execute();
 
       // Generate JWT
       const token = jwt.sign(

@@ -213,6 +213,26 @@ export interface DatabaseSchema {
     tempo: string | null;
     notes: string | null;
   };
+  user_permissions: {
+    id: number;
+    user_id: number;
+    dashboard_enabled: number;
+    training_enabled: number;
+    nutrition_enabled: number;
+    meditation_enabled: number;
+    active_breaks_enabled: number;
+    exercises_enabled: number;
+    created_at: string;
+    updated_at: string;
+  };
+  user_goals: {
+    id: number;
+    user_id: number;
+    daily_steps_goal: number;
+    weekly_points_goal: number;
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 const dataDirectory = process.env.DATA_DIRECTORY || './data';
