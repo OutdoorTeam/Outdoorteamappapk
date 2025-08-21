@@ -151,26 +151,6 @@ export interface DatabaseSchema {
     metadata: string | null;
     created_at: string;
   };
-  user_notifications: {
-    id: number;
-    user_id: number;
-    enabled: number;
-    habits: string;
-    times: string;
-    push_token: string | null;
-    push_endpoint: string | null;
-    push_keys: string | null;
-    created_at: string;
-    updated_at: string;
-  };
-  notification_jobs: {
-    id: number;
-    user_id: number;
-    habit_key: string;
-    reminder_time: string;
-    next_send_at: string;
-    created_at: string;
-  };
   nutrition_plans: {
     id: number;
     user_id: number;

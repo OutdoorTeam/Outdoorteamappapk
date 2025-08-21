@@ -1,5 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/utils/error-handling';
+// Disabled notifications - all functions return empty/disabled states
 
 export interface NotificationPreferences {
   enabled: boolean;
@@ -23,104 +22,78 @@ export interface BroadcastNotificationResult {
 
 // Get user notification preferences (always disabled)
 export const useNotificationPreferences = () => {
-  return useQuery({
-    queryKey: ['notification-preferences'],
-    queryFn: async () => {
-      return apiRequest<NotificationPreferences>('/api/notifications/preferences');
+  return {
+    data: {
+      enabled: false,
+      habits: [],
+      times: {},
+      push_endpoint: null
     },
-    retry: 1,
-    staleTime: 30000, // 30 seconds
-  });
+    isLoading: false,
+    error: null
+  };
 };
 
-// Update notification preferences (always returns disabled)
+// Update notification preferences (no-op)
 export const useUpdateNotificationPreferences = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (data: { enabled: boolean; habits: string[]; times: Record<string, string> }) => {
-      return apiRequest<NotificationPreferences>('/api/notifications/preferences', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: (data) => {
-      // Update the cached preferences
-      queryClient.setQueryData(['notification-preferences'], data);
-    },
-    onError: (error) => {
-      console.error('Failed to update notification preferences:', error);
-    },
-  });
+  return {
+    mutateAsync: async () => ({
+      enabled: false,
+      habits: [],
+      times: {},
+      push_endpoint: null
+    }),
+    isPending: false,
+    error: null
+  };
 };
 
 // Subscribe to push notifications (disabled)
 export const useSubscribeToPushNotifications = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (subscriptionData: { endpoint: string; keys: { p256dh: string; auth: string } }) => {
-      return apiRequest<{ success: boolean }>('/api/notifications/subscribe', {
-        method: 'POST',
-        body: JSON.stringify(subscriptionData),
-      });
-    },
-    onSuccess: () => {
-      // Refresh preferences to get updated subscription status
-      queryClient.invalidateQueries({ queryKey: ['notification-preferences'] });
-    },
-  });
+  return {
+    mutateAsync: async () => ({ success: false }),
+    isPending: false,
+    error: null
+  };
 };
 
-// Unsubscribe from push notifications
+// Unsubscribe from push notifications (no-op)
 export const useUnsubscribeFromPushNotifications = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async () => {
-      return apiRequest<{ success: boolean }>('/api/notifications/unsubscribe', {
-        method: 'POST',
-      });
-    },
-    onSuccess: () => {
-      // Refresh preferences to reflect unsubscribed state
-      queryClient.invalidateQueries({ queryKey: ['notification-preferences'] });
-    },
-  });
+  return {
+    mutateAsync: async () => ({ success: true }),
+    isPending: false,
+    error: null
+  };
 };
 
 // Send test notification (disabled)
 export const useSendTestNotification = () => {
-  return useMutation({
-    mutationFn: async () => {
-      return apiRequest<{ success: boolean }>('/api/notifications/test', {
-        method: 'POST',
-      });
-    },
-  });
+  return {
+    mutateAsync: async () => ({ success: false }),
+    isPending: false,
+    error: null
+  };
 };
 
 // Send broadcast notification (disabled)
 export const useSendBroadcastNotification = () => {
-  return useMutation({
-    mutationFn: async (data: BroadcastNotificationData) => {
-      return apiRequest<BroadcastNotificationResult>('/api/notifications/broadcast', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    },
-  });
+  return {
+    mutateAsync: async (data: BroadcastNotificationData) => ({
+      success: false,
+      sent: 0,
+      failed: 0,
+      message: 'Las notificaciones están desactivadas'
+    }),
+    isPending: false,
+    error: null
+  };
 };
 
 // Get VAPID public key (disabled)
 export const useVapidPublicKey = () => {
-  return useQuery({
-    queryKey: ['vapid-public-key'],
-    queryFn: async () => {
-      const response = await apiRequest<{ publicKey: string }>('/api/notifications/vapid-public-key');
-      return response.publicKey;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 1,
-  });
+  return {
+    data: 'disabled',
+    isLoading: false,
+    error: null
+  };
 };

@@ -9,10 +9,8 @@ import { z } from 'zod';
 import { setupStaticServing } from './static-serve.js';
 import { db } from './database.js';
 import DailyResetScheduler from './scheduler.js';
-import NotificationScheduler from './services/notification-scheduler.js';
 import statsRoutes from './routes/stats-routes.js';
 import userStatsRoutes from './routes/user-stats-routes.js';
-import notificationRoutes from './routes/notification-routes.js';
 import nutritionPlanRoutes from './routes/nutrition-plan-routes.js';
 import trainingPlanRoutes from './routes/training-plan-routes.js';
 import userManagementRoutes from './routes/user-management-routes.js';
@@ -63,33 +61,6 @@ app.set('trust proxy', 1);
 
 // Initialize schedulers
 let resetScheduler: DailyResetScheduler;
-let notificationScheduler: NotificationScheduler;
-
-// Check and log VAPID configuration (single warning only)
-let vapidWarned = false;
-const checkVapidConfiguration = () => {
-  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-
-  const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
-
-  if (!isConfigured && !vapidWarned) {
-    console.warn('⚠️  VAPID keys are not configured!');
-    console.warn('   Push notifications will not work.');
-    console.warn('   To fix this:');
-    console.warn('   1. Run: npm run generate-vapid');
-    console.warn('   2. Restart the server');
-    vapidWarned = true;
-    return false;
-  }
-
-  if (isConfigured && !vapidWarned) {
-    console.log('✅ VAPID keys are configured correctly');
-    vapidWarned = true;
-  }
-
-  return isConfigured;
-};
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
@@ -186,7 +157,6 @@ const formatUserResponse = (user: any) => {
 // Mount routes
 app.use('/api/', statsRoutes);
 app.use('/api/', userStatsRoutes);
-app.use('/api/notifications', notificationRoutes);
 app.use('/api/', nutritionPlanRoutes);
 app.use('/api/', trainingPlanRoutes);
 app.use('/api/admin', userManagementRoutes);
@@ -1271,16 +1241,10 @@ export const startServer = async (port = 3001) => {
     await db.selectFrom('users').select('id').limit(1).execute();
     console.log('✅ Database connection established');
 
-    // Check VAPID configuration
-    checkVapidConfiguration();
-
     // Initialize schedulers AFTER database is ready
     console.log('🔄 Initializing daily reset scheduler...');
     resetScheduler = new DailyResetScheduler(db);
     await resetScheduler.initialize();
-
-    console.log('🔔 Initializing notification scheduler...');
-    notificationScheduler = new NotificationScheduler();
 
     // Setup static serving for production
     if (process.env.NODE_ENV === 'production') {
