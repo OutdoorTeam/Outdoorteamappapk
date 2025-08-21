@@ -5,7 +5,8 @@ const CACHE_NAME = 'outdoor-team-v1';
 const STATIC_CACHE_URLS = [
   '/',
   '/manifest.json',
-  '/assets/logo-gold.png'
+  '/favicon.ico',
+  '/favicon.svg'
 ];
 
 // Install event - cache static assets

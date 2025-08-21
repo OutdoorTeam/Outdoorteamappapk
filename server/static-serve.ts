@@ -12,25 +12,81 @@ export function setupStaticServing(app: express.Application) {
     ? path.join(process.cwd(), 'dist', 'public')
     : path.join(process.cwd(), 'client', 'dist');
 
-  console.log(`📁 Serving static files from: ${staticPath}`);
+  console.log(`📁 Environment: ${process.env.NODE_ENV}`);
+  console.log(`📁 Current working directory: ${process.cwd()}`);
+  console.log(`📁 Attempting to serve static files from: ${staticPath}`);
   
-  // Verify the static path exists
+  // Check if the expected path exists, if not try alternatives
+  let finalStaticPath = staticPath;
+  
   if (!fs.existsSync(staticPath)) {
-    console.error(`❌ Static files directory does not exist: ${staticPath}`);
-    console.error('   Make sure to run "npm run build" before starting the server');
-    process.exit(1);
+    console.warn(`❌ Primary static path does not exist: ${staticPath}`);
+    
+    // Try alternative paths for production
+    const alternatives = [
+      path.join(process.cwd(), 'public'),
+      path.join(process.cwd(), 'dist'),
+      path.join(process.cwd(), 'client', 'public'),
+      path.join(__dirname, '..', '..', 'dist', 'public'),
+      path.join(__dirname, '..', '..', 'public')
+    ];
+    
+    for (const altPath of alternatives) {
+      console.log(`📁 Checking alternative path: ${altPath}`);
+      if (fs.existsSync(altPath)) {
+        const indexExists = fs.existsSync(path.join(altPath, 'index.html'));
+        console.log(`📄 Index.html exists in ${altPath}: ${indexExists}`);
+        if (indexExists) {
+          finalStaticPath = altPath;
+          console.log(`✅ Using alternative static path: ${finalStaticPath}`);
+          break;
+        }
+      }
+    }
+    
+    if (!fs.existsSync(finalStaticPath)) {
+      console.error(`❌ No valid static files directory found!`);
+      console.error('   Tried paths:', [staticPath, ...alternatives]);
+      console.error('   Make sure to run "npm run build" before starting the server');
+      
+      // In production, this is critical, so exit
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      } else {
+        // In development, just warn and continue
+        console.warn('   Continuing without static file serving in development mode');
+        return;
+      }
+    }
   }
 
   // Verify index.html exists
-  const indexPath = path.join(staticPath, 'index.html');
+  const indexPath = path.join(finalStaticPath, 'index.html');
   if (!fs.existsSync(indexPath)) {
     console.error(`❌ index.html not found at: ${indexPath}`);
-    console.error('   Make sure the build completed successfully');
-    process.exit(1);
+    
+    // List contents of the directory for debugging
+    try {
+      const files = fs.readdirSync(finalStaticPath);
+      console.error('   Directory contents:', files);
+    } catch (err) {
+      console.error('   Could not read directory contents:', err);
+    }
+    
+    if (process.env.NODE_ENV === 'production') {
+      console.error('   Make sure the build completed successfully');
+      process.exit(1);
+    } else {
+      console.warn('   Continuing without index.html in development mode');
+      return;
+    }
   }
 
+  console.log(`✅ Static files directory confirmed: ${finalStaticPath}`);
+  console.log(`✅ Index.html confirmed at: ${indexPath}`);
+
   // Serve static files with proper caching headers
-  app.use(express.static(staticPath, {
+  app.use(express.static(finalStaticPath, {
     maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
     etag: true,
     lastModified: true,
@@ -73,6 +129,6 @@ export function setupStaticServing(app: express.Application) {
   });
 
   console.log('✅ Static file serving configured');
-  console.log(`   📂 Static path: ${staticPath}`);
+  console.log(`   📂 Static path: ${finalStaticPath}`);
   console.log(`   📄 Index path: ${indexPath}`);
 }
