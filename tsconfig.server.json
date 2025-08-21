@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist/server",
+    "outDir": "./public/server",
     "rootDir": "./server",
     "module": "ESNext",
     "target": "ES2022",
@@ -23,6 +23,7 @@
   "exclude": [
     "node_modules",
     "client",
-    "dist"
+    "dist",
+    "public"
   ]
 }

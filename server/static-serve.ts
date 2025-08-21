@@ -14,7 +14,7 @@ export function setupStaticServing(app: express.Application) {
   let staticPath: string;
   
   if (process.env.NODE_ENV === 'production') {
-    // In production, serve from public folder in root
+    // In production, serve from public folder in root (where deployment platform expects files)
     staticPath = path.join(process.cwd(), 'public');
   } else {
     // In development, serve from client/dist (Vite output during dev)
@@ -41,7 +41,12 @@ export function setupStaticServing(app: express.Application) {
         console.error(`   public/ contents: ${publicContents.join(', ')}`);
       } else {
         console.error('   ❌ public/ directory does not exist');
-        console.error('   📝 To fix: run "npm run build" to generate the public folder');
+        console.error('   📝 Expected structure after build:');
+        console.error('   📁 public/');
+        console.error('   ├── index.html');
+        console.error('   ├── assets/');
+        console.error('   ├── manifest.json');
+        console.error('   └── server/index.js');
       }
       
     } catch (err) {
@@ -50,7 +55,7 @@ export function setupStaticServing(app: express.Application) {
     
     if (process.env.NODE_ENV === 'production') {
       console.error('   For production deployment, ensure "npm run build" completed successfully');
-      console.error('   This should create a "public" folder with index.html and assets');
+      console.error('   This should create a "public" folder with all built files');
       // Continue without static serving but warn
       console.warn('   ⚠️  Continuing without static file serving - only API will work');
       return;
@@ -178,9 +183,18 @@ export function setupStaticServing(app: express.Application) {
             <div style="text-align: left; max-width: 600px; margin: 0 auto;">
               <h3>📋 Para desplegar:</h3>
               <ol>
-                <li><code>npm run build</code> - Construir frontend</li>
-                <li><code>node dist/server/index.js</code> - Iniciar servidor</li>
+                <li><code>npm run build</code> - Construir frontend y backend</li>
+                <li><code>node public/server/index.js</code> - Iniciar servidor</li>
               </ol>
+              <h3>📁 Estructura esperada:</h3>
+              <pre style="text-align: left; background: #f5f5f5; padding: 15px; border-radius: 5px;">
+public/
+├── index.html        # Frontend principal
+├── assets/          # CSS, JS, imágenes
+├── manifest.json    # PWA manifest
+└── server/
+    └── index.js     # Servidor compilado
+              </pre>
             </div>
             <p><a href="/health" style="color: #D3B869;">🏥 API Health Check</a></p>
           </body>
@@ -189,8 +203,8 @@ export function setupStaticServing(app: express.Application) {
     });
   }
 
-  console.log('✅ Static file serving configured');
+  console.log('✅ Static file serving configured for deployment platform');
   console.log(`   📂 Static path: ${staticPath}`);
   console.log(`   📄 Index path: ${indexPath}`);
-  console.log(`   🌐 Ready for production deployment`);
+  console.log(`   🌐 Ready for production deployment from public/ folder`);
 }

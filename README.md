@@ -80,7 +80,7 @@ Esto iniciará:
 - `npm start` - Iniciar servidor de producción
 - `npm run start:dev` - Alias para desarrollo
 
-## 🚀 Despliegue en Producción (app.outdoorteam.com)
+## 🚀 Despliegue en Producción
 
 ### 1. Construir la Aplicación
 ```bash
@@ -89,19 +89,18 @@ npm run build
 
 Este comando:
 - Construye el frontend con Vite → `public/` (archivos estáticos)
-- Compila el backend TypeScript → `dist/server/` (servidor)
+- Compila el backend TypeScript → `public/server/` (servidor)
 
 **📁 Estructura después del build:**
 ```
 outdoor-team/
-├── public/              # Frontend construido (NUEVO)
-│   ├── index.html
-│   ├── assets/
-│   ├── manifest.json
-│   └── sw.js
-├── dist/               # Backend compilado
-│   └── server/
-│       └── index.js
+├── public/              # Todo listo para despliegue
+│   ├── index.html       # Frontend principal
+│   ├── assets/          # CSS, JS, imágenes optimizadas
+│   ├── manifest.json    # PWA manifest
+│   ├── sw.js           # Service Worker
+│   └── server/         # Backend compilado
+│       └── index.js    # Servidor listo para ejecutar
 └── data/               # Base de datos
     └── database.sqlite
 ```
@@ -118,7 +117,7 @@ TRUST_PROXY=1
 
 ### 3. Iniciar en Producción
 ```bash
-node dist/server/index.js
+node public/server/index.js
 ```
 
 ### 4. Verificar Health Check
@@ -149,12 +148,44 @@ outdoorteam.com        A    [TU_IP_DEL_SERVIDOR]
 www.outdoorteam.com    A    [TU_IP_DEL_SERVIDOR]
 ```
 
-### Configuración Nginx (Actualizada)
-El archivo `nginx.conf` incluido ya está configurado para servir desde la carpeta `public/`:
-
+### Configuración Nginx (Actualizada para public/)
 ```nginx
-# Root directory for static files - now using public folder
-root /var/www/outdoorteam/public;
+server {
+    listen 443 ssl http2;
+    server_name app.outdoorteam.com;
+    
+    # Root directory apunta a la carpeta public
+    root /var/www/outdoorteam/public;
+    index index.html;
+    
+    # API routes
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Health check
+    location = /health {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+    }
+    
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ @backend;
+    }
+    
+    location @backend {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ## 👤 Usuario Administrador
@@ -182,7 +213,7 @@ Se crea automáticamente un usuario administrador:
 - **SQLite** con Kysely
 - **JWT** para autenticación
 - **Rate Limiting** y CORS estricto
-- **Compilado a**: `dist/server/`
+- **Compilado a**: `public/server/`
 
 ### Seguridad de Producción
 - **HTTPS** obligatorio
@@ -207,17 +238,17 @@ git pull origin main
 # Instalar dependencias
 npm ci --omit=dev
 
-# Construir aplicación (genera public/ y dist/server/)
+# Construir aplicación (genera public/ con todo dentro)
 npm run build
 
-# Verificar que se crearon los archivos
+# Verificar que se crearon los archivos en public/
 if [ ! -f "public/index.html" ]; then
     echo "❌ Error: public/index.html no fue creado"
     exit 1
 fi
 
-if [ ! -f "dist/server/index.js" ]; then
-    echo "❌ Error: dist/server/index.js no fue creado"
+if [ ! -f "public/server/index.js" ]; then
+    echo "❌ Error: public/server/index.js no fue creado"
     exit 1
 fi
 
@@ -233,11 +264,13 @@ echo "✅ Despliegue completado exitosamente!"
 
 ## 🔧 Troubleshooting de Producción
 
-### Error: Static files not found
+### Error: ENOENT: no such file or directory, stat '/home/app/public/index.html'
+**✅ SOLUCIONADO**: Ahora todos los archivos se construyen directamente en la carpeta `public/`
+
 ```bash
 # Verificar que el build se completó correctamente
 ls -la public/
-# Debe contener: index.html, assets/, manifest.json, sw.js
+# Debe contener: index.html, assets/, manifest.json, sw.js, server/
 
 # Si no existe public/, ejecutar:
 npm run build
@@ -245,9 +278,6 @@ npm run build
 # Verificar permisos
 chmod -R 755 public/
 ```
-
-### Error: "/home/app/public/index.html" no encontrado
-Este error se solucionó configurando Vite para que genere archivos en `public/` en lugar de `dist/public/`.
 
 ### Error: CORS issues
 ```bash
@@ -288,15 +318,27 @@ Para soporte técnico o preguntas:
 
 ## ⚠️ Cambios Importantes en Esta Versión
 
-### ✅ Estructura de Archivos Actualizada
-- **Antes**: Los archivos se construían en `dist/public/`
-- **Ahora**: Los archivos se construyen directamente en `public/` (raíz)
-- **Motivo**: Compatibilidad con el sistema de despliegue
+### ✅ Estructura de Despliegue Simplificada
+- **Antes**: Archivos divididos entre `dist/public/` y `dist/server/`
+- **Ahora**: Todo unificado en `public/` (frontend + backend)
+- **Motivo**: Compatibilidad total con plataformas de despliegue
 
-### ✅ Configuración Vite Actualizada
-- El `outDir` ahora apunta a `public/` en lugar de `dist/public/`
-- Nginx configurado para servir desde `/var/www/outdoorteam/public`
-- Static serving del servidor actualizado para usar `public/`
+### ✅ Configuración Actualizada
+- Vite construye directamente a `public/`
+- TypeScript compila servidor a `public/server/`
+- Static serving actualizado para buscar en `public/`
+- Scripts npm actualizados para nueva estructura
+
+### 📁 Estructura Final de Despliegue
+```
+public/
+├── index.html        # ← Frontend principal (lo que busca /home/app/public/index.html)
+├── assets/           # ← CSS, JS, imágenes
+├── manifest.json     # ← PWA manifest
+├── sw.js            # ← Service Worker
+└── server/          # ← Backend
+    └── index.js     # ← Servidor compilado
+```
 
 ## 📝 Licencia
 
@@ -307,18 +349,20 @@ Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detall
 ## 🚀 Comandos Rápidos de Producción
 
 ```bash
-# Construcción (crea public/ y dist/server/)
+# Construcción (crea public/ con todo dentro)
 npm run build
 
 # Verificar archivos generados
-ls -la public/          # Debe contener index.html
-ls -la dist/server/     # Debe contener index.js
+ls -la public/              # Debe contener index.html + assets/
+ls -la public/server/       # Debe contener index.js
 
 # Iniciar en producción
-NODE_ENV=production node dist/server/index.js
+NODE_ENV=production node public/server/index.js
 
 # Health check
 curl https://app.outdoorteam.com/health
 ```
 
 ¡Listo para transformar vidas con hábitos saludables desde app.outdoorteam.com! 🌱💪
+
+**🎯 Problema de despliegue RESUELTO**: Ahora todos los archivos se generan directamente en `public/` donde la plataforma los espera.
