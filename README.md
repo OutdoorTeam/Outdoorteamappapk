@@ -35,6 +35,10 @@ npm install
 DATA_DIRECTORY=./data
 JWT_SECRET=tu-secreto-jwt-seguro
 PORT=3001
+
+# Para producción, también agregar:
+NODE_ENV=production
+ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
 ```
 
 4. **Iniciar el servidor de desarrollo**
@@ -122,20 +126,71 @@ npm run start
 ```
 
 ### Producción
-```bash
-# Construir la aplicación
-npm run build
 
-# En el servidor de producción
-NODE_ENV=production node dist/server/index.js
+1. **Construir la aplicación**
+```bash
+npm run build
 ```
 
-### Variables de Entorno para Producción
+2. **Variables de entorno para producción**
 ```env
 NODE_ENV=production
 DATA_DIRECTORY=/path/to/data
 JWT_SECRET=clave-super-segura-para-jwt
 PORT=3001
+ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
+```
+
+3. **Iniciar en producción**
+```bash
+# Desde el directorio dist/
+node server/index.js
+```
+
+### Configuración del Servidor de Producción
+
+La aplicación está configurada para servir archivos estáticos desde `dist/public` en producción:
+
+- **Static Files**: Se sirven desde `dist/public/`
+- **API Routes**: Disponibles en `/api/*`
+- **Health Check**: Disponible en `/health`
+- **SPA Routing**: Todas las rutas no-API retornan `index.html`
+
+### Health Check
+
+El endpoint `/health` proporciona información del estado del servidor:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "environment": "production",
+  "uptime": 3600,
+  "memory": {
+    "used": "45MB",
+    "total": "128MB"
+  },
+  "database": "connected"
+}
+```
+
+### CORS Configuration
+
+- **Desarrollo**: Permite `localhost` en múltiples puertos
+- **Producción**: Solo permite dominios especificados en `ALLOWED_ORIGINS`
+- **Health Check**: Exento de CORS para monitoring
+
+### Estructura de Deployment
+
+```
+dist/
+├── public/           # Static files (HTML, CSS, JS, assets)
+│   ├── index.html
+│   ├── assets/
+│   └── ...
+└── server/          # Compiled server code
+    ├── index.js
+    └── ...
 ```
 
 ## 🤝 Contribuir
@@ -166,6 +221,23 @@ Para soporte técnico o preguntas:
 - [ ] Retos y competencias grupales
 - [ ] Análisis avanzado con IA
 
-## ⚠️ Nota sobre Notificaciones
+## ⚠️ Notas Importantes
 
-Las notificaciones push han sido desactivadas de esta versión del sistema. Todas las demás funcionalidades continúan funcionando normalmente.
+- **Notificaciones Push**: Han sido desactivadas completamente del sistema
+- **Base de Datos**: Compartida entre desarrollo y producción via `DATA_DIRECTORY`
+- **VAPID**: Ya no se requieren claves VAPID
+- **Static Serving**: Configurado automáticamente para desarrollo y producción
+
+## 🔧 Troubleshooting
+
+### Error: VAPID keys not found
+Las notificaciones push han sido desactivadas. Si ves este error, asegúrate de tener la versión más reciente del código.
+
+### Error: Static files not found
+Verifica que hayas ejecutado `npm run build` y que los archivos estén en `dist/public/`.
+
+### Error: CORS issues
+Configura correctamente `ALLOWED_ORIGINS` en producción con tu dominio.
+
+### Database connection issues
+Verifica que `DATA_DIRECTORY` apunte a un directorio existente y que tenga permisos de escritura.

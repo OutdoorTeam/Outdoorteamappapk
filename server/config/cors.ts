@@ -7,8 +7,18 @@ import { SystemLogger } from '../utils/logging.js';
 const getAllowedOrigins = (): string[] => {
   const origins = [];
   
-  // Production domain
-  origins.push('https://app.mioutdoorteam.com');
+  // Production domains
+  if (process.env.NODE_ENV === 'production') {
+    // Add your production domain(s) here
+    const productionDomains = process.env.ALLOWED_ORIGINS?.split(',') || [];
+    origins.push(...productionDomains);
+    
+    // Default production domains if none specified
+    if (productionDomains.length === 0) {
+      origins.push('https://app.mioutdoorteam.com');
+      origins.push('https://mioutdoorteam.com');
+    }
+  }
   
   // Development origins (only in non-production environments)
   if (process.env.NODE_ENV !== 'production') {
@@ -16,8 +26,10 @@ const getAllowedOrigins = (): string[] => {
     origins.push('http://127.0.0.1:5173');
     origins.push('http://localhost:3000');
     origins.push('http://127.0.0.1:3000');
+    origins.push('http://localhost:4173'); // Vite preview mode
   }
   
+  console.log('📋 CORS allowed origins:', origins);
   return origins;
 };
 
@@ -25,7 +37,7 @@ const getAllowedOrigins = (): string[] => {
 const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
   const allowedOrigins = getAllowedOrigins();
   
-  // Allow requests with no origin (e.g., mobile apps, server-to-server)
+  // Allow requests with no origin (e.g., mobile apps, server-to-server, Postman)
   if (!origin) {
     callback(null, true);
     return;
@@ -38,7 +50,7 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
   }
   
   // Log blocked origin attempt
-  console.warn(`CORS: Blocked origin attempt: ${origin}`);
+  console.warn(`🚫 CORS: Blocked origin attempt: ${origin}`);
   SystemLogger.log('warn', 'CORS origin blocked', {
     metadata: {
       blocked_origin: origin,
@@ -118,15 +130,12 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
 
 // Debug function to log CORS configuration (development only)
 export const logCorsConfig = () => {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('CORS Configuration:');
-    console.log('- Allowed origins:', getAllowedOrigins());
-    console.log('- Credentials:', corsOptions.credentials);
-    console.log('- Methods:', corsOptions.methods);
-    console.log('- Allowed headers:', corsOptions.allowedHeaders);
-    console.log('- Exposed headers:', corsOptions.exposedHeaders);
-    console.log('- Max age:', corsOptions.maxAge);
-  }
+  console.log('🌐 CORS Configuration:');
+  console.log('   • Environment:', process.env.NODE_ENV || 'development');
+  console.log('   • Allowed origins:', getAllowedOrigins());
+  console.log('   • Credentials enabled:', corsOptions.credentials);
+  console.log('   • Allowed methods:', corsOptions.methods);
+  console.log('   • Max age:', corsOptions.maxAge, 'seconds');
 };
 
 // Middleware factory for applying CORS to specific routes
@@ -150,28 +159,14 @@ export const createCorsMiddleware = (routePattern?: string) => {
   };
 };
 
-// Development CORS bypass (only for internal tools)
-export const developmentCorsOverride = (req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NODE_ENV === 'development' && process.env.CORS_BYPASS === 'true') {
-    console.warn('⚠️  CORS BYPASS ENABLED - Only use for development!');
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    if (req.method === 'OPTIONS') {
-      res.sendStatus(200);
-      return;
-    }
-  }
-  
-  next();
-};
-
 // Security headers middleware (related to CORS)
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
   // Content Security Policy
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
+  const csp = process.env.NODE_ENV === 'production'
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';"
+    : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws: http: https:;";
+  
+  res.setHeader('Content-Security-Policy', csp);
   
   // X-Frame-Options
   res.setHeader('X-Frame-Options', 'DENY');
@@ -184,6 +179,11 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   
   // X-XSS-Protection
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // HSTS for production
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   
   next();
 };

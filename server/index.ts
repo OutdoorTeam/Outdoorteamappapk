@@ -56,6 +56,25 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 
+// Validate required environment variables for production
+if (process.env.NODE_ENV === 'production') {
+  const requiredEnvVars = ['JWT_SECRET', 'DATA_DIRECTORY'];
+  const missingVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+  
+  if (missingVars.length > 0) {
+    console.error('❌ Missing required environment variables for production:', missingVars);
+    process.exit(1);
+  }
+  
+  // Validate DATA_DIRECTORY exists
+  if (!fs.existsSync(DATA_DIRECTORY)) {
+    console.error(`❌ DATA_DIRECTORY does not exist: ${DATA_DIRECTORY}`);
+    process.exit(1);
+  }
+  
+  console.log('✅ Production environment variables validated');
+}
+
 // Enable trust proxy to get real client IPs (REQUIRED for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
 
@@ -66,6 +85,7 @@ let resetScheduler: DailyResetScheduler;
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('📁 Created uploads directory:', uploadsDir);
 }
 
 // Configure multer for file uploads with validation
@@ -114,14 +134,35 @@ app.use('/api/', createCorsMiddleware('/api'));
 // CORS error handler (must be after CORS middleware)
 app.use(corsErrorHandler);
 
+// Health check endpoint (exempted from rate limiting and CORS)
+app.get('/health', (req, res) => {
+  const healthStatus = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    uptime: Math.floor(process.uptime()),
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
+    }
+  };
+  
+  // Add database health check
+  db.selectFrom('users').select('id').limit(1).execute()
+    .then(() => {
+      healthStatus.database = 'connected';
+      res.json(healthStatus);
+    })
+    .catch((error) => {
+      healthStatus.database = 'error';
+      healthStatus.error = error.message;
+      res.status(503).json(healthStatus);
+    });
+});
+
 // Apply global rate limiting to all API routes
 app.use('/api/', globalApiLimit);
 app.use('/api/', burstLimit);
-
-// Health check endpoint (exempted from rate limiting and CORS)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
 // Helper function to parse user features
 const getUserFeatures = (featuresJson: string) => {
@@ -1237,6 +1278,10 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
 // Server initialization and static serving
 export const startServer = async (port = 3001) => {
   try {
+    console.log('🚀 Starting Outdoor Team server...');
+    console.log('📊 Environment:', process.env.NODE_ENV || 'development');
+    console.log('📁 Data directory:', DATA_DIRECTORY);
+    
     // Check database connection
     await db.selectFrom('users').select('id').limit(1).execute();
     console.log('✅ Database connection established');
@@ -1256,7 +1301,11 @@ export const startServer = async (port = 3001) => {
     const server = app.listen(port, () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      if (process.env.NODE_ENV !== 'production') {
+      
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`🌐 Application available at: http://localhost:${port}`);
+        console.log('📁 Serving static files from: dist/public');
+      } else {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
         console.log(`🔌 API server: http://localhost:${port}`);
       }
