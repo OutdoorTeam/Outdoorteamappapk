@@ -4,9 +4,7 @@
 const CACHE_NAME = 'outdoor-team-v1';
 const STATIC_CACHE_URLS = [
   '/',
-  '/manifest.json',
-  '/favicon.ico',
-  '/favicon.svg'
+  '/manifest.json'
 ];
 
 // Install event - cache static assets
@@ -16,7 +14,8 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Caching static assets...');
-        return cache.addAll(STATIC_CACHE_URLS);
+        // Only cache URLs that definitely exist
+        return cache.addAll(STATIC_CACHE_URLS.filter(url => url === '/'));
       })
       .then(() => {
         console.log('Service Worker installed successfully');
@@ -24,6 +23,8 @@ self.addEventListener('install', (event) => {
       })
       .catch((error) => {
         console.error('Service Worker installation failed:', error);
+        // Don't let cache failures prevent SW installation
+        return self.skipWaiting();
       })
   );
 });
@@ -62,6 +63,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip chrome-extension and other non-http requests
+  if (!event.request.url.startsWith('http')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -78,19 +84,28 @@ self.addEventListener('fetch', (event) => {
               return response;
             }
 
-            // Cache the response for future use
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
+            // Only cache successful responses from same origin
+            if (response.url.startsWith(self.location.origin)) {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(event.request, responseToCache);
+                })
+                .catch(error => {
+                  console.log('Cache put failed:', error);
+                });
+            }
 
             return response;
           })
-          .catch(() => {
-            // If both cache and network fail, return offline page
+          .catch((error) => {
+            console.log('Fetch failed:', error);
+            // If both cache and network fail, return a basic offline response
             if (event.request.destination === 'document') {
-              return caches.match('/');
+              return new Response(
+                '<html><body><h1>Sin conexión</h1><p>La aplicación no está disponible offline.</p></body></html>',
+                { headers: { 'Content-Type': 'text/html' } }
+              );
             }
           });
       })

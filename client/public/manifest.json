@@ -12,29 +12,10 @@
   "categories": ["health", "fitness", "lifestyle"],
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "32x32",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/favicon.svg",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23D3B869'/%3E%3Ctext x='50' y='58' font-family='Arial' font-size='60' text-anchor='middle' fill='%23000'%3EOT%3C/text%3E%3C/svg%3E",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/favicon.svg",
-      "sizes": "390x844",
-      "type": "image/svg+xml",
-      "form_factor": "narrow"
-    },
-    {
-      "src": "/favicon.svg", 
-      "sizes": "1280x720",
-      "type": "image/svg+xml",
-      "form_factor": "wide"
     }
   ],
   "related_applications": [],
@@ -44,27 +25,13 @@
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "Accede rápidamente a tu dashboard de hábitos",
-      "url": "/dashboard",
-      "icons": [
-        {
-          "src": "/favicon.svg",
-          "sizes": "96x96",
-          "type": "image/svg+xml"
-        }
-      ]
+      "url": "/dashboard"
     },
     {
       "name": "Entrenamiento",
       "short_name": "Training",
       "description": "Ve tu plan de entrenamiento personalizado",
-      "url": "/training",
-      "icons": [
-        {
-          "src": "/favicon.svg",
-          "sizes": "96x96",
-          "type": "image/svg+xml"
-        }
-      ]
+      "url": "/training"
     }
   ]
 }
