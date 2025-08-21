@@ -1,243 +1,344 @@
 # Outdoor Team - Academia de Hábitos Saludables
 
-Una aplicación web para el seguimiento de hábitos saludables, entrenamiento, nutrición y bienestar integral.
+Una aplicación web completa para el seguimiento de hábitos saludables, entrenamiento personalizado, nutrición y bienestar integral.
 
-## 🚀 Características
+## 🚀 Características Principales
 
 - **Seguimiento de Hábitos**: Sistema completo para rastrear ejercicio, nutrición, pasos diarios y meditación
-- **Planes Personalizados**: Diferentes niveles de acceso a funcionalidades
-- **Panel de Administración**: Gestión completa de usuarios y contenido
-- **PWA**: Instalable en dispositivos móviles y desktop
-- **Métricas Detalladas**: Análisis de progreso con gráficos y estadísticas
+- **Planes Personalizados**: Diferentes niveles de acceso a funcionalidades según el plan seleccionado
+- **Panel de Administración**: Gestión completa de usuarios, contenido y planes
+- **PWA**: Aplicación web progresiva instalable en dispositivos móviles y desktop
+- **Métricas Detalladas**: Análisis de progreso con gráficos y estadísticas completas
+- **Seguridad**: Sistema robusto con rate limiting, CORS, y validación de datos
 
-## 📋 Requisitos Previos
+## 📋 Requisitos del Sistema
 
-- Node.js (v18 o superior)
-- npm o yarn
-- SQLite
+- **Node.js**: v18 o superior
+- **npm**: v8 o superior
+- **SQLite**: Incluido con better-sqlite3
+- **Sistema Operativo**: Windows, macOS, Linux
 
-## ⚡ Instalación Rápida
+## ⚡ Instalación y Configuración
 
-1. **Clonar el repositorio**
+### 1. Clonar el Repositorio
 ```bash
 git clone <repository-url>
 cd outdoor-team
 ```
 
-2. **Instalar dependencias**
+### 2. Instalar Dependencias
 ```bash
 npm install
 ```
 
-3. **Configurar variables de entorno**
+### 3. Configurar Variables de Entorno
+Copia el archivo `.env` de ejemplo y configúralo:
+
 ```bash
-# Crear archivo .env con las siguientes variables:
+# Environment (development/production)
+NODE_ENV=production
+
+# Database directory (must exist and have write permissions)
 DATA_DIRECTORY=./data
-JWT_SECRET=tu-secreto-jwt-seguro
+
+# JWT Secret (CHANGE THIS IN PRODUCTION!)
+JWT_SECRET=clave-super-segura-para-jwt-cambiar-en-produccion
+
+# Server port
 PORT=3001
 
-# Para producción, también agregar:
-NODE_ENV=production
+# Allowed CORS origins for production (comma separated)
 ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
 ```
 
-4. **Iniciar el servidor de desarrollo**
+**⚠️ Importante**: 
+- Cambia `JWT_SECRET` por una clave segura única
+- Configura `ALLOWED_ORIGINS` con tus dominios de producción
+- Asegúrate de que `DATA_DIRECTORY` exista y tenga permisos de escritura
+
+### 4. Crear Directorio de Datos
 ```bash
-npm run start
+mkdir -p data
 ```
 
-La aplicación estará disponible en `http://localhost:3000` (frontend) y `http://localhost:3001` (API).
+## 🛠️ Desarrollo
 
-## 👤 Usuario Administrador
-
-Se crea automáticamente un usuario administrador con estas credenciales:
-
-- **Email**: franciscodanielechs@gmail.com
-- **Contraseña**: admin123
-- **Rol**: admin
-
-⚠️ **Importante**: Cambia estas credenciales en producción.
-
-## 🏗️ Arquitectura
-
-### Frontend
-- **React 18** con TypeScript
-- **Vite** para desarrollo y build
-- **Tailwind CSS** para estilos
-- **shadcn/ui** para componentes
-- **React Router** para navegación
-- **Tanstack Query** para gestión de estado del servidor
-
-### Backend
-- **Node.js** con Express 5
-- **TypeScript** para type safety
-- **SQLite** con Kysely como query builder
-- **JWT** para autenticación
-- **Multer** para subida de archivos
-
-### PWA
-- **Manifest.json** configurado
-- **Service Worker** básico
-- **Caché automático** de recursos
-- **Instalable** en dispositivos
-
-## 📊 Base de Datos
-
-La aplicación usa SQLite con las siguientes tablas principales:
-
-- `users` - Información de usuarios y planes
-- `daily_habits` - Seguimiento diario de hábitos
-- `meditation_sessions` - Sesiones de meditación registradas
-- `plans` - Planes de suscripción disponibles
-- `content_library` - Biblioteca de ejercicios y contenido
-
-## 🔐 Seguridad
-
-- Autenticación JWT con renovación automática
-- Rate limiting en todas las rutas API
-- Validación de entrada con Zod
-- Headers de seguridad configurados
-- CORS estricto por dominio
-- Sanitización de contenido
-
-## 📱 Funcionalidades Principales
-
-### Para Usuarios
-- Dashboard personalizado con seguimiento diario
-- Contador de pasos con metas
-- Sistema de puntos gamificado
-- Notas diarias
-- Sesiones de meditación guiada
-- Biblioteca de ejercicios
-- Estadísticas y progreso
-
-### Para Administradores
-- Panel de administración completo
-- Gestión de usuarios y planes
-- Subida de archivos para usuarios
-- Estadísticas del sistema
-- Logs de actividad
-
-## 🚀 Despliegue
-
-### Desarrollo
+### Iniciar en Modo Desarrollo
 ```bash
-npm run start
+npm run dev
 ```
 
-### Producción
+Esto iniciará:
+- **Frontend**: http://localhost:3000 (Vite dev server)
+- **API Backend**: http://localhost:3001 (Express server)
 
-1. **Construir la aplicación**
+### Scripts Disponibles
+- `npm run dev` - Desarrollo con hot reload
+- `npm run build` - Construir para producción
+- `npm start` - Iniciar servidor de producción
+- `npm run start:dev` - Alias para desarrollo
+
+## 🚀 Despliegue en Producción
+
+### 1. Construir la Aplicación
 ```bash
 npm run build
 ```
 
-2. **Variables de entorno para producción**
+Este comando:
+- Construye el frontend con Vite → `dist/public/`
+- Compila el backend TypeScript → `dist/server/`
+
+### 2. Configurar Variables de Entorno
 ```env
 NODE_ENV=production
-DATA_DIRECTORY=/path/to/data
-JWT_SECRET=clave-super-segura-para-jwt
+DATA_DIRECTORY=/path/to/production/data
+JWT_SECRET=clave-produccion-super-segura
 PORT=3001
 ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
 ```
 
-3. **Iniciar en producción**
+### 3. Iniciar en Producción
 ```bash
-# Desde el directorio dist/
-node server/index.js
+node dist/server/index.js
 ```
 
-### Configuración del Servidor de Producción
+### 4. Verificar Health Check
+```bash
+curl http://localhost:3001/health
+```
 
-La aplicación está configurada para servir archivos estáticos desde `dist/public` en producción:
+Respuesta esperada:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "environment": "production",
+  "database": "connected",
+  "uptime": 3600,
+  "memory": {...}
+}
+```
 
-- **Static Files**: Se sirven desde `dist/public/`
-- **API Routes**: Disponibles en `/api/*`
-- **Health Check**: Disponible en `/health`
-- **SPA Routing**: Todas las rutas no-API retornan `index.html`
+## 👤 Usuario Administrador
 
-### Health Check
+Se crea automáticamente un usuario administrador:
 
-El endpoint `/health` proporciona información del estado del servidor:
+- **Email**: `franciscodanielechs@gmail.com`
+- **Contraseña**: (definida durante el registro)
+- **Rol**: `admin`
+- **Acceso**: Todas las funcionalidades
 
+**⚠️ Importante**: Cambia estas credenciales después del primer acceso.
+
+## 🏗️ Arquitectura Técnica
+
+### Frontend
+- **React 18** con TypeScript
+- **Vite** para desarrollo y build optimizado
+- **Tailwind CSS** para estilos utility-first
+- **shadcn/ui** para componentes de interfaz
+- **React Router** para navegación SPA
+- **Tanstack Query** para gestión de estado del servidor
+- **PWA** con Service Worker y manifest
+
+### Backend
+- **Node.js** con Express 5
+- **TypeScript** para type safety completo
+- **SQLite** con Kysely como query builder tipado
+- **JWT** para autenticación segura
+- **Multer** para manejo de archivos
+- **Rate Limiting** para protección anti-abuse
+- **CORS** configurado por ambiente
+
+### Base de Datos
+SQLite con esquema completo que incluye:
+- `users` - Usuarios y planes
+- `daily_habits` - Seguimiento diario
+- `meditation_sessions` - Sesiones de meditación
+- `training_plans` - Planes de entrenamiento
+- `nutrition_plans` - Planes nutricionales
+- `content_library` - Biblioteca de ejercicios
+- `system_logs` - Logs del sistema
+
+## 🔐 Seguridad Implementada
+
+- **Autenticación JWT** con expiración
+- **Rate Limiting** por IP y usuario
+- **CORS estricto** configurado por dominio
+- **Validación de entrada** con Zod schemas
+- **Sanitización** de contenido HTML
+- **Headers de seguridad** (CSP, HSTS, etc.)
+- **Logs de seguridad** para auditoría
+
+## 📱 Funcionalidades por Rol
+
+### Para Usuarios
+- Dashboard personalizado con métricas
+- Seguimiento de hábitos diarios
+- Contador de pasos con metas personalizables
+- Sistema de puntos gamificado
+- Notas diarias privadas
+- Sesiones de meditación guiada
+- Biblioteca de ejercicios
+- Visualización de progreso y estadísticas
+
+### Para Administradores
+- Panel de administración completo
+- Gestión de usuarios y estados
+- Asignación de planes y permisos
+- Subida de archivos personalizados (PDFs)
+- Gestión de biblioteca de contenido
+- Estadísticas del sistema
+- Logs de actividad y errores
+- Administración de planes de entrenamiento y nutrición
+
+## 🌐 PWA (Progressive Web App)
+
+La aplicación es una PWA completa que incluye:
+- **Instalable** en dispositivos móviles y desktop
+- **Funciona offline** con Service Worker
+- **Caché inteligente** de recursos
+- **Manifest configurado** con iconos y metadatos
+- **Responsive design** para todos los dispositivos
+
+## 📊 Monitoring y Logs
+
+### Health Check Endpoint
+`GET /health` proporciona:
 ```json
 {
   "status": "ok",
   "timestamp": "2024-01-01T00:00:00.000Z",
   "environment": "production",
   "uptime": 3600,
-  "memory": {
-    "used": "45MB",
-    "total": "128MB"
-  },
+  "memory": {"used": "45MB", "total": "128MB"},
   "database": "connected"
 }
 ```
 
-### CORS Configuration
+### System Logs
+Logging completo con niveles:
+- `info` - Eventos normales
+- `warn` - Advertencias
+- `error` - Errores manejables
+- `critical` - Errores críticos
 
-- **Desarrollo**: Permite `localhost` en múltiples puertos
-- **Producción**: Solo permite dominios especificados en `ALLOWED_ORIGINS`
-- **Health Check**: Exento de CORS para monitoring
+## 🛡️ Rate Limiting
 
-### Estructura de Deployment
+Protección configurada para:
+- **Login**: 5 intentos por 15 minutos
+- **Registro**: 3 intentos por minuto
+- **API Global**: 100 requests por minuto
+- **Burst Protection**: 10 requests por segundo
+
+## 📁 Estructura del Proyecto
 
 ```
-dist/
-├── public/           # Static files (HTML, CSS, JS, assets)
-│   ├── index.html
-│   ├── assets/
-│   └── ...
-└── server/          # Compiled server code
-    ├── index.js
-    └── ...
+outdoor-team/
+├── client/                 # Frontend React
+│   ├── src/
+│   │   ├── components/    # Componentes React
+│   │   ├── pages/         # Páginas de la aplicación
+│   │   ├── hooks/         # Custom hooks
+│   │   └── utils/         # Utilidades frontend
+│   ├── public/            # Assets públicos
+│   └── index.html
+├── server/                # Backend Express
+│   ├── routes/           # Rutas de la API
+│   ├── middleware/       # Middleware personalizado
+│   ├── utils/           # Utilidades backend
+│   ├── config/          # Configuraciones
+│   └── index.ts         # Punto de entrada
+├── shared/               # Código compartido
+│   └── validation-schemas.ts
+├── dist/                # Build de producción
+│   ├── public/         # Frontend construido
+│   └── server/         # Backend compilado
+├── data/               # Base de datos SQLite
+├── .env               # Variables de entorno
+└── package.json
 ```
 
-## 🤝 Contribuir
+## 🔧 Troubleshooting
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+### Error: Static files not found
+```bash
+# Asegúrate de hacer build antes de iniciar
+npm run build
+node dist/server/index.js
+```
 
-## 📝 Licencia
+### Error: Database connection issues
+```bash
+# Verifica que el directorio de datos exista
+mkdir -p data
+chmod 755 data
+```
 
-Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
+### Error: CORS issues
+Configura correctamente `ALLOWED_ORIGINS` en tu `.env`:
+```env
+ALLOWED_ORIGINS=https://tudominio.com,https://app.tudominio.com
+```
 
-## 🆘 Soporte
-
-Para soporte técnico o preguntas:
-
-- Email: admin@outdoorteam.com
-- Crea un issue en el repositorio
+### Error: JWT issues
+Asegúrate de tener un `JWT_SECRET` seguro:
+```env
+JWT_SECRET=tu-clave-super-segura-y-unica-aqui
+```
 
 ## 📈 Roadmap
 
 - [ ] Integración con Google Fit / Apple Health
-- [ ] App móvil nativa
-- [ ] Integración de pagos
+- [ ] Aplicación móvil nativa (React Native)
+- [ ] Sistema de pagos integrado
 - [ ] Chat en vivo con entrenadores
 - [ ] Retos y competencias grupales
 - [ ] Análisis avanzado con IA
+- [ ] Notificaciones push nativas
+
+## 🤝 Contribución
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
+4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Abre un Pull Request
+
+## 📞 Soporte Técnico
+
+Para soporte técnico o preguntas:
+- **Email**: admin@outdoorteam.com
+- **Issues**: Crear issue en el repositorio
+- **Documentación**: Ver este README y comentarios en el código
 
 ## ⚠️ Notas Importantes
 
-- **Notificaciones Push**: Han sido desactivadas completamente del sistema
+- **Notificaciones Push**: Completamente desactivadas del sistema
 - **Base de Datos**: Compartida entre desarrollo y producción via `DATA_DIRECTORY`
-- **VAPID**: Ya no se requieren claves VAPID
+- **VAPID**: Ya no requerido (notificaciones desactivadas)
 - **Static Serving**: Configurado automáticamente para desarrollo y producción
+- **Logs**: Sistema robusto de logging para debugging
 
-## 🔧 Troubleshooting
+## 📝 Licencia
 
-### Error: VAPID keys not found
-Las notificaciones push han sido desactivadas. Si ves este error, asegúrate de tener la versión más reciente del código.
+Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detalles.
 
-### Error: Static files not found
-Verifica que hayas ejecutado `npm run build` y que los archivos estén en `dist/public/`.
+---
 
-### Error: CORS issues
-Configura correctamente `ALLOWED_ORIGINS` en producción con tu dominio.
+## 🚀 Comandos Rápidos
 
-### Database connection issues
-Verifica que `DATA_DIRECTORY` apunte a un directorio existente y que tenga permisos de escritura.
+```bash
+# Desarrollo
+npm run dev
+
+# Producción
+npm run build
+NODE_ENV=production node dist/server/index.js
+
+# Verificar
+curl http://localhost:3001/health
+```
+
+¡Listo para transformar vidas con hábitos saludables! 🌱💪

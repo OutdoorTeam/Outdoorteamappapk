@@ -50,11 +50,16 @@ import {
   toggleUserStatusSchema
 } from '../shared/validation-schemas.js';
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
+
+console.log('🚀 Starting Outdoor Team server...');
+console.log('📊 Environment:', process.env.NODE_ENV || 'development');
+console.log('📁 Data directory:', DATA_DIRECTORY);
 
 // Validate required environment variables for production
 if (process.env.NODE_ENV === 'production') {
@@ -63,12 +68,20 @@ if (process.env.NODE_ENV === 'production') {
   
   if (missingVars.length > 0) {
     console.error('❌ Missing required environment variables for production:', missingVars);
+    console.error('   Please check your .env file and ensure all required variables are set');
     process.exit(1);
   }
   
   // Validate DATA_DIRECTORY exists
   if (!fs.existsSync(DATA_DIRECTORY)) {
     console.error(`❌ DATA_DIRECTORY does not exist: ${DATA_DIRECTORY}`);
+    console.error('   Please create the directory and ensure write permissions');
+    process.exit(1);
+  }
+  
+  // Validate JWT_SECRET is not default
+  if (JWT_SECRET === 'your-secret-key-change-in-production') {
+    console.error('❌ JWT_SECRET is using default value. Please change it in production!');
     process.exit(1);
   }
   
@@ -144,19 +157,22 @@ app.get('/health', (req, res) => {
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
       total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
-    }
+    },
+    version: '1.0.0'
   };
   
   // Add database health check
   db.selectFrom('users').select('id').limit(1).execute()
     .then(() => {
-      healthStatus.database = 'connected';
-      res.json(healthStatus);
+      res.json({ ...healthStatus, database: 'connected' });
     })
     .catch((error) => {
-      healthStatus.database = 'error';
-      healthStatus.error = error.message;
-      res.status(503).json(healthStatus);
+      res.status(503).json({ 
+        ...healthStatus, 
+        status: 'error',
+        database: 'error',
+        error: error.message 
+      });
     });
 });
 
@@ -1278,10 +1294,6 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
 // Server initialization and static serving
 export const startServer = async (port = 3001) => {
   try {
-    console.log('🚀 Starting Outdoor Team server...');
-    console.log('📊 Environment:', process.env.NODE_ENV || 'development');
-    console.log('📁 Data directory:', DATA_DIRECTORY);
-    
     // Check database connection
     await db.selectFrom('users').select('id').limit(1).execute();
     console.log('✅ Database connection established');
@@ -1305,6 +1317,7 @@ export const startServer = async (port = 3001) => {
       if (process.env.NODE_ENV === 'production') {
         console.log(`🌐 Application available at: http://localhost:${port}`);
         console.log('📁 Serving static files from: dist/public');
+        console.log('🔗 Health check: http://localhost:' + port + '/health');
       } else {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
         console.log(`🔌 API server: http://localhost:${port}`);

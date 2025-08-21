@@ -1,11 +1,13 @@
 {
-  "name": "mimo-magic-starter",
+  "name": "outdoor-team-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "tsx watch scripts/dev.ts",
     "build": "vite build && tsc --project tsconfig.server.json",
-    "start": "tsx watch scripts/dev.ts"
+    "start": "node dist/server/index.js",
+    "start:dev": "tsx watch scripts/dev.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
