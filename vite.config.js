@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => {
     },
     root: path.join(process.cwd(), 'client'),
     build: {
-      outDir: path.join(process.cwd(), 'dist/public'),
+      // Modifica la línea 'outDir' para que la salida sea directamente 'public'
+      outDir: path.join(process.cwd(), 'public'),
       emptyOutDir: true,
       rollupOptions: {
         output: {
