@@ -18,7 +18,6 @@ export default defineConfig(({ mode }) => {
     },
     root: path.join(process.cwd(), 'client'),
     build: {
-      // Output directly to public folder in root (final deployment location)
       outDir: path.join(process.cwd(), 'public'),
       emptyOutDir: true,
       rollupOptions: {
