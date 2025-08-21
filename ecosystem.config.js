@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'outdoor-team-app',
-    script: './dist/server/index.js',
+    script: './public/server/index.js',
     cwd: '/var/www/outdoorteam',
     
     // Environment variables
@@ -15,8 +15,8 @@ module.exports = {
     },
     
     // Process management
-    instances: 1, // Start with 1 instance, can be scaled to 'max' later
-    exec_mode: 'fork', // Use 'cluster' for multiple instances
+    instances: 1,
+    exec_mode: 'fork',
     
     // Memory and performance
     max_memory_restart: '512M',

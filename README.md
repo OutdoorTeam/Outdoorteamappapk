@@ -30,6 +30,7 @@ cd outdoor-team
 ### 2. Instalar Dependencias
 ```bash
 npm install
+cd client && npm install && cd ..
 ```
 
 ### 3. Configurar Variables de Entorno
@@ -51,11 +52,6 @@ PORT=3001
 # Allowed CORS origins for production
 ALLOWED_ORIGINS=https://app.outdoorteam.com,https://outdoorteam.com,https://www.outdoorteam.com
 ```
-
-**⚠️ Importante**: 
-- Cambia `JWT_SECRET` por una clave segura única
-- `ALLOWED_ORIGINS` está configurado para outdoorteam.com y sus subdominios
-- Asegúrate de que `DATA_DIRECTORY` exista y tenga permisos de escritura
 
 ### 4. Crear Directorio de Datos
 ```bash
@@ -82,14 +78,28 @@ Esto iniciará:
 
 ## 🚀 Despliegue en Producción
 
-### 1. Construir la Aplicación
+### 1. Script Automático de Build (Recomendado)
 ```bash
-npm run build
+chmod +x build-deploy.sh
+./build-deploy.sh
 ```
 
-Este comando:
-- Construye el frontend con Vite → `public/` (archivos estáticos)
-- Compila el backend TypeScript → `public/server/` (servidor)
+### 2. Build Manual Paso a Paso
+```bash
+# Build del cliente
+cd client
+npm install
+npm run build
+cd ..
+
+# Build del servidor
+npm install --production
+npm run build:server
+npm run copy:assets
+
+# Verificar estructura
+ls -la public/
+```
 
 **📁 Estructura después del build:**
 ```
@@ -105,16 +115,6 @@ outdoor-team/
     └── database.sqlite
 ```
 
-### 2. Configurar Variables de Entorno de Producción
-```env
-NODE_ENV=production
-DATA_DIRECTORY=/var/www/outdoorteam/data
-JWT_SECRET=outdoor-team-production-secret-key-2024
-PORT=3001
-ALLOWED_ORIGINS=https://app.outdoorteam.com,https://outdoorteam.com,https://www.outdoorteam.com
-TRUST_PROXY=1
-```
-
 ### 3. Iniciar en Producción
 ```bash
 node public/server/index.js
@@ -125,69 +125,6 @@ node public/server/index.js
 curl https://app.outdoorteam.com/health
 ```
 
-Respuesta esperada:
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "environment": "production",
-  "database": "connected",
-  "uptime": 3600,
-  "memory": {...},
-  "version": "1.0.0"
-}
-```
-
-## 🌐 Configuración de Dominio
-
-### Configuración DNS
-Para `app.outdoorteam.com`:
-```
-app.outdoorteam.com    A    [TU_IP_DEL_SERVIDOR]
-outdoorteam.com        A    [TU_IP_DEL_SERVIDOR]  
-www.outdoorteam.com    A    [TU_IP_DEL_SERVIDOR]
-```
-
-### Configuración Nginx (Actualizada para public/)
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name app.outdoorteam.com;
-    
-    # Root directory apunta a la carpeta public
-    root /var/www/outdoorteam/public;
-    index index.html;
-    
-    # API routes
-    location /api/ {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    
-    # Health check
-    location = /health {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-    }
-    
-    # SPA fallback
-    location / {
-        try_files $uri $uri/ @backend;
-    }
-    
-    location @backend {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
 ## 👤 Usuario Administrador
 
 Se crea automáticamente un usuario administrador:
@@ -196,8 +133,6 @@ Se crea automáticamente un usuario administrador:
 - **Contraseña**: (definida durante el registro)
 - **Rol**: `admin`
 - **Acceso**: Todas las funcionalidades
-
-**⚠️ Importante**: Cambia estas credenciales después del primer acceso.
 
 ## 🏗️ Arquitectura de Producción
 
@@ -215,14 +150,6 @@ Se crea automáticamente un usuario administrador:
 - **Rate Limiting** y CORS estricto
 - **Compilado a**: `public/server/`
 
-### Seguridad de Producción
-- **HTTPS** obligatorio
-- **HSTS** habilitado
-- **CSP** configurado para outdoorteam.com
-- **Headers de seguridad** completos
-- **Rate limiting** por IP
-- **CORS** estricto para dominios permitidos
-
 ## 🔧 Comandos de Despliegue
 
 ### Script de Despliegue Completo
@@ -235,22 +162,9 @@ echo "🚀 Iniciando despliegue de Outdoor Team..."
 # Actualizar código
 git pull origin main
 
-# Instalar dependencias
-npm ci --omit=dev
-
-# Construir aplicación (genera public/ con todo dentro)
-npm run build
-
-# Verificar que se crearon los archivos en public/
-if [ ! -f "public/index.html" ]; then
-    echo "❌ Error: public/index.html no fue creado"
-    exit 1
-fi
-
-if [ ! -f "public/server/index.js" ]; then
-    echo "❌ Error: public/server/index.js no fue creado"
-    exit 1
-fi
+# Usar script de build automático
+chmod +x build-deploy.sh
+./build-deploy.sh
 
 # Reiniciar PM2 (si usas PM2)
 pm2 reload outdoor-team
@@ -264,19 +178,27 @@ echo "✅ Despliegue completado exitosamente!"
 
 ## 🔧 Troubleshooting de Producción
 
-### Error: ENOENT: no such file or directory, stat '/home/app/public/index.html'
-**✅ SOLUCIONADO**: Ahora todos los archivos se construyen directamente en la carpeta `public/`
+### ✅ Error SOLUCIONADO: Cannot find module '/home/app/public/server/index.js'
 
+**Causa**: El build no estaba generando los archivos en la estructura correcta.
+
+**Solución implementada**:
+1. **Separación de builds**: Cliente y servidor se construyen por separado
+2. **Estructura correcta**: Todo se genera en `public/`
+3. **Script automático**: `build-deploy.sh` maneja todo el proceso
+4. **Verificación**: El script verifica que todos los archivos existan
+
+**Para verificar que funciona**:
 ```bash
-# Verificar que el build se completó correctamente
-ls -la public/
-# Debe contener: index.html, assets/, manifest.json, sw.js, server/
+# Ejecutar build
+./build-deploy.sh
 
-# Si no existe public/, ejecutar:
-npm run build
+# Verificar archivos
+ls -la public/              # index.html + assets/
+ls -la public/server/       # index.js
 
-# Verificar permisos
-chmod -R 755 public/
+# Probar inicio
+NODE_ENV=production node public/server/index.js
 ```
 
 ### Error: CORS issues
@@ -291,7 +213,6 @@ echo $ALLOWED_ORIGINS
 # Verificar directorio de datos
 ls -la data/
 chmod 755 data/
-chown www-data:www-data data/
 ```
 
 ## 📈 URLs de Producción
@@ -301,60 +222,43 @@ chown www-data:www-data data/
 - **Health Check**: https://app.outdoorteam.com/health
 - **API Base**: https://app.outdoorteam.com/api
 
-## 🤝 Contribución
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
-
-## 📞 Soporte Técnico
-
-Para soporte técnico o preguntas:
-- **Email**: admin@outdoorteam.com
-- **Issues**: Crear issue en el repositorio
-- **Documentación**: Ver este README
-
 ## ⚠️ Cambios Importantes en Esta Versión
 
-### ✅ Estructura de Despliegue Simplificada
-- **Antes**: Archivos divididos entre `dist/public/` y `dist/server/`
-- **Ahora**: Todo unificado en `public/` (frontend + backend)
-- **Motivo**: Compatibilidad total con plataformas de despliegue
+### ✅ Estructura de Build Corregida
+- **Problema**: El servidor buscaba `/home/app/public/server/index.js` pero no existía
+- **Solución**: Build separado cliente/servidor con salida unificada en `public/`
+- **Script**: `build-deploy.sh` automatiza todo el proceso
+- **Verificación**: El script valida que todos los archivos se generen correctamente
 
-### ✅ Configuración Actualizada
-- Vite construye directamente a `public/`
-- TypeScript compila servidor a `public/server/`
-- Static serving actualizado para buscar en `public/`
+### ✅ Configuración Mejorada
+- Client tiene su propio `package.json` y configuración
+- Build process simplificado con verificaciones
 - Scripts npm actualizados para nueva estructura
+- Configuración de PM2 corregida
 
 ### 📁 Estructura Final de Despliegue
 ```
 public/
-├── index.html        # ← Frontend principal (lo que busca /home/app/public/index.html)
-├── assets/           # ← CSS, JS, imágenes
-├── manifest.json     # ← PWA manifest
-├── sw.js            # ← Service Worker
-└── server/          # ← Backend
-    └── index.js     # ← Servidor compilado
+├── index.html        # ← Frontend (lo que busca /home/app/public/index.html) ✅
+├── assets/           # ← CSS, JS, imágenes ✅
+├── manifest.json     # ← PWA manifest ✅
+├── sw.js            # ← Service Worker ✅
+└── server/          # ← Backend ✅
+    └── index.js     # ← Servidor compilado ✅
 ```
 
 ## 📝 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detalles.
+Este proyecto está bajo la Licencia MIT.
 
 ---
 
 ## 🚀 Comandos Rápidos de Producción
 
 ```bash
-# Construcción (crea public/ con todo dentro)
-npm run build
-
-# Verificar archivos generados
-ls -la public/              # Debe contener index.html + assets/
-ls -la public/server/       # Debe contener index.js
+# Build automático (RECOMENDADO)
+chmod +x build-deploy.sh
+./build-deploy.sh
 
 # Iniciar en producción
 NODE_ENV=production node public/server/index.js
@@ -363,6 +267,6 @@ NODE_ENV=production node public/server/index.js
 curl https://app.outdoorteam.com/health
 ```
 
-¡Listo para transformar vidas con hábitos saludables desde app.outdoorteam.com! 🌱💪
+**🎯 Problema RESUELTO**: El error "Cannot find module '/home/app/public/server/index.js'" está solucionado con la nueva estructura de build.
 
-**🎯 Problema de despliegue RESUELTO**: Ahora todos los archivos se generan directamente en `public/` donde la plataforma los espera.
+¡Listo para transformar vidas con hábitos saludables desde app.outdoorteam.com! 🌱💪
