@@ -7,74 +7,45 @@ import fs from 'fs';
  * @param app Express application instance
  */
 export function setupStaticServing(app: express.Application) {
-  // Determine the static path based on environment
+  // In production, always serve from dist/public
+  // In development, serve from client/dist (Vite output)
   const staticPath = process.env.NODE_ENV === 'production'
     ? path.join(process.cwd(), 'dist', 'public')
     : path.join(process.cwd(), 'client', 'dist');
 
   console.log(`📁 Environment: ${process.env.NODE_ENV}`);
   console.log(`📁 Current working directory: ${process.cwd()}`);
-  console.log(`📁 Attempting to serve static files from: ${staticPath}`);
+  console.log(`📁 Serving static files from: ${staticPath}`);
   
-  // Check if the expected path exists, if not try alternatives
-  let finalStaticPath = staticPath;
-  
+  // Verify the static path exists
   if (!fs.existsSync(staticPath)) {
-    console.warn(`❌ Primary static path does not exist: ${staticPath}`);
+    console.error(`❌ Static files directory does not exist: ${staticPath}`);
+    console.error('   Make sure to run "npm run build" before starting the server');
     
-    // Try alternative paths for production
-    const alternatives = [
-      path.join(process.cwd(), 'public'),
-      path.join(process.cwd(), 'dist'),
-      path.join(process.cwd(), 'client', 'public'),
-      path.join(__dirname, '..', '..', 'dist', 'public'),
-      path.join(__dirname, '..', '..', 'public')
-    ];
-    
-    for (const altPath of alternatives) {
-      console.log(`📁 Checking alternative path: ${altPath}`);
-      if (fs.existsSync(altPath)) {
-        const indexExists = fs.existsSync(path.join(altPath, 'index.html'));
-        console.log(`📄 Index.html exists in ${altPath}: ${indexExists}`);
-        if (indexExists) {
-          finalStaticPath = altPath;
-          console.log(`✅ Using alternative static path: ${finalStaticPath}`);
-          break;
-        }
-      }
-    }
-    
-    if (!fs.existsSync(finalStaticPath)) {
-      console.error(`❌ No valid static files directory found!`);
-      console.error('   Tried paths:', [staticPath, ...alternatives]);
-      console.error('   Make sure to run "npm run build" before starting the server');
-      
-      // In production, this is critical, so exit
-      if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-      } else {
-        // In development, just warn and continue
-        console.warn('   Continuing without static file serving in development mode');
-        return;
-      }
+    if (process.env.NODE_ENV === 'production') {
+      console.error('   For production deployment, ensure dist/public contains the built frontend');
+      process.exit(1);
+    } else {
+      console.warn('   Continuing without static file serving in development mode');
+      return;
     }
   }
 
   // Verify index.html exists
-  const indexPath = path.join(finalStaticPath, 'index.html');
+  const indexPath = path.join(staticPath, 'index.html');
   if (!fs.existsSync(indexPath)) {
     console.error(`❌ index.html not found at: ${indexPath}`);
     
     // List contents of the directory for debugging
     try {
-      const files = fs.readdirSync(finalStaticPath);
+      const files = fs.readdirSync(staticPath);
       console.error('   Directory contents:', files);
     } catch (err) {
       console.error('   Could not read directory contents:', err);
     }
     
     if (process.env.NODE_ENV === 'production') {
-      console.error('   Make sure the build completed successfully');
+      console.error('   Make sure the build completed successfully and generated dist/public/index.html');
       process.exit(1);
     } else {
       console.warn('   Continuing without index.html in development mode');
@@ -82,20 +53,27 @@ export function setupStaticServing(app: express.Application) {
     }
   }
 
-  console.log(`✅ Static files directory confirmed: ${finalStaticPath}`);
+  console.log(`✅ Static files directory confirmed: ${staticPath}`);
   console.log(`✅ Index.html confirmed at: ${indexPath}`);
 
   // Serve static files with proper caching headers
-  app.use(express.static(finalStaticPath, {
+  app.use(express.static(staticPath, {
     maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
     etag: true,
     lastModified: true,
     setHeaders: (res, filePath) => {
+      const fileName = path.basename(filePath);
+      
       // Don't cache index.html to ensure app updates are loaded
-      if (path.basename(filePath) === 'index.html') {
+      if (fileName === 'index.html') {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+      }
+      
+      // Cache static assets for a long time
+      else if (fileName.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
       }
     }
   }));
@@ -117,18 +95,28 @@ export function setupStaticServing(app: express.Application) {
       return next();
     }
 
-    console.log(`🔄 Serving SPA route: ${req.path}`);
+    console.log(`🔄 Serving SPA route: ${req.path} from ${indexPath}`);
 
     // Send index.html for all other routes (SPA routing)
     res.sendFile(indexPath, (err) => {
       if (err) {
         console.error('Error serving index.html:', err);
-        res.status(500).send('Error loading application');
+        res.status(500).send(`
+          <html>
+            <head><title>Error - Outdoor Team</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+              <h1>Error cargando la aplicación</h1>
+              <p>Por favor, intenta nuevamente en unos minutos.</p>
+              <p><a href="/">Volver al inicio</a></p>
+            </body>
+          </html>
+        `);
       }
     });
   });
 
-  console.log('✅ Static file serving configured');
-  console.log(`   📂 Static path: ${finalStaticPath}`);
+  console.log('✅ Static file serving configured for production deployment');
+  console.log(`   📂 Static path: ${staticPath}`);
   console.log(`   📄 Index path: ${indexPath}`);
+  console.log(`   🌐 Ready for app.outdoorteam.com deployment`);
 }

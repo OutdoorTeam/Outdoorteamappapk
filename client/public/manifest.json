@@ -4,7 +4,7 @@
   "description": "Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#000000",
   "theme_color": "#D3B869",
   "orientation": "portrait-primary",
   "scope": "/",
@@ -21,6 +21,50 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "390x844",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/favicon.svg", 
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Accede rápidamente a tu dashboard de hábitos",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Entrenamiento",
+      "short_name": "Training",
+      "description": "Ve tu plan de entrenamiento personalizado",
+      "url": "/training",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ]
 }

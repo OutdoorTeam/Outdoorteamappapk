@@ -17,6 +17,7 @@ Una aplicación web completa para el seguimiento de hábitos saludables, entrena
 - **npm**: v8 o superior
 - **SQLite**: Incluido con better-sqlite3
 - **Sistema Operativo**: Windows, macOS, Linux
+- **Dominio**: app.outdoorteam.com (producción)
 
 ## ⚡ Instalación y Configuración
 
@@ -32,7 +33,7 @@ npm install
 ```
 
 ### 3. Configurar Variables de Entorno
-Copia el archivo `.env` de ejemplo y configúralo:
+Configura el archivo `.env` para producción:
 
 ```bash
 # Environment (development/production)
@@ -42,23 +43,24 @@ NODE_ENV=production
 DATA_DIRECTORY=./data
 
 # JWT Secret (CHANGE THIS IN PRODUCTION!)
-JWT_SECRET=clave-super-segura-para-jwt-cambiar-en-produccion
+JWT_SECRET=outdoor-team-super-secure-jwt-key-change-in-production-2024
 
 # Server port
 PORT=3001
 
-# Allowed CORS origins for production (comma separated)
-ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
+# Allowed CORS origins for production
+ALLOWED_ORIGINS=https://app.outdoorteam.com,https://outdoorteam.com,https://www.outdoorteam.com
 ```
 
 **⚠️ Importante**: 
 - Cambia `JWT_SECRET` por una clave segura única
-- Configura `ALLOWED_ORIGINS` con tus dominios de producción
+- `ALLOWED_ORIGINS` está configurado para outdoorteam.com y sus subdominios
 - Asegúrate de que `DATA_DIRECTORY` exista y tenga permisos de escritura
 
 ### 4. Crear Directorio de Datos
 ```bash
 mkdir -p data
+chmod 755 data
 ```
 
 ## 🛠️ Desarrollo
@@ -78,7 +80,7 @@ Esto iniciará:
 - `npm start` - Iniciar servidor de producción
 - `npm run start:dev` - Alias para desarrollo
 
-## 🚀 Despliegue en Producción
+## 🚀 Despliegue en Producción (app.outdoorteam.com)
 
 ### 1. Construir la Aplicación
 ```bash
@@ -89,13 +91,14 @@ Este comando:
 - Construye el frontend con Vite → `dist/public/`
 - Compila el backend TypeScript → `dist/server/`
 
-### 2. Configurar Variables de Entorno
+### 2. Configurar Variables de Entorno de Producción
 ```env
 NODE_ENV=production
-DATA_DIRECTORY=/path/to/production/data
-JWT_SECRET=clave-produccion-super-segura
+DATA_DIRECTORY=/var/www/outdoorteam/data
+JWT_SECRET=outdoor-team-production-secret-key-2024
 PORT=3001
-ALLOWED_ORIGINS=https://tudominio.com,https://www.tudominio.com
+ALLOWED_ORIGINS=https://app.outdoorteam.com,https://outdoorteam.com,https://www.outdoorteam.com
+TRUST_PROXY=1
 ```
 
 ### 3. Iniciar en Producción
@@ -105,7 +108,7 @@ node dist/server/index.js
 
 ### 4. Verificar Health Check
 ```bash
-curl http://localhost:3001/health
+curl https://app.outdoorteam.com/health
 ```
 
 Respuesta esperada:
@@ -116,7 +119,88 @@ Respuesta esperada:
   "environment": "production",
   "database": "connected",
   "uptime": 3600,
-  "memory": {...}
+  "memory": {...},
+  "version": "1.0.0"
+}
+```
+
+## 🌐 Configuración de Dominio
+
+### Configuración DNS
+Para `app.outdoorteam.com`:
+```
+app.outdoorteam.com    A    [TU_IP_DEL_SERVIDOR]
+outdoorteam.com        A    [TU_IP_DEL_SERVIDOR]  
+www.outdoorteam.com    A    [TU_IP_DEL_SERVIDOR]
+```
+
+### Configuración Nginx (Recomendada)
+```nginx
+server {
+    listen 80;
+    server_name app.outdoorteam.com outdoorteam.com www.outdoorteam.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name app.outdoorteam.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/private.key;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    
+    # Static files
+    location / {
+        try_files $uri $uri/ @backend;
+        root /var/www/outdoorteam/dist/public;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # API routes
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # Health check
+    location /health {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # SPA fallback
+    location @backend {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Redirect www to non-www for main domain
+server {
+    listen 443 ssl http2;
+    server_name www.outdoorteam.com;
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/private.key;
+    return 301 https://outdoorteam.com$request_uri;
 }
 ```
 
@@ -131,172 +215,171 @@ Se crea automáticamente un usuario administrador:
 
 **⚠️ Importante**: Cambia estas credenciales después del primer acceso.
 
-## 🏗️ Arquitectura Técnica
+## 🏗️ Arquitectura de Producción
 
 ### Frontend
 - **React 18** con TypeScript
-- **Vite** para desarrollo y build optimizado
-- **Tailwind CSS** para estilos utility-first
-- **shadcn/ui** para componentes de interfaz
-- **React Router** para navegación SPA
-- **Tanstack Query** para gestión de estado del servidor
-- **PWA** con Service Worker y manifest
+- **Vite** para build optimizado
+- **Tailwind CSS** para estilos
+- **PWA** completa instalable
+- **Servido desde**: `dist/public/`
 
 ### Backend
 - **Node.js** con Express 5
-- **TypeScript** para type safety completo
-- **SQLite** con Kysely como query builder tipado
-- **JWT** para autenticación segura
-- **Multer** para manejo de archivos
-- **Rate Limiting** para protección anti-abuse
-- **CORS** configurado por ambiente
+- **SQLite** con Kysely
+- **JWT** para autenticación
+- **Rate Limiting** y CORS estricto
+- **Compilado a**: `dist/server/`
 
-### Base de Datos
-SQLite con esquema completo que incluye:
-- `users` - Usuarios y planes
-- `daily_habits` - Seguimiento diario
-- `meditation_sessions` - Sesiones de meditación
-- `training_plans` - Planes de entrenamiento
-- `nutrition_plans` - Planes nutricionales
-- `content_library` - Biblioteca de ejercicios
-- `system_logs` - Logs del sistema
+### Seguridad de Producción
+- **HTTPS** obligatorio
+- **HSTS** habilitado
+- **CSP** configurado para outdoorteam.com
+- **Headers de seguridad** completos
+- **Rate limiting** por IP
+- **CORS** estricto para dominios permitidos
 
-## 🔐 Seguridad Implementada
+## 🔐 Configuración de Seguridad
 
-- **Autenticación JWT** con expiración
-- **Rate Limiting** por IP y usuario
-- **CORS estricto** configurado por dominio
-- **Validación de entrada** con Zod schemas
-- **Sanitización** de contenido HTML
-- **Headers de seguridad** (CSP, HSTS, etc.)
-- **Logs de seguridad** para auditoría
+### SSL/TLS (Let's Encrypt recomendado)
+```bash
+# Instalar Certbot
+sudo apt install certbot python3-certbot-nginx
 
-## 📱 Funcionalidades por Rol
+# Obtener certificados
+sudo certbot --nginx -d app.outdoorteam.com -d outdoorteam.com -d www.outdoorteam.com
 
-### Para Usuarios
-- Dashboard personalizado con métricas
-- Seguimiento de hábitos diarios
-- Contador de pasos con metas personalizables
-- Sistema de puntos gamificado
-- Notas diarias privadas
-- Sesiones de meditación guiada
-- Biblioteca de ejercicios
-- Visualización de progreso y estadísticas
+# Renovación automática
+sudo crontab -e
+# Agregar: 0 12 * * * /usr/bin/certbot renew --quiet
+```
 
-### Para Administradores
-- Panel de administración completo
-- Gestión de usuarios y estados
-- Asignación de planes y permisos
-- Subida de archivos personalizados (PDFs)
-- Gestión de biblioteca de contenido
-- Estadísticas del sistema
-- Logs de actividad y errores
-- Administración de planes de entrenamiento y nutrición
+### Firewall (UFW)
+```bash
+sudo ufw enable
+sudo ufw allow ssh
+sudo ufw allow 'Nginx Full'
+sudo ufw status
+```
 
-## 🌐 PWA (Progressive Web App)
+## 📊 Monitoring de Producción
 
-La aplicación es una PWA completa que incluye:
-- **Instalable** en dispositivos móviles y desktop
-- **Funciona offline** con Service Worker
-- **Caché inteligente** de recursos
-- **Manifest configurado** con iconos y metadatos
-- **Responsive design** para todos los dispositivos
+### Health Check
+- **Endpoint**: `https://app.outdoorteam.com/health`
+- **Monitoreo**: Base de datos, memoria, tiempo de actividad
+- **Alertas**: Configurar monitoreo externo
 
-## 📊 Monitoring y Logs
+### Logs del Sistema
+```bash
+# Ver logs de la aplicación
+tail -f /var/log/outdoorteam/app.log
 
-### Health Check Endpoint
-`GET /health` proporciona:
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "environment": "production",
-  "uptime": 3600,
-  "memory": {"used": "45MB", "total": "128MB"},
-  "database": "connected"
+# Ver logs de Nginx
+tail -f /var/log/nginx/access.log
+tail -f /var/log/nginx/error.log
+```
+
+### PM2 para Gestión de Procesos (Recomendado)
+```bash
+# Instalar PM2
+npm install -g pm2
+
+# Crear ecosystem.config.js
+module.exports = {
+  apps: [{
+    name: 'outdoor-team',
+    script: './dist/server/index.js',
+    cwd: '/var/www/outdoorteam',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3001
+    },
+    instances: 'max',
+    exec_mode: 'cluster',
+    max_memory_restart: '1G',
+    error_file: './logs/err.log',
+    out_file: './logs/out.log',
+    log_file: './logs/combined.log'
+  }]
 }
+
+# Iniciar con PM2
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
 ```
 
-### System Logs
-Logging completo con niveles:
-- `info` - Eventos normales
-- `warn` - Advertencias
-- `error` - Errores manejables
-- `critical` - Errores críticos
+## 🔧 Comandos de Despliegue
 
-## 🛡️ Rate Limiting
+### Script de Despliegue Completo
+```bash
+#!/bin/bash
+# deploy.sh
 
-Protección configurada para:
-- **Login**: 5 intentos por 15 minutos
-- **Registro**: 3 intentos por minuto
-- **API Global**: 100 requests por minuto
-- **Burst Protection**: 10 requests por segundo
+echo "🚀 Iniciando despliegue de Outdoor Team..."
 
-## 📁 Estructura del Proyecto
+# Actualizar código
+git pull origin main
 
-```
-outdoor-team/
-├── client/                 # Frontend React
-│   ├── src/
-│   │   ├── components/    # Componentes React
-│   │   ├── pages/         # Páginas de la aplicación
-│   │   ├── hooks/         # Custom hooks
-│   │   └── utils/         # Utilidades frontend
-│   ├── public/            # Assets públicos
-│   └── index.html
-├── server/                # Backend Express
-│   ├── routes/           # Rutas de la API
-│   ├── middleware/       # Middleware personalizado
-│   ├── utils/           # Utilidades backend
-│   ├── config/          # Configuraciones
-│   └── index.ts         # Punto de entrada
-├── shared/               # Código compartido
-│   └── validation-schemas.ts
-├── dist/                # Build de producción
-│   ├── public/         # Frontend construido
-│   └── server/         # Backend compilado
-├── data/               # Base de datos SQLite
-├── .env               # Variables de entorno
-└── package.json
+# Instalar dependencias
+npm ci --omit=dev
+
+# Construir aplicación
+npm run build
+
+# Reiniciar PM2
+pm2 reload outdoor-team
+
+# Verificar health check
+sleep 5
+curl -f https://app.outdoorteam.com/health || exit 1
+
+echo "✅ Despliegue completado exitosamente!"
 ```
 
-## 🔧 Troubleshooting
+### Backup de Base de Datos
+```bash
+#!/bin/bash
+# backup.sh
+
+DATE=$(date +%Y%m%d_%H%M%S)
+cp ./data/database.sqlite ./backups/database_$DATE.sqlite
+echo "✅ Backup creado: database_$DATE.sqlite"
+```
+
+## 🔧 Troubleshooting de Producción
 
 ### Error: Static files not found
 ```bash
-# Asegúrate de hacer build antes de iniciar
-npm run build
-node dist/server/index.js
-```
+# Verificar build
+ls -la dist/public/
+# Debe contener index.html y assets/
 
-### Error: Database connection issues
-```bash
-# Verifica que el directorio de datos exista
-mkdir -p data
-chmod 755 data
+# Verificar permisos
+chmod -R 755 dist/public/
 ```
 
 ### Error: CORS issues
-Configura correctamente `ALLOWED_ORIGINS` en tu `.env`:
-```env
-ALLOWED_ORIGINS=https://tudominio.com,https://app.tudominio.com
+```bash
+# Verificar dominios en .env
+echo $ALLOWED_ORIGINS
+# Debe incluir https://app.outdoorteam.com
 ```
 
-### Error: JWT issues
-Asegúrate de tener un `JWT_SECRET` seguro:
-```env
-JWT_SECRET=tu-clave-super-segura-y-unica-aqui
+### Error: Database connection
+```bash
+# Verificar directorio de datos
+ls -la data/
+chmod 755 data/
+chown www-data:www-data data/
 ```
 
-## 📈 Roadmap
+## 📈 URLs de Producción
 
-- [ ] Integración con Google Fit / Apple Health
-- [ ] Aplicación móvil nativa (React Native)
-- [ ] Sistema de pagos integrado
-- [ ] Chat en vivo con entrenadores
-- [ ] Retos y competencias grupales
-- [ ] Análisis avanzado con IA
-- [ ] Notificaciones push nativas
+- **Aplicación Principal**: https://app.outdoorteam.com
+- **Sitio Web**: https://outdoorteam.com
+- **Health Check**: https://app.outdoorteam.com/health
+- **API Base**: https://app.outdoorteam.com/api
 
 ## 🤝 Contribución
 
@@ -311,15 +394,16 @@ JWT_SECRET=tu-clave-super-segura-y-unica-aqui
 Para soporte técnico o preguntas:
 - **Email**: admin@outdoorteam.com
 - **Issues**: Crear issue en el repositorio
-- **Documentación**: Ver este README y comentarios en el código
+- **Documentación**: Ver este README
 
-## ⚠️ Notas Importantes
+## ⚠️ Notas de Producción
 
-- **Notificaciones Push**: Completamente desactivadas del sistema
-- **Base de Datos**: Compartida entre desarrollo y producción via `DATA_DIRECTORY`
-- **VAPID**: Ya no requerido (notificaciones desactivadas)
-- **Static Serving**: Configurado automáticamente para desarrollo y producción
-- **Logs**: Sistema robusto de logging para debugging
+- **Dominio Principal**: app.outdoorteam.com
+- **Archivos Estáticos**: Servidos desde `dist/public/`
+- **Base de Datos**: SQLite en directorio `data/`
+- **HTTPS**: Obligatorio en producción
+- **Logs**: Sistema completo de logging
+- **Backup**: Configurar backups automáticos de la BD
 
 ## 📝 Licencia
 
@@ -327,18 +411,18 @@ Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detall
 
 ---
 
-## 🚀 Comandos Rápidos
+## 🚀 Comandos Rápidos de Producción
 
 ```bash
-# Desarrollo
-npm run dev
-
-# Producción
+# Construcción y despliegue
 npm run build
 NODE_ENV=production node dist/server/index.js
 
-# Verificar
-curl http://localhost:3001/health
+# Health check
+curl https://app.outdoorteam.com/health
+
+# Ver logs
+tail -f logs/combined.log
 ```
 
-¡Listo para transformar vidas con hábitos saludables! 🌱💪
+¡Listo para transformar vidas con hábitos saludables desde app.outdoorteam.com! 🌱💪

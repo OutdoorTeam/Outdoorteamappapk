@@ -7,17 +7,18 @@ import { SystemLogger } from '../utils/logging.js';
 const getAllowedOrigins = (): string[] => {
   const origins = [];
   
-  // Production domains
+  // Production domains for outdoorteam.com
   if (process.env.NODE_ENV === 'production') {
-    // Add your production domain(s) here
-    const productionDomains = process.env.ALLOWED_ORIGINS?.split(',') || [];
-    origins.push(...productionDomains);
+    // Primary production domains
+    origins.push('https://app.outdoorteam.com');
+    origins.push('https://outdoorteam.com');
+    origins.push('https://www.outdoorteam.com');
     
-    // Default production domains if none specified
-    if (productionDomains.length === 0) {
-      origins.push('https://app.mioutdoorteam.com');
-      origins.push('https://mioutdoorteam.com');
-    }
+    // Add custom domains from environment variable
+    const customDomains = process.env.ALLOWED_ORIGINS?.split(',') || [];
+    origins.push(...customDomains.map(domain => domain.trim()));
+    
+    console.log('🌐 Production CORS configured for outdoorteam.com domains');
   }
   
   // Development origins (only in non-production environments)
@@ -27,6 +28,8 @@ const getAllowedOrigins = (): string[] => {
     origins.push('http://localhost:3000');
     origins.push('http://127.0.0.1:3000');
     origins.push('http://localhost:4173'); // Vite preview mode
+    
+    console.log('🔧 Development CORS configured for localhost');
   }
   
   console.log('📋 CORS allowed origins:', origins);
@@ -37,7 +40,7 @@ const getAllowedOrigins = (): string[] => {
 const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
   const allowedOrigins = getAllowedOrigins();
   
-  // Allow requests with no origin (e.g., mobile apps, server-to-server, Postman)
+  // Allow requests with no origin (e.g., mobile apps, server-to-server, Postman, direct server access)
   if (!origin) {
     callback(null, true);
     return;
@@ -128,7 +131,7 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   return allowedOrigins.includes(origin);
 };
 
-// Debug function to log CORS configuration (development only)
+// Debug function to log CORS configuration
 export const logCorsConfig = () => {
   console.log('🌐 CORS Configuration:');
   console.log('   • Environment:', process.env.NODE_ENV || 'development');
@@ -136,6 +139,13 @@ export const logCorsConfig = () => {
   console.log('   • Credentials enabled:', corsOptions.credentials);
   console.log('   • Allowed methods:', corsOptions.methods);
   console.log('   • Max age:', corsOptions.maxAge, 'seconds');
+  
+  if (process.env.NODE_ENV === 'production') {
+    console.log('   🏢 Production deployment ready for:');
+    console.log('     - https://app.outdoorteam.com (main app)');
+    console.log('     - https://outdoorteam.com (website)');
+    console.log('     - https://www.outdoorteam.com (www redirect)');
+  }
 };
 
 // Middleware factory for applying CORS to specific routes
@@ -161,10 +171,17 @@ export const createCorsMiddleware = (routePattern?: string) => {
 
 // Security headers middleware (related to CORS)
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
-  // Content Security Policy
+  // Content Security Policy for production
   const csp = process.env.NODE_ENV === 'production'
-    ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';"
-    : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' ws: http: https:;";
+    ? "default-src 'self' https://app.outdoorteam.com https://outdoorteam.com; " +
+      "script-src 'self' 'unsafe-inline' https://www.youtube.com https://www.googletagmanager.com; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com; " +
+      "img-src 'self' data: https: blob:; " +
+      "media-src 'self' https: blob:; " +
+      "frame-src 'self' https://www.youtube.com https://youtube.com; " +
+      "connect-src 'self' https://app.outdoorteam.com https://api.outdoorteam.com;"
+    : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self' ws: http: https:; frame-src 'self' https://www.youtube.com https://youtube.com;";
   
   res.setHeader('Content-Security-Policy', csp);
   
@@ -180,9 +197,16 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   // X-XSS-Protection
   res.setHeader('X-XSS-Protection', '1; mode=block');
   
-  // HSTS for production
+  // HSTS for production (force HTTPS)
   if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  
+  // Additional security headers for production
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
+    res.setHeader('X-Download-Options', 'noopen');
+    res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   }
   
   next();
