@@ -26,7 +26,6 @@ const LoginPage: React.FC = () => {
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
-    setValue
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     mode: 'onBlur'
@@ -83,29 +82,6 @@ const LoginPage: React.FC = () => {
       description: "El login con Google aún no está implementado. Por favor usa email y contraseña.",
       variant: "warning",
     });
-  };
-
-  const handleFillAdminCredentials = () => {
-    setValue('email', 'franciscodanielechs@gmail.com');
-    setValue('password', 'admin123');
-  };
-
-  const handleTestAdmin = async () => {
-    try {
-      const response = await fetch('/api/test/admin-user');
-      const data = await response.json();
-      toast({
-        title: "Test de usuario admin",
-        description: `Estado: ${data.message}`,
-        variant: "default",
-      });
-    } catch (error) {
-      toast({
-        title: "Error en test",
-        description: "No se pudo verificar el usuario admin",
-        variant: "destructive",
-      });
-    }
   };
 
   if (user) {
@@ -221,30 +197,6 @@ const LoginPage: React.FC = () => {
               <Link to="/register" className="text-primary hover:underline">
                 Regístrate
               </Link>
-            </div>
-
-            <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-xs text-blue-600 mb-2">Credenciales de administrador:</p>
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleFillAdminCredentials}
-                  disabled={isSubmitting}
-                >
-                  Usar credenciales admin
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTestAdmin}
-                  disabled={isSubmitting}
-                >
-                  Verificar usuario admin
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>

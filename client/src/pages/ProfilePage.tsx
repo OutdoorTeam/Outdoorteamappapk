@@ -11,7 +11,7 @@ import MonthlyHabitsChart from '@/components/profile/MonthlyHabitsChart';
 import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
 import StatsSummary from '@/components/profile/StatsSummary';
 import NotificationSettings from '@/components/profile/NotificationSettings';
-import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, TrendingUp, Bell } from 'lucide-react';
+import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, Bell } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -220,26 +220,17 @@ const ProfilePage: React.FC = () => {
                     <div className="text-center py-4">
                       <div className="text-sm text-red-600">Error al cargar estadísticas</div>
                     </div>
-                  ) : userStats?.weekly ? (
+                  ) : userStats ? (
                     <>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-primary">{userStats.weekly.totalPoints || 0}</div>
+                        <div className="text-3xl font-bold text-primary">{userStats.weekly_points || 0}</div>
                         <div className="text-sm text-muted-foreground">Puntos esta semana</div>
                       </div>
                       
-                      {(userStats.weekly.totalMeditationSessions || 0) > 0 && (
-                        <>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{userStats.weekly.totalMeditationSessions || 0}</div>
-                            <div className="text-sm text-muted-foreground">Sesiones de meditación</div>
-                          </div>
-                          
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{userStats.weekly.totalMeditationMinutes || 0}</div>
-                            <div className="text-sm text-muted-foreground">Minutos meditando</div>
-                          </div>
-                        </>
-                      )}
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{userStats.average_steps.toLocaleString() || 0}</div>
+                        <div className="text-sm text-muted-foreground">Pasos promedio</div>
+                      </div>
                     </>
                   ) : (
                     <div className="text-center py-4">
@@ -347,21 +338,62 @@ const ProfilePage: React.FC = () => {
             <>
               {/* Summary Cards */}
               <StatsSummary 
-                weeklyStats={userStats.weekly} 
-                monthlyStats={userStats.monthly} 
+                weeklyStats={{
+                  totalPoints: userStats.weekly_points,
+                  totalSteps: userStats.average_steps * 7,
+                  totalMeditationSessions: 0,
+                  totalMeditationMinutes: 0,
+                  averageDailyPoints: userStats.average_daily_points
+                }}
+                monthlyStats={{
+                  totalPoints: userStats.weekly_points * 4,
+                  totalSteps: userStats.average_steps * 30,
+                  totalMeditationSessions: 0,
+                  totalMeditationMinutes: 0
+                }}
               />
 
               {/* Charts Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Weekly Points Chart */}
-                <WeeklyPointsChart data={userStats.weekly.dailyData || []} />
+                <WeeklyPointsChart data={userStats.weekly_data?.map(day => ({
+                  ...day,
+                  steps: userStats.average_steps,
+                  meditationSessions: 0,
+                  meditationMinutes: 0
+                })) || []} />
 
                 {/* Habit Completion Donut */}
-                <HabitCompletionDonut data={userStats.monthly.habitCompletionRates || {}} />
+                <HabitCompletionDonut data={userStats.habit_completion || {}} />
               </div>
 
               {/* Monthly Habits Chart - Full Width */}
-              <MonthlyHabitsChart data={userStats.monthly.habitCompletionData || []} />
+              <MonthlyHabitsChart data={[
+                { 
+                  name: 'Entrenamiento', 
+                  completed: Math.round((userStats.habit_completion?.training / 100 || 0) * userStats.total_active_days),
+                  total: userStats.total_active_days,
+                  percentage: Math.round(userStats.habit_completion?.training || 0)
+                },
+                { 
+                  name: 'Nutrición', 
+                  completed: Math.round((userStats.habit_completion?.nutrition / 100 || 0) * userStats.total_active_days),
+                  total: userStats.total_active_days,
+                  percentage: Math.round(userStats.habit_completion?.nutrition || 0)
+                },
+                { 
+                  name: 'Movimiento', 
+                  completed: Math.round((userStats.habit_completion?.movement / 100 || 0) * userStats.total_active_days),
+                  total: userStats.total_active_days,
+                  percentage: Math.round(userStats.habit_completion?.movement || 0)
+                },
+                { 
+                  name: 'Meditación', 
+                  completed: Math.round((userStats.habit_completion?.meditation / 100 || 0) * userStats.total_active_days),
+                  total: userStats.total_active_days,
+                  percentage: Math.round(userStats.habit_completion?.meditation || 0)
+                }
+              ]} />
 
               {/* Additional Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -370,44 +402,44 @@ const ProfilePage: React.FC = () => {
                     <CardTitle className="text-sm">Puntos Totales</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-primary">{userStats.monthly.totalPoints || 0}</div>
+                    <div className="text-2xl font-bold text-primary">{userStats.weekly_points * 4 || 0}</div>
                     <div className="text-xs text-muted-foreground">Últimos 30 días</div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Pasos Totales</CardTitle>
+                    <CardTitle className="text-sm">Pasos Promedio</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-blue-600">
-                      {(userStats.monthly.totalSteps || 0).toLocaleString()}
+                      {userStats.average_steps?.toLocaleString() || 0}
                     </div>
-                    <div className="text-xs text-muted-foreground">Últimos 30 días</div>
+                    <div className="text-xs text-muted-foreground">Por día</div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Sesiones Totales</CardTitle>
+                    <CardTitle className="text-sm">Días Activos</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-purple-600">
-                      {userStats.monthly.totalMeditationSessions || 0}
+                      {userStats.total_active_days || 0}
                     </div>
-                    <div className="text-xs text-muted-foreground">Meditación</div>
+                    <div className="text-xs text-muted-foreground">Total registrados</div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Minutos Totales</CardTitle>
+                    <CardTitle className="text-sm">Tasa Completitud</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-green-600">
-                      {userStats.monthly.totalMeditationMinutes || 0}
+                      {Math.round(userStats.completion_rate) || 0}%
                     </div>
-                    <div className="text-xs text-muted-foreground">Meditación</div>
+                    <div className="text-xs text-muted-foreground">Promedio general</div>
                   </CardContent>
                 </Card>
               </div>

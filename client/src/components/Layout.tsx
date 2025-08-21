@@ -78,7 +78,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && (canAccessFeature("training") || user.role === "admin")) {
       items.push({
         path: "/training",
-        label: "Training",
+        label: "Entrenamiento",
         icon: Dumbbell,
         available: canAccessFeature("training"),
       });
@@ -88,7 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && (canAccessFeature("nutrition") || user.role === "admin")) {
       items.push({
         path: "/nutrition",
-        label: "Nutrition",
+        label: "Nutrición",
         icon: Apple,
         available: canAccessFeature("nutrition"),
       });
@@ -98,7 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && (canAccessFeature("meditation") || user.role === "admin")) {
       items.push({
         path: "/meditation",
-        label: "Meditation",
+        label: "Meditación",
         icon: Brain,
         available: canAccessFeature("meditation"),
       });
@@ -108,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && (canAccessFeature("active_breaks") || user.role === "admin")) {
       items.push({
         path: "/active-breaks",
-        label: "Breaks",
+        label: "Pausas Activas",
         icon: Coffee,
         available: canAccessFeature("active_breaks"),
       });
@@ -118,7 +118,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && (canAccessFeature("training") || user.role === "admin")) {
       items.push({
         path: "/exercises",
-        label: "Exercises",
+        label: "Ejercicios",
         icon: Activity,
         available: canAccessFeature("training"),
       });
@@ -127,7 +127,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     // Plans - always available
     items.push({
       path: "/plans",
-      label: "Plans",
+      label: "Planes",
       icon: CreditCard,
       available: true,
     });
@@ -136,7 +136,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && user.role !== "admin") {
       items.push({
         path: "/profile",
-        label: "Profile",
+        label: "Perfil",
         icon: User,
         available: true,
       });
@@ -146,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && user.role === "admin") {
       items.push({
         path: "/admin",
-        label: "Admin",
+        label: "Administración",
         icon: Settings,
         available: true,
       });
@@ -157,76 +157,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navigationItems = getNavigationItems();
 
-  // Don't show navigation on dashboard for users
-  const showFullNav =
-    !user ||
-    user.role === "admin" ||
-    !location.pathname.startsWith("/dashboard");
-
-  if (user && user.role === "user" && location.pathname === "/dashboard") {
-    // Minimal header for dashboard with bottom navigation
-    return (
-      <div className="min-h-screen">
-        <nav className="bg-black border-b border-[#D3B869] px-4 py-2">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <Link to="/" className="flex items-center">
-              <img 
-                src="/assets/logo-gold.png" 
-                alt="Outdoor Team Logo" 
-                className="h-10 w-auto"
-              />
-            </Link>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-300">
-                {user.full_name.split(" ")[0]}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
-              >
-                Salir
-              </Button>
-            </div>
-          </div>
-        </nav>
-        <main className="pb-20">{children}</main>
-
-        {/* Bottom Navigation for logged-in users */}
-        <div className="fixed bottom-0 left-0 right-0 bg-[#D3B869] border-t border-gray-800 px-1 py-2 z-50">
-          <div className="grid grid-cols-4 gap-0.5 max-w-md mx-auto">
-            {navigationItems.slice(0, 8).map((item) => (
-              <Link
-                key={item.path}
-                to={item.available ? item.path : "#"}
-                className={`flex flex-col items-center space-y-1 px-1 py-1 rounded-lg transition-colors ${
-                  isActive(item.path)
-                    ? "text-black bg-black/10"
-                    : item.available
-                      ? "text-black hover:text-black hover:bg-black/5"
-                      : "text-gray-600 cursor-not-allowed"
-                }`}
-                onClick={(e) => {
-                  if (!item.available) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <item.icon size={16} />
-                <span className="text-xs">{item.label}</span>
-                {!item.available && (
-                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // For other logged-in users (non-dashboard pages) or admin users
+  // Show full navigation for dashboard users too
   if (user && user.role === "user") {
     return (
       <div className="min-h-screen bg-background">
@@ -278,7 +209,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-black text-black hover:bg-black hover:text-[#D3B869]"
+                    className="border-black text-[#D3B869] bg-black hover:bg-gray-800 hover:text-[#D3B869]"
                   >
                     Cerrar Sesión
                   </Button>
@@ -295,7 +226,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-black text-black hover:bg-black hover:text-[#D3B869]"
+                    className="border-black text-[#D3B869] bg-black hover:bg-gray-800 hover:text-[#D3B869]"
                   >
                     Salir
                   </Button>
