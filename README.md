@@ -88,8 +88,23 @@ npm run build
 ```
 
 Este comando:
-- Construye el frontend con Vite → `dist/public/`
-- Compila el backend TypeScript → `dist/server/`
+- Construye el frontend con Vite → `public/` (archivos estáticos)
+- Compila el backend TypeScript → `dist/server/` (servidor)
+
+**📁 Estructura después del build:**
+```
+outdoor-team/
+├── public/              # Frontend construido (NUEVO)
+│   ├── index.html
+│   ├── assets/
+│   ├── manifest.json
+│   └── sw.js
+├── dist/               # Backend compilado
+│   └── server/
+│       └── index.js
+└── data/               # Base de datos
+    └── database.sqlite
+```
 
 ### 2. Configurar Variables de Entorno de Producción
 ```env
@@ -134,74 +149,12 @@ outdoorteam.com        A    [TU_IP_DEL_SERVIDOR]
 www.outdoorteam.com    A    [TU_IP_DEL_SERVIDOR]
 ```
 
-### Configuración Nginx (Recomendada)
+### Configuración Nginx (Actualizada)
+El archivo `nginx.conf` incluido ya está configurado para servir desde la carpeta `public/`:
+
 ```nginx
-server {
-    listen 80;
-    server_name app.outdoorteam.com outdoorteam.com www.outdoorteam.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name app.outdoorteam.com;
-    
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/private.key;
-    
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-    
-    # Static files
-    location / {
-        try_files $uri $uri/ @backend;
-        root /var/www/outdoorteam/dist/public;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # API routes
-    location /api/ {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-    
-    # Health check
-    location /health {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    
-    # SPA fallback
-    location @backend {
-        proxy_pass http://localhost:3001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-
-# Redirect www to non-www for main domain
-server {
-    listen 443 ssl http2;
-    server_name www.outdoorteam.com;
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/private.key;
-    return 301 https://outdoorteam.com$request_uri;
-}
+# Root directory for static files - now using public folder
+root /var/www/outdoorteam/public;
 ```
 
 ## 👤 Usuario Administrador
@@ -222,7 +175,7 @@ Se crea automáticamente un usuario administrador:
 - **Vite** para build optimizado
 - **Tailwind CSS** para estilos
 - **PWA** completa instalable
-- **Servido desde**: `dist/public/`
+- **Servido desde**: `public/` (raíz del proyecto)
 
 ### Backend
 - **Node.js** con Express 5
@@ -239,76 +192,6 @@ Se crea automáticamente un usuario administrador:
 - **Rate limiting** por IP
 - **CORS** estricto para dominios permitidos
 
-## 🔐 Configuración de Seguridad
-
-### SSL/TLS (Let's Encrypt recomendado)
-```bash
-# Instalar Certbot
-sudo apt install certbot python3-certbot-nginx
-
-# Obtener certificados
-sudo certbot --nginx -d app.outdoorteam.com -d outdoorteam.com -d www.outdoorteam.com
-
-# Renovación automática
-sudo crontab -e
-# Agregar: 0 12 * * * /usr/bin/certbot renew --quiet
-```
-
-### Firewall (UFW)
-```bash
-sudo ufw enable
-sudo ufw allow ssh
-sudo ufw allow 'Nginx Full'
-sudo ufw status
-```
-
-## 📊 Monitoring de Producción
-
-### Health Check
-- **Endpoint**: `https://app.outdoorteam.com/health`
-- **Monitoreo**: Base de datos, memoria, tiempo de actividad
-- **Alertas**: Configurar monitoreo externo
-
-### Logs del Sistema
-```bash
-# Ver logs de la aplicación
-tail -f /var/log/outdoorteam/app.log
-
-# Ver logs de Nginx
-tail -f /var/log/nginx/access.log
-tail -f /var/log/nginx/error.log
-```
-
-### PM2 para Gestión de Procesos (Recomendado)
-```bash
-# Instalar PM2
-npm install -g pm2
-
-# Crear ecosystem.config.js
-module.exports = {
-  apps: [{
-    name: 'outdoor-team',
-    script: './dist/server/index.js',
-    cwd: '/var/www/outdoorteam',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3001
-    },
-    instances: 'max',
-    exec_mode: 'cluster',
-    max_memory_restart: '1G',
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_file: './logs/combined.log'
-  }]
-}
-
-# Iniciar con PM2
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-```
-
 ## 🔧 Comandos de Despliegue
 
 ### Script de Despliegue Completo
@@ -324,10 +207,21 @@ git pull origin main
 # Instalar dependencias
 npm ci --omit=dev
 
-# Construir aplicación
+# Construir aplicación (genera public/ y dist/server/)
 npm run build
 
-# Reiniciar PM2
+# Verificar que se crearon los archivos
+if [ ! -f "public/index.html" ]; then
+    echo "❌ Error: public/index.html no fue creado"
+    exit 1
+fi
+
+if [ ! -f "dist/server/index.js" ]; then
+    echo "❌ Error: dist/server/index.js no fue creado"
+    exit 1
+fi
+
+# Reiniciar PM2 (si usas PM2)
 pm2 reload outdoor-team
 
 # Verificar health check
@@ -337,27 +231,23 @@ curl -f https://app.outdoorteam.com/health || exit 1
 echo "✅ Despliegue completado exitosamente!"
 ```
 
-### Backup de Base de Datos
-```bash
-#!/bin/bash
-# backup.sh
-
-DATE=$(date +%Y%m%d_%H%M%S)
-cp ./data/database.sqlite ./backups/database_$DATE.sqlite
-echo "✅ Backup creado: database_$DATE.sqlite"
-```
-
 ## 🔧 Troubleshooting de Producción
 
 ### Error: Static files not found
 ```bash
-# Verificar build
-ls -la dist/public/
-# Debe contener index.html y assets/
+# Verificar que el build se completó correctamente
+ls -la public/
+# Debe contener: index.html, assets/, manifest.json, sw.js
+
+# Si no existe public/, ejecutar:
+npm run build
 
 # Verificar permisos
-chmod -R 755 dist/public/
+chmod -R 755 public/
 ```
+
+### Error: "/home/app/public/index.html" no encontrado
+Este error se solucionó configurando Vite para que genere archivos en `public/` en lugar de `dist/public/`.
 
 ### Error: CORS issues
 ```bash
@@ -396,14 +286,17 @@ Para soporte técnico o preguntas:
 - **Issues**: Crear issue en el repositorio
 - **Documentación**: Ver este README
 
-## ⚠️ Notas de Producción
+## ⚠️ Cambios Importantes en Esta Versión
 
-- **Dominio Principal**: app.outdoorteam.com
-- **Archivos Estáticos**: Servidos desde `dist/public/`
-- **Base de Datos**: SQLite en directorio `data/`
-- **HTTPS**: Obligatorio en producción
-- **Logs**: Sistema completo de logging
-- **Backup**: Configurar backups automáticos de la BD
+### ✅ Estructura de Archivos Actualizada
+- **Antes**: Los archivos se construían en `dist/public/`
+- **Ahora**: Los archivos se construyen directamente en `public/` (raíz)
+- **Motivo**: Compatibilidad con el sistema de despliegue
+
+### ✅ Configuración Vite Actualizada
+- El `outDir` ahora apunta a `public/` en lugar de `dist/public/`
+- Nginx configurado para servir desde `/var/www/outdoorteam/public`
+- Static serving del servidor actualizado para usar `public/`
 
 ## 📝 Licencia
 
@@ -414,15 +307,18 @@ Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detall
 ## 🚀 Comandos Rápidos de Producción
 
 ```bash
-# Construcción y despliegue
+# Construcción (crea public/ y dist/server/)
 npm run build
+
+# Verificar archivos generados
+ls -la public/          # Debe contener index.html
+ls -la dist/server/     # Debe contener index.js
+
+# Iniciar en producción
 NODE_ENV=production node dist/server/index.js
 
 # Health check
 curl https://app.outdoorteam.com/health
-
-# Ver logs
-tail -f logs/combined.log
 ```
 
 ¡Listo para transformar vidas con hábitos saludables desde app.outdoorteam.com! 🌱💪

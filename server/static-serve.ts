@@ -10,38 +10,18 @@ export function setupStaticServing(app: express.Application) {
   console.log(`📁 Environment: ${process.env.NODE_ENV}`);
   console.log(`📁 Current working directory: ${process.cwd()}`);
   
-  // Determine the correct static path based on environment and actual file structure
+  // Determine the correct static path based on environment
   let staticPath: string;
   
   if (process.env.NODE_ENV === 'production') {
-    // In production, try multiple possible paths
-    const possiblePaths = [
-      path.join(process.cwd(), 'dist', 'public'),  // Standard build output
-      path.join(process.cwd(), 'public'),          // Fallback to public in root
-      path.join(process.cwd(), 'client', 'dist'),  // Development build
-      '/home/app/dist/public',                     // Docker absolute path
-      '/home/app/public'                           // Docker fallback
-    ];
-    
-    staticPath = possiblePaths[0]; // Default
-    
-    for (const tryPath of possiblePaths) {
-      console.log(`📁 Checking path: ${tryPath}`);
-      if (fs.existsSync(tryPath)) {
-        const indexExists = fs.existsSync(path.join(tryPath, 'index.html'));
-        console.log(`📁 Path exists: ${tryPath}, index.html: ${indexExists}`);
-        if (indexExists) {
-          staticPath = tryPath;
-          console.log(`✅ Using static path: ${staticPath}`);
-          break;
-        }
-      }
-    }
+    // In production, serve from public folder in root
+    staticPath = path.join(process.cwd(), 'public');
   } else {
+    // In development, serve from client/dist (Vite output during dev)
     staticPath = path.join(process.cwd(), 'client', 'dist');
   }
 
-  console.log(`📁 Final static path: ${staticPath}`);
+  console.log(`📁 Static path: ${staticPath}`);
   
   // Verify the static path exists
   if (!fs.existsSync(staticPath)) {
@@ -54,18 +34,14 @@ export function setupStaticServing(app: express.Application) {
         .map(dirent => dirent.name);
       console.error(`   ${dirs.join(', ')}`);
       
-      // Check if dist exists and what's inside
-      const distPath = path.join(process.cwd(), 'dist');
-      if (fs.existsSync(distPath)) {
-        const distContents = fs.readdirSync(distPath);
-        console.error(`   dist/ contents: ${distContents.join(', ')}`);
-      }
-      
       // Check if public exists in root
       const publicPath = path.join(process.cwd(), 'public');
       if (fs.existsSync(publicPath)) {
         const publicContents = fs.readdirSync(publicPath);
         console.error(`   public/ contents: ${publicContents.join(', ')}`);
+      } else {
+        console.error('   ❌ public/ directory does not exist');
+        console.error('   📝 To fix: run "npm run build" to generate the public folder');
       }
       
     } catch (err) {
@@ -73,12 +49,13 @@ export function setupStaticServing(app: express.Application) {
     }
     
     if (process.env.NODE_ENV === 'production') {
-      console.error('   For production deployment, ensure the build process completed successfully');
-      // Instead of exiting, continue with a warning
-      console.warn('   Continuing without static file serving - API will still work');
+      console.error('   For production deployment, ensure "npm run build" completed successfully');
+      console.error('   This should create a "public" folder with index.html and assets');
+      // Continue without static serving but warn
+      console.warn('   ⚠️  Continuing without static file serving - only API will work');
       return;
     } else {
-      console.warn('   Continuing without static file serving in development mode');
+      console.warn('   ⚠️  Continuing without static file serving in development mode');
       return;
     }
   }
@@ -97,10 +74,12 @@ export function setupStaticServing(app: express.Application) {
     }
     
     if (process.env.NODE_ENV === 'production') {
-      console.warn('   Continuing without SPA routing - API will still work');
+      console.error('   ❌ Build incomplete - index.html missing');
+      console.error('   📝 To fix: run "npm run build" and ensure it completes successfully');
+      console.warn('   ⚠️  Continuing without SPA routing - only API will work');
       // Don't exit, just continue without SPA routing
     } else {
-      console.warn('   Continuing without index.html in development mode');
+      console.warn('   ⚠️  Continuing without index.html in development mode');
       return;
     }
   } else {
@@ -162,7 +141,7 @@ export function setupStaticServing(app: express.Application) {
               <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
                 <h1>Error cargando la aplicación</h1>
                 <p>Por favor, intenta nuevamente en unos minutos.</p>
-                <p><a href="/api/health">Check API Health</a></p>
+                <p><a href="/health">API Health Check</a></p>
               </body>
             </html>
           `);
@@ -190,20 +169,28 @@ export function setupStaticServing(app: express.Application) {
       // Send a basic response indicating the app is running but frontend is not built
       res.status(200).send(`
         <html>
-          <head><title>Outdoor Team - API Active</title></head>
+          <head><title>Outdoor Team - API Running</title></head>
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-            <h1>Outdoor Team API</h1>
-            <p>El servidor está funcionando correctamente.</p>
-            <p>Frontend no está disponible - ejecuta <code>npm run build</code></p>
-            <p><a href="/health">API Health Check</a></p>
+            <h1>🚀 Outdoor Team API</h1>
+            <p>✅ El servidor está funcionando correctamente.</p>
+            <p>⚠️ Frontend no construido - ejecuta <strong>npm run build</strong></p>
+            <hr style="margin: 40px 0;">
+            <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+              <h3>📋 Para desplegar:</h3>
+              <ol>
+                <li><code>npm run build</code> - Construir frontend</li>
+                <li><code>node dist/server/index.js</code> - Iniciar servidor</li>
+              </ol>
+            </div>
+            <p><a href="/health" style="color: #D3B869;">🏥 API Health Check</a></p>
           </body>
         </html>
       `);
     });
   }
 
-  console.log('✅ Static file serving configured for production deployment');
+  console.log('✅ Static file serving configured');
   console.log(`   📂 Static path: ${staticPath}`);
   console.log(`   📄 Index path: ${indexPath}`);
-  console.log(`   🌐 Ready for app.outdoorteam.com deployment`);
+  console.log(`   🌐 Ready for production deployment`);
 }
