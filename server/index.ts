@@ -36,7 +36,7 @@ import {
   checkLoginBlock
 } from './middleware/rate-limiter.js';
 import {
-  createCorsMiddleware,
+  corsMiddleware,
   corsErrorHandler,
   securityHeaders,
   logCorsConfig
@@ -133,8 +133,8 @@ app.use(securityHeaders);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Apply CORS only to API routes
-app.use('/api/', createCorsMiddleware('/api'));
+// Apply CORS to all routes
+app.use(corsMiddleware);
 
 // CORS error handler (must be after CORS middleware)
 app.use(corsErrorHandler);
@@ -1298,7 +1298,13 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
   }
 });
 
-// Server initialization and static serving
+// Setup static serving for production
+if (process.env.NODE_ENV === 'production') {
+  setupStaticServing(app);
+  console.log('📁 Static file serving configured for production');
+}
+
+// Server initialization
 export const startServer = async (port = 3001) => {
   try {
     // Check database connection
@@ -1315,12 +1321,6 @@ export const startServer = async (port = 3001) => {
 
     console.log('🔔 Initializing notification scheduler...');
     notificationScheduler = new NotificationScheduler();
-
-    // Setup static serving for production
-    if (process.env.NODE_ENV === 'production') {
-      setupStaticServing(app);
-      console.log('📁 Static file serving configured for production');
-    }
 
     // Start server
     const server = app.listen(port, () => {

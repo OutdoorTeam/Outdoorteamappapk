@@ -150,24 +150,6 @@ export const createCorsMiddleware = (routePattern?: string) => {
   };
 };
 
-// Development CORS bypass (only for internal tools)
-export const developmentCorsOverride = (req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NODE_ENV === 'development' && process.env.CORS_BYPASS === 'true') {
-    console.warn('⚠️  CORS BYPASS ENABLED - Only use for development!');
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    if (req.method === 'OPTIONS') {
-      res.sendStatus(200);
-      return;
-    }
-  }
-  
-  next();
-};
-
 // Security headers middleware (related to CORS)
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
   // Content Security Policy
