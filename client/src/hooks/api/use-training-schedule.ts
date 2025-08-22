@@ -77,6 +77,7 @@ export function useCreateTrainingSchedule() {
       }),
     onSuccess: (_, { userId }) => {
       queryClient.invalidateQueries({ queryKey: TRAINING_SCHEDULE_KEYS.byUser(userId) });
+      queryClient.invalidateQueries({ queryKey: TRAINING_SCHEDULE_KEYS.my() });
     },
   });
 }

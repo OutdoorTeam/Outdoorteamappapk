@@ -69,6 +69,11 @@ export function useCreateContentLibraryItem() {
   });
 }
 
+// Alias for useCreateContentLibraryItem to match ContentManagement imports
+export function useCreateContent() {
+  return useCreateContentLibraryItem();
+}
+
 // Hook to update content library item (admin only)
 export function useUpdateContentLibraryItem() {
   const queryClient = useQueryClient();
@@ -85,6 +90,11 @@ export function useUpdateContentLibraryItem() {
   });
 }
 
+// Alias for useUpdateContentLibraryItem to match ContentManagement imports
+export function useUpdateContent() {
+  return useUpdateContentLibraryItem();
+}
+
 // Hook to delete content library item (admin only)
 export function useDeleteContentLibraryItem() {
   const queryClient = useQueryClient();
@@ -98,4 +108,9 @@ export function useDeleteContentLibraryItem() {
       queryClient.invalidateQueries({ queryKey: CONTENT_LIBRARY_KEYS.all });
     },
   });
+}
+
+// Alias for useDeleteContentLibraryItem to match ContentManagement imports
+export function useDeleteContent() {
+  return useDeleteContentLibraryItem();
 }

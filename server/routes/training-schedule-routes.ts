@@ -6,32 +6,35 @@ import { SystemLogger } from '../utils/logging.js';
 
 const router = Router();
 
-// Get user's active training schedule
+// Get user's active training schedule - fixed route path for user access
 router.get('/users/:userId/training-schedule', authenticateToken, async (req: any, res) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
     const isAdmin = req.user.role === 'admin';
 
+    // For user's own schedule, support "me" as userId
+    const targetUserId = userId === 'me' ? requestingUserId : parseInt(userId);
+
     // Users can only view their own schedule unless admin
-    if (!isAdmin && parseInt(userId) !== requestingUserId) {
+    if (!isAdmin && targetUserId !== requestingUserId) {
       sendErrorResponse(res, ERROR_CODES.AUTHORIZATION_ERROR, 'Acceso denegado');
       return;
     }
 
-    console.log('Fetching training schedule for user:', userId);
+    console.log('Fetching training schedule for user:', targetUserId);
 
     // Get active training schedule
     const schedule = await db
       .selectFrom('training_plan_schedules')
       .selectAll()
-      .where('user_id', '=', parseInt(userId))
+      .where('user_id', '=', targetUserId)
       .where('status', '=', 'active')
       .orderBy('created_at', 'desc')
       .executeTakeFirst();
 
     if (!schedule) {
-      res.json({ schedule: null, exercises: [] });
+      res.json({ schedule: null, exercises: {} });
       return;
     }
 
