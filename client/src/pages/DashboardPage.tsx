@@ -13,6 +13,7 @@ import {
 } from "@/hooks/api/use-daily-habits";
 import { useTodayNote, useSaveNote } from "@/hooks/api/use-daily-notes";
 import { useSaveMeditationSession } from "@/hooks/api/use-meditation";
+import { useMyGoals } from "@/hooks/api/use-user-goals";
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -21,18 +22,22 @@ const DashboardPage: React.FC = () => {
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
 
   const today = new Date().toISOString().split("T")[0];
-  const stepGoal = 8000;
 
   // React Query hooks
   const { data: todayHabits, isLoading: habitsLoading } = useTodayHabits();
   const { data: weeklyPointsData, isLoading: weeklyLoading } = useWeeklyPoints();
   const { data: calendarData, isLoading: calendarLoading } = useCalendarData();
   const { data: todayNoteData, isLoading: noteLoading } = useTodayNote();
+  const { data: userGoals, isLoading: goalsLoading } = useMyGoals();
   
   // Mutations
   const updateHabitMutation = useUpdateHabit();
   const saveNoteMutation = useSaveNote();
   const saveMeditationMutation = useSaveMeditationSession();
+
+  // Use user goals or defaults
+  const stepGoal = userGoals?.daily_steps_goal || 8000;
+  const weeklyGoal = userGoals?.weekly_points_goal || 28;
 
   // Initialize note from query data
   React.useEffect(() => {
@@ -228,8 +233,9 @@ const DashboardPage: React.FC = () => {
   const currentSteps = todayHabits?.steps || 0;
   const stepsProgress = Math.min((currentSteps / stepGoal) * 100, 100);
   const weeklyPoints = weeklyPointsData?.total_points || 0;
+  const weeklyProgress = Math.min((weeklyPoints / weeklyGoal) * 100, 100);
 
-  const isLoading = habitsLoading || weeklyLoading || calendarLoading || noteLoading;
+  const isLoading = habitsLoading || weeklyLoading || calendarLoading || noteLoading || goalsLoading;
 
   if (isLoading && user?.role === "user") {
     return (
@@ -306,9 +312,15 @@ const DashboardPage: React.FC = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm text-gray-400 mb-1">Esta Semana</div>
+                  <div className="text-sm text-gray-400 mb-1">
+                    Esta Semana
+                    <span className="text-xs ml-2">Meta: {weeklyGoal}</span>
+                  </div>
                   <div className="text-2xl font-bold text-[#D3B869]">
                     {weeklyPoints}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {weeklyProgress.toFixed(1)}% de la meta
                   </div>
                 </div>
                 <div className="text-3xl">🎯</div>

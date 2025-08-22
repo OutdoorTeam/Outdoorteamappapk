@@ -401,6 +401,42 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(formatUserResponse(req.user));
 });
 
+// User Goals Route - Current user can get their own goals
+app.get('/api/my-goals', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+
+    console.log('Fetching goals for user:', userId);
+
+    let goals = await db
+      .selectFrom('user_goals')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .executeTakeFirst();
+
+    if (!goals) {
+      // Create default goals if none exist
+      goals = await db
+        .insertInto('user_goals')
+        .values({
+          user_id: userId,
+          daily_steps_goal: 8000,
+          weekly_points_goal: 28,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .returning(['id', 'user_id', 'daily_steps_goal', 'weekly_points_goal', 'created_at', 'updated_at'])
+        .executeTakeFirst();
+    }
+
+    res.json(goals);
+  } catch (error) {
+    console.error('Error fetching user goals:', error);
+    await SystemLogger.logCriticalError('User goals fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener metas del usuario');
+  }
+});
+
 // Plan Selection and Assignment
 app.post('/api/users/:id/assign-plan',
   authenticateToken,
