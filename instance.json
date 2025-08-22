@@ -14,7 +14,13 @@
   },
   "env": {
     "NODE_ENV": "production",
-    "PORT": "3001"
+    "PORT": "3001",
+    "DATA_DIRECTORY": "/app/data",
+    "JWT_SECRET": "8f7a6e5d4c3b2a1098765432109876543210fedcba0987654321abcdef123456",
+    "VAPID_PUBLIC_KEY": "BEl62iUYgUivxIkv69yViEuiBIa40HnYmN7J21ZiNvJGDCG6n_bHUXP5Y8v_dKfNwvRz4rHNL8HpEPYWnSAAMoI",
+    "VAPID_PRIVATE_KEY": "aDYHV4taW2xzpn2pi1HZnzjjcqruoyWNdcCcqPx9yGc",
+    "VAPID_EMAIL": "admin@mioutdoorteam.com",
+    "CORS_ORIGINS": "https://app.mioutdoorteam.com"
   },
   "healthcheck": {
     "path": "/health",

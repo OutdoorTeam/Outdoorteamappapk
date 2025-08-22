@@ -54,8 +54,17 @@ import {
   toggleUserStatusSchema
 } from '../shared/validation-schemas.js';
 
-// Load environment variables
+// Load environment variables first
 dotenv.config();
+
+console.log('🚀 Starting Outdoor Team server...');
+console.log('Environment variables loaded:');
+console.log('- NODE_ENV:', process.env.NODE_ENV);
+console.log('- PORT:', process.env.PORT);
+console.log('- DATA_DIRECTORY:', process.env.DATA_DIRECTORY);
+console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
+console.log('- VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY ? 'Set' : 'Not set');
+console.log('- VAPID_PRIVATE_KEY:', process.env.VAPID_PRIVATE_KEY ? 'Set' : 'Not set');
 
 const app = express();
 
@@ -65,13 +74,45 @@ const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Validate JWT configuration early
-validateJWTConfig();
+console.log('Resolved configuration:');
+console.log('- JWT_SECRET length:', JWT_SECRET.length);
+console.log('- DATA_DIRECTORY:', DATA_DIRECTORY);
+console.log('- PORT:', PORT);
+console.log('- NODE_ENV:', NODE_ENV);
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIRECTORY)) {
-  console.log(`📁 Creating data directory: ${DATA_DIRECTORY}`);
-  fs.mkdirSync(DATA_DIRECTORY, { recursive: true });
+// Validate JWT configuration early
+try {
+  validateJWTConfig();
+  console.log('✅ JWT configuration validated');
+} catch (error) {
+  console.error('❌ JWT configuration error:', error);
+  process.exit(1);
+}
+
+// Ensure data directory exists with proper error handling
+console.log('📁 Setting up data directory...');
+try {
+  const resolvedDataDir = path.resolve(DATA_DIRECTORY);
+  console.log('Resolved data directory path:', resolvedDataDir);
+  
+  if (!fs.existsSync(resolvedDataDir)) {
+    console.log(`Creating data directory: ${resolvedDataDir}`);
+    fs.mkdirSync(resolvedDataDir, { recursive: true });
+    console.log('✅ Data directory created');
+  } else {
+    console.log('✅ Data directory already exists');
+  }
+  
+  // Test write permissions
+  const testFile = path.join(resolvedDataDir, '.write-test');
+  fs.writeFileSync(testFile, 'test');
+  fs.unlinkSync(testFile);
+  console.log('✅ Data directory is writable');
+  
+} catch (error) {
+  console.error('❌ Error setting up data directory:', error);
+  console.error('This is usually a permissions issue or invalid path');
+  process.exit(1);
 }
 
 // Enable trust proxy to get real client IPs (REQUIRED for rate limiting behind reverse proxy)
@@ -86,14 +127,15 @@ const checkVapidConfiguration = () => {
   const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
   const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
+  console.log('🔔 Checking VAPID configuration...');
+  
   const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
 
   if (!isConfigured) {
-    console.warn('⚠️  VAPID keys are not configured!');
+    console.warn('⚠️  VAPID keys are not properly configured!');
     console.warn('   Push notifications will not work.');
-    console.warn('   To fix this:');
-    console.warn('   1. Run: npm run generate-vapid');
-    console.warn('   2. Restart the server');
+    console.warn('   Public key:', VAPID_PUBLIC_KEY ? 'Set' : 'Not set');
+    console.warn('   Private key length:', VAPID_PRIVATE_KEY ? VAPID_PRIVATE_KEY.length : 0);
     return false;
   }
 
@@ -103,8 +145,16 @@ const checkVapidConfiguration = () => {
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+console.log('📁 Setting up uploads directory:', uploadsDir);
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('✅ Uploads directory created');
+  } else {
+    console.log('✅ Uploads directory already exists');
+  }
+} catch (error) {
+  console.error('❌ Error creating uploads directory:', error);
 }
 
 // Configure multer for file uploads with validation
@@ -159,12 +209,14 @@ app.use('/api/', burstLimit);
 
 // Health check endpoint (exempted from rate limiting and CORS)
 app.get('/health', (req, res) => {
+  console.log('Health check requested');
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     environment: NODE_ENV,
     port: PORT,
-    dataDirectory: DATA_DIRECTORY
+    dataDirectory: DATA_DIRECTORY,
+    vapidConfigured: checkVapidConfiguration()
   });
 });
 
@@ -200,6 +252,7 @@ const formatUserResponse = (user: any) => {
 };
 
 // Mount routes
+console.log('🛣️  Setting up routes...');
 app.use('/api/', statsRoutes);
 app.use('/api/', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -208,6 +261,7 @@ app.use('/api/', trainingPlanRoutes);
 app.use('/api/', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
+console.log('✅ Routes mounted');
 
 // Auth Routes with Rate Limiting (CORRECT ORDER)
 app.post('/api/auth/register',
@@ -581,31 +635,50 @@ app.post('/api/meditation-sessions',
   });
 
 // Setup static file serving and remaining routes
+console.log('🌐 Setting up static file serving...');
 setupStaticServing(app, DATA_DIRECTORY);
 
 // Start server and initialize background services
 const startServer = async () => {
   try {
-    // Check VAPID configuration
-    checkVapidConfiguration();
+    console.log('🔧 Initializing server components...');
 
-    // Log CORS configuration in development
-    if (NODE_ENV === 'development') {
-      logCorsConfig();
-    }
+    // Check VAPID configuration
+    const vapidConfigured = checkVapidConfiguration();
+
+    // Log CORS configuration
+    logCorsConfig();
 
     // Initialize schedulers
+    console.log('⏰ Initializing schedulers...');
     resetScheduler = new DailyResetScheduler(db);
     await resetScheduler.initialize();
 
     notificationScheduler = new NotificationScheduler(db);
     await notificationScheduler.initialize();
+    console.log('✅ Schedulers initialized');
 
+    console.log(`🎧 Starting server on port ${PORT}...`);
     const server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log('');
+      console.log('🎉 ===============================================');
+      console.log('🚀 Outdoor Team server started successfully!');
+      console.log('===============================================');
+      console.log(`📍 Server running on port: ${PORT}`);
       console.log(`📁 Data directory: ${DATA_DIRECTORY}`);
       console.log(`🌍 Environment: ${NODE_ENV}`);
-      console.log(`✅ Server is ready to accept connections`);
+      console.log(`🔔 VAPID configured: ${vapidConfigured ? 'Yes' : 'No'}`);
+      console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+      
+      if (NODE_ENV === 'production') {
+        console.log(`🌐 Production server ready`);
+      } else {
+        console.log(`🌐 Frontend: http://localhost:3000`);
+        console.log(`🔧 API: http://localhost:${PORT}`);
+      }
+      console.log('===============================================');
+      console.log('✅ Server is ready to accept connections');
+      console.log('');
     });
 
     // Graceful shutdown
@@ -636,10 +709,28 @@ const startServer = async () => {
 
   } catch (error) {
     console.error('❌ Failed to start server:', error);
-    await SystemLogger.logCriticalError('Server startup failed', error as Error);
+    console.error('Stack trace:', (error as Error).stack);
+    
+    if (SystemLogger) {
+      await SystemLogger.logCriticalError('Server startup failed', error as Error);
+    }
+    
+    console.error('Exiting with code 1...');
     process.exit(1);
   }
 };
 
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 // Start the server
+console.log('🏁 Initiating server startup...');
 startServer();
