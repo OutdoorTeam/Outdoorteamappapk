@@ -7,14 +7,8 @@ import { SystemLogger } from '../utils/logging.js';
 const getAllowedOrigins = (): string[] => {
   const origins = [];
   
-  // Production domain from environment variable
-  const corsOrigins = process.env.CORS_ORIGINS;
-  if (corsOrigins) {
-    origins.push(...corsOrigins.split(',').map(origin => origin.trim()));
-  } else {
-    // Default production domain
-    origins.push('https://app.mioutdoorteam.com');
-  }
+  // Production domain
+  origins.push('https://app.mioutdoorteam.com');
   
   // Development origins (only in non-production environments)
   if (process.env.NODE_ENV !== 'production') {
@@ -31,33 +25,27 @@ const getAllowedOrigins = (): string[] => {
 const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
   const allowedOrigins = getAllowedOrigins();
   
-  console.log('CORS validation - Origin:', origin, 'Allowed:', allowedOrigins);
-  
   // Allow requests with no origin (e.g., mobile apps, server-to-server)
   if (!origin) {
-    console.log('CORS: Allowing request with no origin');
     callback(null, true);
     return;
   }
   
   // Check if origin is in allowlist
   if (allowedOrigins.includes(origin)) {
-    console.log('CORS: Origin allowed');
     callback(null, true);
     return;
   }
   
   // Log blocked origin attempt
   console.warn(`CORS: Blocked origin attempt: ${origin}`);
-  if (SystemLogger) {
-    SystemLogger.log('warn', 'CORS origin blocked', {
-      metadata: {
-        blocked_origin: origin,
-        allowed_origins: allowedOrigins,
-        timestamp: new Date().toISOString()
-      }
-    });
-  }
+  SystemLogger.log('warn', 'CORS origin blocked', {
+    metadata: {
+      blocked_origin: origin,
+      allowed_origins: allowedOrigins,
+      timestamp: new Date().toISOString()
+    }
+  });
   
   callback(new Error(`Origin ${origin} not allowed by CORS policy`), false);
 };
@@ -91,21 +79,17 @@ export const corsMiddleware = cors(corsOptions);
 // Custom CORS error handler middleware
 export const corsErrorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   if (err && err.message && err.message.includes('not allowed by CORS policy')) {
-    console.error('CORS error:', err.message);
-    
     // Log the blocked request details
-    if (SystemLogger) {
-      SystemLogger.log('warn', 'CORS request blocked', {
-        req,
-        metadata: {
-          origin: req.headers.origin,
-          user_agent: req.headers['user-agent'],
-          method: req.method,
-          path: req.path,
-          timestamp: new Date().toISOString()
-        }
-      });
-    }
+    SystemLogger.log('warn', 'CORS request blocked', {
+      req,
+      metadata: {
+        origin: req.headers.origin,
+        user_agent: req.headers['user-agent'],
+        method: req.method,
+        path: req.path,
+        timestamp: new Date().toISOString()
+      }
+    });
     
     // Set Vary header
     res.setHeader('Vary', 'Origin');
@@ -134,15 +118,15 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
 
 // Debug function to log CORS configuration (development only)
 export const logCorsConfig = () => {
-  const allowedOrigins = getAllowedOrigins();
-  console.log('🔒 CORS Configuration:');
-  console.log('- NODE_ENV:', process.env.NODE_ENV);
-  console.log('- Allowed origins:', allowedOrigins);
-  console.log('- Credentials:', corsOptions.credentials);
-  console.log('- Methods:', corsOptions.methods);
-  console.log('- Allowed headers:', corsOptions.allowedHeaders);
-  console.log('- Exposed headers:', corsOptions.exposedHeaders);
-  console.log('- Max age:', corsOptions.maxAge);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('CORS Configuration:');
+    console.log('- Allowed origins:', getAllowedOrigins());
+    console.log('- Credentials:', corsOptions.credentials);
+    console.log('- Methods:', corsOptions.methods);
+    console.log('- Allowed headers:', corsOptions.allowedHeaders);
+    console.log('- Exposed headers:', corsOptions.exposedHeaders);
+    console.log('- Max age:', corsOptions.maxAge);
+  }
 };
 
 // Middleware factory for applying CORS to specific routes
@@ -187,7 +171,7 @@ export const developmentCorsOverride = (req: Request, res: Response, next: NextF
 // Security headers middleware (related to CORS)
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
   // Content Security Policy
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
   
   // X-Frame-Options
   res.setHeader('X-Frame-Options', 'DENY');

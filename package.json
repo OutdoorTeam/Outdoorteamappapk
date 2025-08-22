@@ -3,18 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
-  },
   "scripts": {
     "build": "vite build && tsc --project tsconfig.server.json",
     "start": "tsx watch scripts/dev.ts",
-    "prod": "node dist/server/index.js",
-    "generate-vapid": "node scripts/generate-vapid.js",
-    "db:migrate": "node -e \"console.log('Database migrations are handled automatically on startup')\"",
-    "health": "curl -f http://localhost:${PORT:-3001}/health || exit 1",
-    "postinstall": "echo 'Dependencies installed successfully'"
+    "generate-vapid": "node scripts/generate-vapid.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

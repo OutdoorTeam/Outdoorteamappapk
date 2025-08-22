@@ -67,19 +67,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         const userData = await response.json();
-        console.log('Auth check successful:', { 
-          id: userData.id,
-          email: userData.email,
-          role: userData.role,
-          plan: userData.plan_type, 
-          features: userData.features 
-        });
+        console.log('Auth check successful for:', userData.email, 'Plan:', userData.plan_type, 'Features:', userData.features);
         setUser(userData);
       } else {
-        console.log('Auth check failed, status:', response.status);
-        if (response.status === 401) {
-          console.log('Token expired or invalid, removing token');
-        }
+        console.log('Auth check failed, removing token');
         localStorage.removeItem('auth_token');
       }
     } catch (error) {
@@ -103,11 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.ok) {
         const userData = await response.json();
-        console.log('User data refreshed:', {
-          email: userData.email,
-          plan: userData.plan_type,
-          features: userData.features
-        });
+        console.log('User data refreshed:', userData.email, 'Plan:', userData.plan_type);
         setUser(userData);
       }
     } catch (error) {
@@ -118,41 +105,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     console.log('Attempting login for:', email);
     
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: email.trim(), 
-          password 
-        }),
-      });
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        email: email.trim(), 
+        password 
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        console.error('Login failed with status:', response.status, 'Error:', data.error);
-        throw new Error(data.error?.message || 'Error al iniciar sesión');
-      }
+    if (!response.ok) {
+      console.error('Login failed:', data.error);
+      throw new Error(data.error || 'Error al iniciar sesión');
+    }
 
-      if (data.token && data.user) {
-        localStorage.setItem('auth_token', data.token);
-        setUser(data.user);
-        console.log('Login successful:', {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.role,
-          plan: data.user.plan_type
-        });
-      } else {
-        console.error('Invalid login response structure:', data);
-        throw new Error('Respuesta de login inválida');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+    if (data.token && data.user) {
+      localStorage.setItem('auth_token', data.token);
+      setUser(data.user);
+      console.log('Login successful for user:', data.user.email, 'Role:', data.user.role, 'Plan:', data.user.plan_type);
+    } else {
+      throw new Error('Respuesta de login inválida');
     }
   };
 
@@ -171,42 +147,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error('La contraseña debe tener al menos 6 caracteres');
     }
 
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          full_name: fullName.trim(), 
-          email: email.trim(), 
-          password 
-        }),
-      });
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        full_name: fullName.trim(), 
+        email: email.trim(), 
+        password 
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        console.error('Registration failed with status:', response.status, 'Error:', data.error);
-        throw new Error(data.error?.message || 'Error al registrarse');
-      }
+    if (!response.ok) {
+      console.error('Registration failed:', data.error);
+      throw new Error(data.error || 'Error al registrarse');
+    }
 
-      if (data.token && data.user) {
-        localStorage.setItem('auth_token', data.token);
-        setUser(data.user);
-        console.log('Registration successful:', {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.role,
-          plan: data.user.plan_type
-        });
-      } else {
-        console.error('Invalid registration response structure:', data);
-        throw new Error('Respuesta de registro inválida');
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+    if (data.token && data.user) {
+      localStorage.setItem('auth_token', data.token);
+      setUser(data.user);
+      console.log('Registration successful for user:', data.user.email, 'Role:', data.user.role, 'Plan:', data.user.plan_type);
+    } else {
+      throw new Error('Respuesta de registro inválida');
     }
   };
 
@@ -217,30 +182,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     console.log('Assigning plan', planId, 'to user', user.id);
 
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/users/${user.id}/assign-plan`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ planId }),
-      });
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`/api/users/${user.id}/assign-plan`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ planId }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        console.error('Plan assignment failed:', data.error);
-        throw new Error(data.error?.message || 'Error al asignar plan');
-      }
-
-      setUser(data);
-      console.log('Plan assigned successfully:', data.plan_type);
-    } catch (error) {
-      console.error('Plan assignment error:', error);
-      throw error;
+    if (!response.ok) {
+      console.error('Plan assignment failed:', data.error);
+      throw new Error(data.error || 'Error al asignar plan');
     }
+
+    setUser(data);
+    console.log('Plan assigned successfully:', data.plan_type);
   };
 
   const logout = () => {
