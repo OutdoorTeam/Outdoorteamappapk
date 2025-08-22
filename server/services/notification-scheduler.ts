@@ -8,7 +8,11 @@ class NotificationScheduler {
 
   constructor() {
     this.checkVapidConfiguration();
-    console.log(`NotificationScheduler initialized (${this.isConfigured ? 'enabled' : 'disabled'} mode)`);
+    if (this.isConfigured) {
+      console.log('✅ NotificationScheduler initialized and configured');
+    } else {
+      console.log('⚠️  NotificationScheduler initialized but VAPID keys not configured');
+    }
   }
 
   private checkVapidConfiguration(): void {
@@ -16,11 +20,14 @@ class NotificationScheduler {
     const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
     const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
 
+    // Check if keys are properly configured
     this.isConfigured = !!(
       VAPID_PUBLIC_KEY && 
       VAPID_PRIVATE_KEY && 
       VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && 
-      VAPID_PRIVATE_KEY.length >= 32
+      VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE' &&
+      VAPID_PRIVATE_KEY.length >= 32 &&
+      VAPID_PUBLIC_KEY.length >= 32
     );
 
     if (this.isConfigured) {
@@ -31,16 +38,29 @@ class NotificationScheduler {
           VAPID_PRIVATE_KEY
         );
         console.log('✅ VAPID keys configured successfully for push notifications');
+        console.log(`📧 VAPID email: ${VAPID_EMAIL}`);
+        console.log(`🔑 VAPID public key: ${VAPID_PUBLIC_KEY.substring(0, 20)}...`);
       } catch (error) {
         console.error('❌ Error configuring VAPID keys:', error);
         this.isConfigured = false;
       }
     } else {
-      console.warn('⚠️  VAPID keys are not configured!');
-      console.warn('   Push notifications will not work.');
-      console.warn('   To fix this:');
-      console.warn('   1. Run: npm run generate-vapid');
-      console.warn('   2. Restart the server');
+      console.log('');
+      console.log('═══════════════════════════════════════');
+      console.log('⚠️   VAPID KEYS NOT CONFIGURED   ⚠️');
+      console.log('═══════════════════════════════════════');
+      console.log('Push notifications are disabled.');
+      console.log('');
+      console.log('To enable push notifications:');
+      console.log('1. Run: npm run generate-vapid');
+      console.log('2. Restart the server');
+      console.log('');
+      console.log('Current VAPID status:');
+      console.log(`- Public key: ${VAPID_PUBLIC_KEY ? '✓ Set' : '✗ Missing'}`);
+      console.log(`- Private key: ${VAPID_PRIVATE_KEY ? '✓ Set' : '✗ Missing'}`);
+      console.log(`- Email: ${VAPID_EMAIL || '✗ Missing'}`);
+      console.log('═══════════════════════════════════════');
+      console.log('');
     }
   }
 
@@ -82,11 +102,19 @@ class NotificationScheduler {
   }
 
   public start(): void {
-    console.log(`NotificationScheduler start (${this.isConfigured ? 'enabled' : 'disabled'} mode)`);
+    console.log(`NotificationScheduler started (${this.isConfigured ? 'enabled' : 'disabled'} mode)`);
   }
 
   public isVapidConfigured(): boolean {
     return this.isConfigured;
+  }
+
+  public getVapidStatus(): { configured: boolean; publicKey?: string; email?: string } {
+    return {
+      configured: this.isConfigured,
+      publicKey: this.isConfigured ? process.env.VAPID_PUBLIC_KEY : undefined,
+      email: process.env.VAPID_EMAIL || 'admin@outdoorteam.com'
+    };
   }
 }
 

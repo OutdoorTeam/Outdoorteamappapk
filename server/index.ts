@@ -72,14 +72,14 @@ const checkVapidConfiguration = () => {
   const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
   const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
-  const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
+  const isConfigured = !!(VAPID_PUBLIC_KEY && 
+                         VAPID_PRIVATE_KEY && 
+                         VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && 
+                         VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE' &&
+                         VAPID_PRIVATE_KEY.length >= 32 &&
+                         VAPID_PUBLIC_KEY.length >= 32);
 
   if (!isConfigured) {
-    console.warn('⚠️  VAPID keys are not configured!');
-    console.warn('   Push notifications will not work.');
-    console.warn('   To fix this:');
-    console.warn('   1. Run: npm run generate-vapid');
-    console.warn('   2. Restart the server');
     return false;
   }
 
@@ -1338,7 +1338,8 @@ export const startServer = async (port = 3001) => {
       if (vapidConfigured) {
         console.log('📱 Push notifications: Ready');
       } else {
-        console.log('📱 Push notifications: Disabled (run: npm run generate-vapid)');
+        console.log('📱 Push notifications: Disabled');
+        console.log('   To enable: npm run generate-vapid && restart server');
       }
     });
 
