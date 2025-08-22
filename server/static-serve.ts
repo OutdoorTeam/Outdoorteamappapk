@@ -11,9 +11,23 @@ export function setupStaticServing(app: express.Application, dataDirectory: stri
   console.log('Setting up static file serving...');
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('Current working directory:', process.cwd());
+  console.log('Data directory:', dataDirectory);
   
+  // Health check endpoint (before static files)
+  app.get('/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 3001,
+      dataDirectory: dataDirectory,
+      workingDir: process.cwd()
+    });
+  });
+
   // In production, serve the built frontend files
   if (process.env.NODE_ENV === 'production') {
+    // Production: serve from dist/public (where Vite builds to)
     const publicDir = path.resolve(process.cwd(), 'dist', 'public');
     console.log('Production mode - serving static files from:', publicDir);
     
@@ -24,7 +38,15 @@ export function setupStaticServing(app: express.Application, dataDirectory: stri
       // List contents for debugging
       try {
         const files = fs.readdirSync(publicDir);
-        console.log('Static directory contents:', files.slice(0, 10)); // Show first 10 files
+        console.log('Static directory contents:', files.length > 0 ? files.slice(0, 10) : 'No files found');
+        
+        // Check for index.html specifically
+        const indexPath = path.join(publicDir, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          console.log('✅ index.html found');
+        } else {
+          console.error('❌ index.html NOT found at:', indexPath);
+        }
       } catch (error) {
         console.warn('Could not read static directory contents:', error);
       }
@@ -36,8 +58,22 @@ export function setupStaticServing(app: express.Application, dataDirectory: stri
         if (fs.existsSync(distDir)) {
           const distContents = fs.readdirSync(distDir);
           console.log('dist/ contents:', distContents);
+          
+          // Try to find where the frontend files are
+          for (const item of distContents) {
+            const itemPath = path.join(distDir, item);
+            if (fs.statSync(itemPath).isDirectory()) {
+              const subContents = fs.readdirSync(itemPath);
+              console.log(`  ${item}/ contents:`, subContents);
+            }
+          }
         } else {
-          console.log('dist/ directory does not exist');
+          console.error('❌ dist/ directory does not exist');
+          
+          // List current directory contents
+          console.log('Current directory contents:');
+          const currentContents = fs.readdirSync(process.cwd());
+          console.log(currentContents);
         }
       } catch (error) {
         console.error('Error checking dist directory:', error);
@@ -74,7 +110,7 @@ export function setupStaticServing(app: express.Application, dataDirectory: stri
   if (!fs.existsSync(uploadsPath)) {
     console.log('📁 Creating uploads directory:', uploadsPath);
     try {
-      fs.mkdirSync(uploadsPath, { recursive: true });
+      fs.mkdirSync(uploadsPath, { recursive: true, mode: 0o755 });
       console.log('✅ Uploads directory created');
     } catch (error) {
       console.error('❌ Failed to create uploads directory:', error);
@@ -104,23 +140,48 @@ export function setupStaticServing(app: express.Application, dataDirectory: stri
       
       // Serve React app for all other routes
       const indexPath = path.resolve(process.cwd(), 'dist', 'public', 'index.html');
-      console.log('Serving index.html from:', indexPath);
+      console.log('Serving SPA route:', req.path, 'from:', indexPath);
       
       // Check if index.html exists
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath, (err) => {
           if (err) {
             console.error('Error serving index.html:', err);
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ 
+              error: 'Internal server error',
+              message: 'Failed to serve application'
+            });
           }
         });
       } else {
         console.error('❌ index.html not found at:', indexPath);
-        res.status(404).json({ 
-          error: 'Frontend not found',
-          message: 'The application frontend is not properly built or deployed',
-          indexPath: indexPath
-        });
+        
+        // Try alternative locations
+        const alternativePaths = [
+          path.resolve(process.cwd(), 'public', 'index.html'),
+          path.resolve(process.cwd(), 'dist', 'index.html'),
+          path.resolve(process.cwd(), 'client', 'dist', 'index.html')
+        ];
+        
+        let foundAlternative = false;
+        for (const altPath of alternativePaths) {
+          if (fs.existsSync(altPath)) {
+            console.log('✅ Found alternative index.html at:', altPath);
+            res.sendFile(altPath);
+            foundAlternative = true;
+            break;
+          }
+        }
+        
+        if (!foundAlternative) {
+          res.status(404).json({ 
+            error: 'Frontend not found',
+            message: 'The application frontend is not properly built or deployed',
+            expectedPath: indexPath,
+            workingDirectory: process.cwd(),
+            checkedPaths: alternativePaths
+          });
+        }
       }
     });
 

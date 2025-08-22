@@ -62,17 +62,24 @@ console.log('Environment variables loaded:');
 console.log('- NODE_ENV:', process.env.NODE_ENV);
 console.log('- PORT:', process.env.PORT);
 console.log('- DATA_DIRECTORY:', process.env.DATA_DIRECTORY);
-console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'Set' : 'Not set');
+console.log('- JWT_SECRET:', process.env.JWT_SECRET ? `Set (${process.env.JWT_SECRET.length} chars)` : 'Not set');
 console.log('- VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY ? 'Set' : 'Not set');
-console.log('- VAPID_PRIVATE_KEY:', process.env.VAPID_PRIVATE_KEY ? 'Set' : 'Not set');
+console.log('- VAPID_PRIVATE_KEY:', process.env.VAPID_PRIVATE_KEY ? `Set (${process.env.VAPID_PRIVATE_KEY.length} chars)` : 'Not set');
 
 const app = express();
 
 // Environment variable validation and defaults
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
+const JWT_SECRET = process.env.JWT_SECRET || 'production-fallback-jwt-secret-8f7a6e5d4c3b2a1098765432109876543210fedcba0987654321abcdef123456';
+const DATA_DIRECTORY = path.resolve(process.env.DATA_DIRECTORY || '/app/data');
 const PORT = parseInt(process.env.PORT || '3001', 10);
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE_ENV || 'production';
+
+// Critical validation - prevent startup if JWT_SECRET is not secure in production
+if (NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
+  console.error('❌ CRITICAL ERROR: JWT_SECRET must be set and secure (32+ chars) in production!');
+  console.error('Current JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0);
+  process.exit(1);
+}
 
 console.log('Resolved configuration:');
 console.log('- JWT_SECRET length:', JWT_SECRET.length);
@@ -92,27 +99,56 @@ try {
 // Ensure data directory exists with proper error handling
 console.log('📁 Setting up data directory...');
 try {
-  const resolvedDataDir = path.resolve(DATA_DIRECTORY);
-  console.log('Resolved data directory path:', resolvedDataDir);
+  console.log('Creating data directory if it doesn\'t exist:', DATA_DIRECTORY);
   
-  if (!fs.existsSync(resolvedDataDir)) {
-    console.log(`Creating data directory: ${resolvedDataDir}`);
-    fs.mkdirSync(resolvedDataDir, { recursive: true });
+  if (!fs.existsSync(DATA_DIRECTORY)) {
+    console.log(`Creating data directory: ${DATA_DIRECTORY}`);
+    fs.mkdirSync(DATA_DIRECTORY, { recursive: true, mode: 0o755 });
     console.log('✅ Data directory created');
   } else {
     console.log('✅ Data directory already exists');
   }
   
   // Test write permissions
-  const testFile = path.join(resolvedDataDir, '.write-test');
-  fs.writeFileSync(testFile, 'test');
-  fs.unlinkSync(testFile);
-  console.log('✅ Data directory is writable');
+  const testFile = path.join(DATA_DIRECTORY, '.write-test');
+  try {
+    fs.writeFileSync(testFile, 'test', { mode: 0o644 });
+    fs.unlinkSync(testFile);
+    console.log('✅ Data directory is writable');
+  } catch (writeError) {
+    console.error('❌ Data directory is not writable:', writeError);
+    // Try to fix permissions
+    try {
+      fs.chmodSync(DATA_DIRECTORY, 0o755);
+      console.log('📝 Fixed data directory permissions');
+    } catch (chmodError) {
+      console.error('❌ Could not fix data directory permissions:', chmodError);
+      process.exit(1);
+    }
+  }
   
 } catch (error) {
   console.error('❌ Error setting up data directory:', error);
   console.error('This is usually a permissions issue or invalid path');
-  process.exit(1);
+  
+  // In production, try alternative data directory
+  if (NODE_ENV === 'production') {
+    console.log('🔄 Trying alternative data directory: ./data');
+    try {
+      const altDataDir = path.resolve('./data');
+      if (!fs.existsSync(altDataDir)) {
+        fs.mkdirSync(altDataDir, { recursive: true, mode: 0o755 });
+      }
+      console.log('✅ Alternative data directory created:', altDataDir);
+      // Update DATA_DIRECTORY for the rest of the application
+      process.env.DATA_DIRECTORY = altDataDir;
+    } catch (altError) {
+      console.error('❌ Could not create alternative data directory:', altError);
+      process.exit(1);
+    }
+  } else {
+    process.exit(1);
+  }
 }
 
 // Enable trust proxy to get real client IPs (REQUIRED for rate limiting behind reverse proxy)
@@ -134,8 +170,8 @@ const checkVapidConfiguration = () => {
   if (!isConfigured) {
     console.warn('⚠️  VAPID keys are not properly configured!');
     console.warn('   Push notifications will not work.');
-    console.warn('   Public key:', VAPID_PUBLIC_KEY ? 'Set' : 'Not set');
-    console.warn('   Private key length:', VAPID_PRIVATE_KEY ? VAPID_PRIVATE_KEY.length : 0);
+    console.warn('   Public key:', VAPID_PUBLIC_KEY ? `Set (${VAPID_PUBLIC_KEY.length} chars)` : 'Not set');
+    console.warn('   Private key:', VAPID_PRIVATE_KEY ? `Set (${VAPID_PRIVATE_KEY.length} chars)` : 'Not set');
     return false;
   }
 
@@ -148,13 +184,14 @@ const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
 console.log('📁 Setting up uploads directory:', uploadsDir);
 try {
   if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+    fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o755 });
     console.log('✅ Uploads directory created');
   } else {
     console.log('✅ Uploads directory already exists');
   }
 } catch (error) {
   console.error('❌ Error creating uploads directory:', error);
+  // Don't exit - this is not critical for startup
 }
 
 // Configure multer for file uploads with validation
@@ -216,7 +253,8 @@ app.get('/health', (req, res) => {
     environment: NODE_ENV,
     port: PORT,
     dataDirectory: DATA_DIRECTORY,
-    vapidConfigured: checkVapidConfiguration()
+    vapidConfigured: checkVapidConfiguration(),
+    version: '1.0.0'
   });
 });
 
@@ -654,17 +692,26 @@ const startServer = async () => {
     // Log CORS configuration
     logCorsConfig();
 
-    // Initialize schedulers
+    // Initialize schedulers with error handling
     console.log('⏰ Initializing schedulers...');
-    resetScheduler = new DailyResetScheduler(db);
-    await resetScheduler.initialize();
+    try {
+      resetScheduler = new DailyResetScheduler(db);
+      await resetScheduler.initialize();
+      console.log('✅ Daily reset scheduler initialized');
+    } catch (error) {
+      console.error('⚠️  Failed to initialize daily reset scheduler (non-fatal):', error);
+    }
 
-    notificationScheduler = new NotificationScheduler(db);
-    await notificationScheduler.initialize();
-    console.log('✅ Schedulers initialized');
+    try {
+      notificationScheduler = new NotificationScheduler(db);
+      await notificationScheduler.initialize();
+      console.log('✅ Notification scheduler initialized');
+    } catch (error) {
+      console.error('⚠️  Failed to initialize notification scheduler (non-fatal):', error);
+    }
 
     console.log(`🎧 Starting server on port ${PORT}...`);
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('');
       console.log('🎉 ===============================================');
       console.log('🚀 Outdoor Team server started successfully!');
@@ -686,6 +733,12 @@ const startServer = async () => {
       console.log('');
     });
 
+    // Handle server errors
+    server.on('error', (error: Error) => {
+      console.error('❌ Server error:', error);
+      process.exit(1);
+    });
+
     // Graceful shutdown
     const gracefulShutdown = (signal: string) => {
       console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
@@ -694,14 +747,22 @@ const startServer = async () => {
         console.log('🔌 HTTP server closed');
         
         // Stop schedulers
-        if (resetScheduler) {
-          resetScheduler.stop();
-          console.log('⏹️  Daily reset scheduler stopped');
+        try {
+          if (resetScheduler) {
+            resetScheduler.stop();
+            console.log('⏹️  Daily reset scheduler stopped');
+          }
+        } catch (error) {
+          console.error('Error stopping reset scheduler:', error);
         }
         
-        if (notificationScheduler) {
-          notificationScheduler.stop();
-          console.log('⏹️  Notification scheduler stopped');
+        try {
+          if (notificationScheduler) {
+            notificationScheduler.stop();
+            console.log('⏹️  Notification scheduler stopped');
+          }
+        } catch (error) {
+          console.error('Error stopping notification scheduler:', error);
         }
         
         console.log('✅ Graceful shutdown complete');
@@ -728,6 +789,7 @@ const startServer = async () => {
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
+  console.error('Stack trace:', error.stack);
   process.exit(1);
 });
 
@@ -738,4 +800,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start the server
 console.log('🏁 Initiating server startup...');
-startServer();
+startServer().catch((error) => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
+});

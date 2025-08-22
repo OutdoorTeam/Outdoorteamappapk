@@ -4,7 +4,7 @@ import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
 import type { Request, Response, NextFunction } from 'express';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'production-fallback-jwt-secret-8f7a6e5d4c3b2a1098765432109876543210fedcba0987654321abcdef123456';
 
 // Extend Request interface to include user
 declare global {
@@ -99,15 +99,26 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction) =>
 
 // Helper function to validate JWT secret configuration
 export const validateJWTConfig = (): void => {
-  if (JWT_SECRET === 'your-secret-key-change-in-production' && process.env.NODE_ENV === 'production') {
-    console.error('❌ CRITICAL: JWT_SECRET must be changed in production!');
-    console.error('   Set JWT_SECRET environment variable to a secure random string');
-    process.exit(1);
+  const currentSecret = process.env.JWT_SECRET || JWT_SECRET;
+  
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ CRITICAL: JWT_SECRET environment variable not set in production!');
+      console.error('   Using fallback secret (not secure for production)');
+      throw new Error('JWT_SECRET must be set in production environment');
+    }
+    
+    if (currentSecret.length < 32) {
+      console.error('❌ CRITICAL: JWT_SECRET is too short for production (< 32 characters)!');
+      console.error('   Current length:', currentSecret.length);
+      throw new Error('JWT_SECRET must be at least 32 characters long in production');
+    }
+  } else {
+    if (currentSecret.length < 32) {
+      console.warn('⚠️  WARNING: JWT_SECRET is too short. Use at least 32 characters for security.');
+      console.warn('   Current length:', currentSecret.length);
+    }
   }
   
-  if (JWT_SECRET.length < 32) {
-    console.warn('⚠️  WARNING: JWT_SECRET is too short. Use at least 32 characters for security.');
-  }
-  
-  console.log('✅ JWT configuration validated');
+  console.log('✅ JWT configuration validated (length:', currentSecret.length, 'chars)');
 };
