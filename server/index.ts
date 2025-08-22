@@ -65,30 +65,24 @@ app.set('trust proxy', 1);
 let resetScheduler: DailyResetScheduler;
 let notificationScheduler: NotificationScheduler;
 
-// Check and log VAPID configuration (single warning only)
-let vapidWarned = false;
+// Check and log VAPID configuration
 const checkVapidConfiguration = () => {
   const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
   const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
   const isConfigured = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && VAPID_PRIVATE_KEY.length >= 32);
 
-  if (!isConfigured && !vapidWarned) {
+  if (!isConfigured) {
     console.warn('⚠️  VAPID keys are not configured!');
     console.warn('   Push notifications will not work.');
     console.warn('   To fix this:');
     console.warn('   1. Run: npm run generate-vapid');
     console.warn('   2. Restart the server');
-    vapidWarned = true;
     return false;
   }
 
-  if (isConfigured && !vapidWarned) {
-    console.log('✅ VAPID keys are configured correctly');
-    vapidWarned = true;
-  }
-
-  return isConfigured;
+  console.log('✅ VAPID keys are configured correctly');
+  return true;
 };
 
 // Create uploads directory if it doesn't exist
@@ -1272,7 +1266,7 @@ export const startServer = async (port = 3001) => {
     console.log('✅ Database connection established');
 
     // Check VAPID configuration
-    checkVapidConfiguration();
+    const vapidConfigured = checkVapidConfiguration();
 
     // Initialize schedulers AFTER database is ready
     console.log('🔄 Initializing daily reset scheduler...');
@@ -1299,6 +1293,13 @@ export const startServer = async (port = 3001) => {
       
       // Log CORS configuration
       logCorsConfig();
+      
+      // Show VAPID status
+      if (vapidConfigured) {
+        console.log('📱 Push notifications: Ready');
+      } else {
+        console.log('📱 Push notifications: Disabled (run: npm run generate-vapid)');
+      }
     });
 
     // Graceful shutdown handling
