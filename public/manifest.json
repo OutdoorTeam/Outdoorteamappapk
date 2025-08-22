@@ -1,0 +1,44 @@
+{
+  "name": "Outdoor Team - Academia de Hábitos Saludables",
+  "short_name": "Outdoor Team",
+  "description": "Aplicación para el seguimiento de hábitos saludables, entrenamiento, nutrición y bienestar integral.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#D3B869",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/assets/logo-gold.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo-gold.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "fitness", "lifestyle"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Panel",
+      "description": "Acceso rápido al panel principal",
+      "url": "/dashboard",
+      "icons": []
+    },
+    {
+      "name": "Entrenamiento",
+      "short_name": "Training",
+      "description": "Plan de entrenamiento personalizado",
+      "url": "/training",
+      "icons": []
+    }
+  ]
+}

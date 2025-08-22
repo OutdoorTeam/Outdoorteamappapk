@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Development files
+.vscode/
+.env.local
+.env.development
+.env.test
+
+# Build artifacts (except dist/)
+client/
+server/
+scripts/
+shared/
+
+# Config files not needed in production
+vite.config.js
+tsconfig*.json
+tailwind.config.js
+postcss.config.js
+components.json
+
+# Development and testing
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
+.nyc_output/
+
+# Version control
+.git/
+.gitignore
+.dockerignore
+
+# Documentation
+README.md
+deployment.md
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/

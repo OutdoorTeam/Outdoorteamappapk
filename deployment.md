@@ -1,78 +1,134 @@
 # Deployment Guide
 
-This application is ready for production deployment. Follow these steps to deploy successfully.
+This application is configured for deployment on Instance and other platforms. Follow these steps for successful deployment.
 
-## Environment Variables
+## Instance Deployment
 
-Make sure the following environment variables are set in your production environment:
+### Prerequisites
+- Instance account set up
+- Repository connected to Instance
 
+### Configuration Files
+The project includes the following deployment configuration:
+
+- `instance.json` - Instance-specific configuration
+- `.instanceignore` - Files to exclude from deployment
+- Updated `package.json` with proper scripts
+
+### Environment Variables
+Set these environment variables in your Instance dashboard:
+
+**Required:**
 ```env
 NODE_ENV=production
-PORT=3001
-DATA_DIRECTORY=./data
 JWT_SECRET=your-secure-jwt-secret-here
+DATA_DIRECTORY=./data
+```
+
+**Optional (for push notifications):**
+```env
 VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 VAPID_EMAIL=admin@yourapp.com
 ```
 
-## Pre-deployment Steps
+**Optional (for advanced features):**
+```env
+INTERNAL_API_KEY=your-internal-api-key
+INTERNAL_IPS=127.0.0.1,::1
+DISABLE_RATE_LIMITING=false
+```
 
-1. **Generate VAPID Keys** (for push notifications):
+### Deployment Process
+
+Instance will automatically:
+
+1. **Install Dependencies**: `npm ci`
+2. **Build Application**: `npm run build`
+   - Builds frontend with Vite → `dist/public/`
+   - Compiles TypeScript backend → `dist/server/`
+3. **Start Application**: `npm run prod`
+   - Runs `node dist/server/index.js`
+
+### Health Check
+- Endpoint: `/health`
+- Returns application status and configuration info
+- Used by Instance to monitor application health
+
+## Manual Deployment Steps
+
+If deploying manually to other platforms:
+
+1. **Clone and Setup**:
    ```bash
-   npm run generate-vapid
+   git clone <your-repo>
+   cd outdoor-team-app
+   npm ci
    ```
-   Copy the generated keys to your production environment variables.
 
-2. **Build the application**:
+2. **Set Environment Variables**:
+   ```bash
+   export NODE_ENV=production
+   export JWT_SECRET=your-secure-secret
+   export DATA_DIRECTORY=./data
+   # Add other variables as needed
+   ```
+
+3. **Build Application**:
    ```bash
    npm run build
    ```
 
-3. **Verify build output**:
-   - `dist/server/` should contain compiled server files
-   - `dist/public/` should contain built client files
-
-## Production Startup
-
-The application starts with:
-```bash
-node dist/server/index.js
-```
-
-Or using the npm script:
-```bash
-npm run prod
-```
-
-## Docker Deployment
-
-1. **Build the Docker image**:
+4. **Start Production Server**:
    ```bash
-   docker build -t outdoor-team-app .
+   npm run prod
    ```
 
-2. **Run with environment variables**:
-   ```bash
-   docker run -d \
-     --name outdoor-team-app \
-     -p 3001:3001 \
-     -v $(pwd)/data:/app/data \
-     -e NODE_ENV=production \
-     -e JWT_SECRET=your-secret \
-     -e VAPID_PUBLIC_KEY=your-public-key \
-     -e VAPID_PRIVATE_KEY=your-private-key \
-     outdoor-team-app
-   ```
+## Application Architecture
 
-## Health Check
-
-The application provides a health check endpoint:
+### Build Output Structure
 ```
-GET /health
+dist/
+├── public/          # Frontend build (served by Express)
+│   ├── index.html
+│   ├── assets/
+│   └── ...
+└── server/          # Compiled backend
+    ├── index.js
+    ├── routes/
+    ├── middleware/
+    └── ...
 ```
 
-Returns:
+### Runtime Behavior
+- Express server serves both API (`/api/*`) and static files
+- SQLite database auto-created in `DATA_DIRECTORY`
+- File uploads stored in `DATA_DIRECTORY/uploads/`
+- Admin user auto-created on first startup
+
+## Database
+
+- **Type**: SQLite
+- **Location**: `{DATA_DIRECTORY}/database.sqlite`
+- **Migration**: Automatic on startup
+- **Backup**: File-based, easy to backup entire data directory
+
+## Security Features
+
+- JWT authentication with configurable secret
+- Rate limiting on all API routes
+- CORS protection for frontend domain
+- Input validation and sanitization
+- Security headers on all responses
+
+## Monitoring and Logs
+
+### Health Check Endpoint
+```bash
+curl https://your-app.instance.app/health
+```
+
+Response:
 ```json
 {
   "status": "ok",
@@ -83,49 +139,58 @@ Returns:
 }
 ```
 
-## Database
-
-- SQLite database is automatically created in the DATA_DIRECTORY
-- No manual migration needed - tables are created on first startup
-- Database file: `{DATA_DIRECTORY}/database.sqlite`
-
-## File Storage
-
-- User uploads are stored in `{DATA_DIRECTORY}/uploads/`
-- Ensure the data directory has proper write permissions
-
-## Security Considerations
-
-1. **JWT Secret**: Use a strong, random JWT secret in production
-2. **HTTPS**: Deploy behind HTTPS in production
-3. **Rate Limiting**: Rate limiting is enabled by default
-4. **CORS**: Properly configured for your domain
-5. **File Upload**: Limited to PDFs, 10MB max size
+### Application Logs
+- Console output for deployment logs
+- Database logs stored in `system_logs` table
+- Error tracking and performance monitoring built-in
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Database connection errors**:
-   - Ensure DATA_DIRECTORY exists and is writable
-   - Check file permissions
+1. **Build Failures**:
+   - Ensure Node.js version ≥18
+   - Check for TypeScript errors
+   - Verify all dependencies are declared
 
-2. **Static files not serving**:
-   - Verify `dist/public/` contains built frontend files
-   - Check NODE_ENV is set to "production"
+2. **Database Issues**:
+   - Ensure `DATA_DIRECTORY` is writable
+   - Check SQLite file permissions
+   - Verify disk space availability
 
-3. **Push notifications not working**:
-   - Generate and set VAPID keys
-   - Restart the server after setting keys
+3. **Static Files Not Loading**:
+   - Confirm `dist/public/` contains built frontend
+   - Check server static file configuration
+   - Verify Express routes don't conflict
 
-4. **CORS errors**:
-   - Update allowed origins in `server/config/cors.ts`
-   - Ensure your domain is in the allowed list
+4. **Environment Variables**:
+   - JWT_SECRET must be set and secure (≥32 chars)
+   - DATA_DIRECTORY must exist and be writable
+   - PORT defaults to 3001 if not specified
 
-### Logs
+### Debug Mode
+For debugging in production, temporarily set:
+```env
+DEBUG=true
+DISABLE_RATE_LIMITING=true  # Only for debugging
+```
 
-The application logs important events to:
-- Console output
-- System logs table in database
+### Support
+- Check Instance dashboard for deployment logs
+- Use health check endpoint to verify status
+- Review application logs in database `system_logs` table
 
-Check logs for detailed error information.
+## Performance Optimization
+
+- Static files served with proper caching headers
+- Database queries optimized with indexes
+- Rate limiting prevents abuse
+- Gzip compression enabled
+- Efficient bundle sizes with Vite
+
+## Scaling Considerations
+
+- SQLite suitable for small to medium applications
+- Consider PostgreSQL for high-traffic scenarios
+- File uploads stored locally (consider cloud storage for scale)
+- Session management via JWT (stateless)

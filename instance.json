@@ -1,0 +1,30 @@
+{
+  "name": "outdoor-team-app",
+  "description": "Outdoor Team - Academia de Hábitos Saludables",
+  "version": "1.0.0",
+  "type": "web",
+  "build": {
+    "commands": [
+      "npm ci",
+      "npm run build"
+    ]
+  },
+  "start": {
+    "command": "npm run prod"
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3001"
+  },
+  "healthcheck": {
+    "path": "/health",
+    "interval": 30
+  },
+  "static": false,
+  "files": [
+    "dist/",
+    "data/",
+    "package.json",
+    "package-lock.json"
+  ]
+}
