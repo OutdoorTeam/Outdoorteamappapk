@@ -54,11 +54,29 @@ import {
   toggleUserStatusSchema
 } from '../shared/validation-schemas.js';
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
+
+// Environment variable validation and defaults
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
+const PORT = parseInt(process.env.PORT || '3001', 10);
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Validate required environment variables
+if (JWT_SECRET === 'your-secret-key-change-in-production' && NODE_ENV === 'production') {
+  console.error('❌ CRITICAL: JWT_SECRET must be changed in production!');
+  console.error('   Set JWT_SECRET environment variable to a secure random string');
+  process.exit(1);
+}
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIRECTORY)) {
+  console.log(`📁 Creating data directory: ${DATA_DIRECTORY}`);
+  fs.mkdirSync(DATA_DIRECTORY, { recursive: true });
+}
 
 // Enable trust proxy to get real client IPs (REQUIRED for rate limiting behind reverse proxy)
 app.set('trust proxy', 1);
@@ -145,7 +163,13 @@ app.use('/api/', burstLimit);
 
 // Health check endpoint (exempted from rate limiting and CORS)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: NODE_ENV,
+    port: PORT,
+    dataDirectory: DATA_DIRECTORY
+  });
 });
 
 // Helper function to parse user features
@@ -1299,7 +1323,7 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
 });
 
 // Server initialization and static serving
-export const startServer = async (port = 3001) => {
+export const startServer = async (port = PORT) => {
   try {
     // Check database connection
     await db.selectFrom('users').select('id').limit(1).execute();
@@ -1317,7 +1341,7 @@ export const startServer = async (port = 3001) => {
     notificationScheduler = new NotificationScheduler();
 
     // Setup static serving for production
-    if (process.env.NODE_ENV === 'production') {
+    if (NODE_ENV === 'production') {
       setupStaticServing(app);
       console.log('📁 Static file serving configured for production');
     }
@@ -1325,8 +1349,10 @@ export const startServer = async (port = 3001) => {
     // Start server
     const server = app.listen(port, () => {
       console.log(`🚀 Server running on port ${port}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      if (process.env.NODE_ENV !== 'production') {
+      console.log(`📊 Environment: ${NODE_ENV}`);
+      console.log(`📂 Data directory: ${DATA_DIRECTORY}`);
+      
+      if (NODE_ENV !== 'production') {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
         console.log(`🔌 API server: http://localhost:${port}`);
       }
@@ -1388,14 +1414,14 @@ export const startServer = async (port = 3001) => {
     return server;
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    await SystemLogger.logCriticalError('Server startup failed', error as Error);
     process.exit(1);
   }
 };
 
 // Start server if running directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = parseInt(process.env.PORT || '3001', 10);
-  startServer(port);
+  startServer();
 }
 
 export default app;

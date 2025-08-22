@@ -6,7 +6,10 @@
   "scripts": {
     "build": "vite build && tsc --project tsconfig.server.json",
     "start": "tsx watch scripts/dev.ts",
-    "generate-vapid": "node scripts/generate-vapid.js"
+    "generate-vapid": "node scripts/generate-vapid.js",
+    "prod": "node dist/server/index.js",
+    "db:migrate": "node -e \"console.log('Database migrations are handled automatically on startup')\"",
+    "health": "curl -f http://localhost:${PORT:-3001}/health || exit 1"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -72,5 +75,9 @@
     "tsx": "4.19.3",
     "typescript": "5.8.2",
     "vite": "6.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }
