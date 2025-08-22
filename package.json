@@ -1,18 +1,12 @@
 {
-  "name": "outdoor-team-app",
+  "name": "mimo-magic-starter",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch scripts/dev.ts",
-    "build": "npm run build:client && npm run build:server && npm run copy:assets",
-    "build:client": "cd client && npm run build",
-    "build:server": "tsc --project tsconfig.server.json",
-    "copy:assets": "npm run copy:manifest && npm run copy:sw",
-    "copy:manifest": "cp client/public/manifest.json public/manifest.json 2>/dev/null || echo 'manifest.json not found, skipping'",
-    "copy:sw": "cp client/public/sw.js public/sw.js 2>/dev/null || echo 'sw.js not found, skipping'",
-    "start": "node public/server/index.js",
-    "start:dev": "tsx watch scripts/dev.ts"
+    "build": "vite build && tsc --project tsconfig.server.json",
+    "start": "tsx watch scripts/dev.ts",
+    "generate-vapid": "node scripts/generate-vapid.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -62,6 +56,7 @@
     "recharts": "^3.1.2",
     "tailwind-merge": "3.2.0",
     "tailwindcss-animate": "1.0.7",
+    "web-push": "^3.6.7",
     "zod": "^4.0.17"
   },
   "devDependencies": {

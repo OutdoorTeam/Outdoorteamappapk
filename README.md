@@ -1,272 +1,214 @@
 # Outdoor Team - Academia de Hábitos Saludables
 
-Una aplicación web completa para el seguimiento de hábitos saludables, entrenamiento personalizado, nutrición y bienestar integral.
+Una aplicación web para el seguimiento de hábitos saludables, entrenamiento, nutrición y bienestar integral.
 
-## 🚀 Características Principales
+## 🚀 Características
 
 - **Seguimiento de Hábitos**: Sistema completo para rastrear ejercicio, nutrición, pasos diarios y meditación
-- **Planes Personalizados**: Diferentes niveles de acceso a funcionalidades según el plan seleccionado
-- **Panel de Administración**: Gestión completa de usuarios, contenido y planes
-- **PWA**: Aplicación web progresiva instalable en dispositivos móviles y desktop
-- **Métricas Detalladas**: Análisis de progreso con gráficos y estadísticas completas
-- **Seguridad**: Sistema robusto con rate limiting, CORS, y validación de datos
+- **Notificaciones Push**: Recordatorios personalizados para mantener tus hábitos
+- **Planes Personalizados**: Diferentes niveles de acceso a funcionalidades
+- **Panel de Administración**: Gestión completa de usuarios y contenido
+- **PWA**: Instalable en dispositivos móviles y desktop
+- **Métricas Detalladas**: Análisis de progreso con gráficos y estadísticas
 
-## 📋 Requisitos del Sistema
+## 📋 Requisitos Previos
 
-- **Node.js**: v18 o superior
-- **npm**: v8 o superior
-- **SQLite**: Incluido con better-sqlite3
-- **Sistema Operativo**: Windows, macOS, Linux
-- **Dominio**: app.outdoorteam.com (producción)
+- Node.js (v18 o superior)
+- npm o yarn
+- SQLite
 
-## ⚡ Instalación y Configuración
+## ⚡ Instalación Rápida
 
-### 1. Clonar el Repositorio
+1. **Clonar el repositorio**
 ```bash
 git clone <repository-url>
 cd outdoor-team
 ```
 
-### 2. Instalar Dependencias
+2. **Instalar dependencias**
 ```bash
 npm install
-cd client && npm install && cd ..
 ```
 
-### 3. Configurar Variables de Entorno
-Configura el archivo `.env` para producción:
-
+3. **Configurar variables de entorno**
 ```bash
-# Environment (development/production)
-NODE_ENV=production
+# Generar claves VAPID para notificaciones push
+node scripts/generate-vapid.js
 
-# Database directory (must exist and have write permissions)
+# O crear manualmente .env con:
+VAPID_PUBLIC_KEY=tu_clave_publica
+VAPID_PRIVATE_KEY=tu_clave_privada
+VAPID_EMAIL=admin@outdoorteam.com
 DATA_DIRECTORY=./data
-
-# JWT Secret (CHANGE THIS IN PRODUCTION!)
-JWT_SECRET=outdoor-team-super-secure-jwt-key-change-in-production-2024
-
-# Server port
+JWT_SECRET=tu-secreto-jwt-seguro
 PORT=3001
-
-# Allowed CORS origins for production
-ALLOWED_ORIGINS=https://app.outdoorteam.com,https://outdoorteam.com,https://www.outdoorteam.com
 ```
 
-### 4. Crear Directorio de Datos
+4. **Iniciar el servidor de desarrollo**
 ```bash
-mkdir -p data
-chmod 755 data
+npm run start
 ```
 
-## 🛠️ Desarrollo
+La aplicación estará disponible en `http://localhost:3000` (frontend) y `http://localhost:3001` (API).
 
-### Iniciar en Modo Desarrollo
+## 🔧 Configuración de Notificaciones Push
+
+### Generar Claves VAPID
+
+Las notificaciones push requieren claves VAPID. Puedes generarlas ejecutando:
+
 ```bash
-npm run dev
+node scripts/generate-vapid.js
 ```
 
-Esto iniciará:
-- **Frontend**: http://localhost:3000 (Vite dev server)
-- **API Backend**: http://localhost:3001 (Express server)
+Este script:
+- Genera automáticamente las claves VAPID
+- Crea/actualiza tu archivo `.env`
+- Proporciona instrucciones para la configuración
 
-### Scripts Disponibles
-- `npm run dev` - Desarrollo con hot reload
-- `npm run build` - Construir para producción
-- `npm start` - Iniciar servidor de producción
-- `npm run start:dev` - Alias para desarrollo
+### Configuración Manual
 
-## 🚀 Despliegue en Producción
+Si prefieres generar las claves manualmente:
 
-### 1. Script Automático de Build (Recomendado)
 ```bash
-chmod +x build-deploy.sh
-./build-deploy.sh
+npx web-push generate-vapid-keys
 ```
 
-### 2. Build Manual Paso a Paso
-```bash
-# Build del cliente
-cd client
-npm install
-npm run build
-cd ..
+Luego agrega las claves a tu archivo `.env`:
 
-# Build del servidor
-npm install --production
-npm run build:server
-npm run copy:assets
-
-# Verificar estructura
-ls -la public/
-```
-
-**📁 Estructura después del build:**
-```
-outdoor-team/
-├── public/              # Todo listo para despliegue
-│   ├── index.html       # Frontend principal
-│   ├── assets/          # CSS, JS, imágenes optimizadas
-│   ├── manifest.json    # PWA manifest
-│   ├── sw.js           # Service Worker
-│   └── server/         # Backend compilado
-│       └── index.js    # Servidor listo para ejecutar
-└── data/               # Base de datos
-    └── database.sqlite
-```
-
-### 3. Iniciar en Producción
-```bash
-node public/server/index.js
-```
-
-### 4. Verificar Health Check
-```bash
-curl https://app.outdoorteam.com/health
+```env
+VAPID_PUBLIC_KEY=tu_clave_publica_aqui
+VAPID_PRIVATE_KEY=tu_clave_privada_aqui
+VAPID_EMAIL=admin@outdoorteam.com
 ```
 
 ## 👤 Usuario Administrador
 
-Se crea automáticamente un usuario administrador:
+Se crea automáticamente un usuario administrador con estas credenciales:
 
-- **Email**: `franciscodanielechs@gmail.com`
-- **Contraseña**: (definida durante el registro)
-- **Rol**: `admin`
-- **Acceso**: Todas las funcionalidades
+- **Email**: franciscodanielechs@gmail.com
+- **Contraseña**: admin123
+- **Rol**: admin
 
-## 🏗️ Arquitectura de Producción
+⚠️ **Importante**: Cambia estas credenciales en producción.
+
+## 🏗️ Arquitectura
 
 ### Frontend
 - **React 18** con TypeScript
-- **Vite** para build optimizado
+- **Vite** para desarrollo y build
 - **Tailwind CSS** para estilos
-- **PWA** completa instalable
-- **Servido desde**: `public/` (raíz del proyecto)
+- **shadcn/ui** para componentes
+- **React Router** para navegación
+- **Tanstack Query** para gestión de estado del servidor
 
 ### Backend
 - **Node.js** con Express 5
-- **SQLite** con Kysely
+- **TypeScript** para type safety
+- **SQLite** con Kysely como query builder
 - **JWT** para autenticación
-- **Rate Limiting** y CORS estricto
-- **Compilado a**: `public/server/`
+- **Web Push** para notificaciones
+- **Multer** para subida de archivos
 
-## 🔧 Comandos de Despliegue
+### PWA y Service Worker
+- **Manifest.json** configurado
+- **Service Worker** para notificaciones push
+- **Caché automático** de recursos
+- **Instalable** en dispositivos
 
-### Script de Despliegue Completo
+## 📊 Base de Datos
+
+La aplicación usa SQLite con las siguientes tablas principales:
+
+- `users` - Información de usuarios y planes
+- `daily_habits` - Seguimiento diario de hábitos
+- `meditation_sessions` - Sesiones de meditación registradas
+- `user_notifications` - Configuración de notificaciones
+- `notification_jobs` - Jobs programados para recordatorios
+- `plans` - Planes de suscripción disponibles
+- `content_library` - Biblioteca de ejercicios y contenido
+
+## 🔐 Seguridad
+
+- Autenticación JWT con renovación automática
+- Rate limiting en todas las rutas API
+- Validación de entrada con Zod
+- Headers de seguridad configurados
+- CORS estricto por dominio
+- Sanitización de contenido
+
+## 📱 Funcionalidades Principales
+
+### Para Usuarios
+- Dashboard personalizado con seguimiento diario
+- Contador de pasos con metas
+- Sistema de puntos gamificado
+- Notas diarias
+- Sesiones de meditación guiada
+- Biblioteca de ejercicios
+- Configuración de notificaciones
+- Estadísticas y progreso
+
+### Para Administradores
+- Panel de administración completo
+- Gestión de usuarios y planes
+- Envío de notificaciones masivas
+- Subida de archivos para usuarios
+- Estadísticas del sistema
+- Logs de actividad
+
+## 🚀 Despliegue
+
+### Desarrollo
 ```bash
-#!/bin/bash
-# deploy.sh
-
-echo "🚀 Iniciando despliegue de Outdoor Team..."
-
-# Actualizar código
-git pull origin main
-
-# Usar script de build automático
-chmod +x build-deploy.sh
-./build-deploy.sh
-
-# Reiniciar PM2 (si usas PM2)
-pm2 reload outdoor-team
-
-# Verificar health check
-sleep 5
-curl -f https://app.outdoorteam.com/health || exit 1
-
-echo "✅ Despliegue completado exitosamente!"
+npm run start
 ```
 
-## 🔧 Troubleshooting de Producción
-
-### ✅ Error SOLUCIONADO: Cannot find module '/home/app/public/server/index.js'
-
-**Causa**: El build no estaba generando los archivos en la estructura correcta.
-
-**Solución implementada**:
-1. **Separación de builds**: Cliente y servidor se construyen por separado
-2. **Estructura correcta**: Todo se genera en `public/`
-3. **Script automático**: `build-deploy.sh` maneja todo el proceso
-4. **Verificación**: El script verifica que todos los archivos existan
-
-**Para verificar que funciona**:
+### Producción
 ```bash
-# Ejecutar build
-./build-deploy.sh
+# Construir la aplicación
+npm run build
 
-# Verificar archivos
-ls -la public/              # index.html + assets/
-ls -la public/server/       # index.js
-
-# Probar inicio
-NODE_ENV=production node public/server/index.js
+# En el servidor de producción
+NODE_ENV=production node dist/server/index.js
 ```
 
-### Error: CORS issues
-```bash
-# Verificar dominios en .env
-echo $ALLOWED_ORIGINS
-# Debe incluir https://app.outdoorteam.com
+### Variables de Entorno para Producción
+```env
+NODE_ENV=production
+VAPID_PUBLIC_KEY=tu_clave_publica
+VAPID_PRIVATE_KEY=tu_clave_privada
+VAPID_EMAIL=admin@tudominio.com
+DATA_DIRECTORY=/path/to/data
+JWT_SECRET=clave-super-segura-para-jwt
+PORT=3001
 ```
 
-### Error: Database connection
-```bash
-# Verificar directorio de datos
-ls -la data/
-chmod 755 data/
-```
+## 🤝 Contribuir
 
-## 📈 URLs de Producción
-
-- **Aplicación Principal**: https://app.outdoorteam.com
-- **Sitio Web**: https://outdoorteam.com
-- **Health Check**: https://app.outdoorteam.com/health
-- **API Base**: https://app.outdoorteam.com/api
-
-## ⚠️ Cambios Importantes en Esta Versión
-
-### ✅ Estructura de Build Corregida
-- **Problema**: El servidor buscaba `/home/app/public/server/index.js` pero no existía
-- **Solución**: Build separado cliente/servidor con salida unificada en `public/`
-- **Script**: `build-deploy.sh` automatiza todo el proceso
-- **Verificación**: El script valida que todos los archivos se generen correctamente
-
-### ✅ Configuración Mejorada
-- Client tiene su propio `package.json` y configuración
-- Build process simplificado con verificaciones
-- Scripts npm actualizados para nueva estructura
-- Configuración de PM2 corregida
-
-### 📁 Estructura Final de Despliegue
-```
-public/
-├── index.html        # ← Frontend (lo que busca /home/app/public/index.html) ✅
-├── assets/           # ← CSS, JS, imágenes ✅
-├── manifest.json     # ← PWA manifest ✅
-├── sw.js            # ← Service Worker ✅
-└── server/          # ← Backend ✅
-    └── index.js     # ← Servidor compilado ✅
-```
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
 ## 📝 Licencia
 
-Este proyecto está bajo la Licencia MIT.
+Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 
----
+## 🆘 Soporte
 
-## 🚀 Comandos Rápidos de Producción
+Para soporte técnico o preguntas:
 
-```bash
-# Build automático (RECOMENDADO)
-chmod +x build-deploy.sh
-./build-deploy.sh
+- Email: admin@outdoorteam.com
+- Crea un issue en el repositorio
 
-# Iniciar en producción
-NODE_ENV=production node public/server/index.js
+## 📈 Roadmap
 
-# Health check
-curl https://app.outdoorteam.com/health
-```
-
-**🎯 Problema RESUELTO**: El error "Cannot find module '/home/app/public/server/index.js'" está solucionado con la nueva estructura de build.
-
-¡Listo para transformar vidas con hábitos saludables desde app.outdoorteam.com! 🌱💪
+- [ ] Integración con Google Fit / Apple Health
+- [ ] Notificaciones en tiempo real con WebSockets  
+- [ ] App móvil nativa
+- [ ] Integración de pagos
+- [ ] Chat en vivo con entrenadores
+- [ ] Retos y competencias grupales
+- [ ] Análisis avanzado con IA

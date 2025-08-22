@@ -1,80 +1,47 @@
-import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { startServer } from '../server/index.js';
+import { createServer } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const rootDir = join(__dirname, '..');
+let viteServer;
 
-console.log('🚀 Starting Outdoor Team development servers...');
+async function startDev() {
+  // Start the Express API server first
+  await startServer(3001);
 
-// Start Vite dev server for frontend
-console.log('📦 Starting Vite dev server...');
-const viteProcess = spawn('npm', ['run', 'dev'], {
-  stdio: 'inherit',
-  shell: true,
-  cwd: join(rootDir, 'client'),
-  env: { ...process.env, FORCE_COLOR: '1' }
-});
+  // Then start Vite in dev mode
+  const viteServer = await createServer({
+    configFile: './vite.config.js',
+  });
 
-// Start backend server with tsx watch
-console.log('🔧 Starting backend server...');
-const backendProcess = spawn('npx', ['tsx', 'watch', 'server/index.ts'], {
-  stdio: 'inherit',
-  shell: true,
-  cwd: rootDir,
-  env: { 
-    ...process.env, 
-    NODE_ENV: 'development',
-    PORT: '3001',
-    DATA_DIRECTORY: './data',
-    FORCE_COLOR: '1'
-  }
-});
+  const x = await viteServer.listen();
+  console.log(
+    `Vite dev server running on port ${viteServer.config.server.port}`,
+  );
+}
 
-// Handle process termination
-const cleanup = () => {
-  console.log('\n🛑 Shutting down development servers...');
-  
-  if (viteProcess && !viteProcess.killed) {
-    viteProcess.kill('SIGTERM');
-  }
-  
-  if (backendProcess && !backendProcess.killed) {
-    backendProcess.kill('SIGTERM');
-  }
-  
-  setTimeout(() => {
-    process.exit(0);
-  }, 1000);
-};
+// Handle nodemon restarts - only needed if we're running under nodemon
+if (
+  process.env.npm_lifecycle_event &&
+  process.env.npm_lifecycle_event.includes('watch')
+) {
+  let isRestarting = false;
 
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+  process.once('SIGUSR2', async () => {
+    if (isRestarting) return;
+    isRestarting = true;
 
-// Handle process errors
-viteProcess.on('error', (error) => {
-  console.error('❌ Vite process error:', error);
-});
+    console.log('Nodemon restart detected, closing Vite server...');
+    if (viteServer) {
+      try {
+        await viteServer.close();
+        console.log('Vite server closed successfully');
+      } catch (err) {
+        console.error('Error closing Vite server:', err);
+      }
+    }
 
-backendProcess.on('error', (error) => {
-  console.error('❌ Backend process error:', error);
-});
+    // Allow nodemon to restart the process
+    process.kill(process.pid, 'SIGUSR2');
+  });
+}
 
-viteProcess.on('exit', (code) => {
-  if (code !== 0) {
-    console.error(`❌ Vite process exited with code ${code}`);
-  }
-});
-
-backendProcess.on('exit', (code) => {
-  if (code !== 0) {
-    console.error(`❌ Backend process exited with code ${code}`);
-  }
-});
-
-console.log('✅ Development servers started successfully!');
-console.log('🌐 Frontend: http://localhost:3000');
-console.log('🔌 Backend: http://localhost:3001');
-console.log('📊 Health check: http://localhost:3001/health');
-console.log('\nPress Ctrl+C to stop all servers');
+startDev();
