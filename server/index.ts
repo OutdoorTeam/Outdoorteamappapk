@@ -325,3 +325,321 @@ app.post('/api/auth/register',
 // LOGIN ROUTE WITH CORRECT MIDDLEWARE ORDER
 app.post('/api/auth/login',
   checkLoginBlock,    
+  loginLimit,
+  validateRequest(loginSchema),
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const { email, password } = req.body;
+
+      console.log('Login attempt for:', email);
+
+      // Find user
+      const user = await db
+        .selectFrom('users')
+        .selectAll()
+        .where('email', '=', email.toLowerCase())
+        .executeTakeFirst();
+
+      if (!user || !user.password_hash) {
+        console.log('User not found or no password:', email);
+        await SystemLogger.logAuthError('Login attempt with invalid email', email, req);
+        sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
+        return;
+      }
+
+      if (!user.is_active) {
+        console.log('Inactive user login attempt:', email);
+        await SystemLogger.logAuthError('Login attempt by inactive user', email, req);
+        sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Cuenta desactivada');
+        return;
+      }
+
+      // Verify password
+      const passwordValid = await bcrypt.compare(password, user.password_hash);
+
+      if (!passwordValid) {
+        console.log('Invalid password for user:', email);
+        await SystemLogger.logAuthError('Login attempt with invalid password', email, req);
+        sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
+        return;
+      }
+
+      // Generate JWT with consistent secret
+      const token = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          iat: Math.floor(Date.now() / 1000)
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      console.log('User logged in successfully:', user.email, 'Role:', user.role);
+      await SystemLogger.log('info', 'User logged in', {
+        userId: user.id,
+        metadata: { email: user.email, role: user.role }
+      });
+
+      res.json({
+        user: formatUserResponse(user),
+        token
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      await SystemLogger.logCriticalError('Login error', error as Error);
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor');
+    }
+  });
+
+// Verify token endpoint
+app.get('/api/auth/verify', authenticateToken, async (req: express.Request, res: express.Response) => {
+  res.json({
+    user: formatUserResponse(req.user)
+  });
+});
+
+// PROTECTED ROUTES (require authentication)
+
+// Daily habits endpoints
+app.get('/api/daily-habits', authenticateToken, async (req: express.Request, res: express.Response) => {
+  try {
+    const { date } = req.query;
+    const userId = req.user.id;
+    const targetDate = date as string || new Date().toISOString().split('T')[0];
+
+    console.log(`Fetching daily habits for user ${userId}, date: ${targetDate}`);
+
+    const habits = await db
+      .selectFrom('daily_habits')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', targetDate)
+      .executeTakeFirst();
+
+    if (!habits) {
+      // Create default habits record if none exists
+      const defaultHabits = await db
+        .insertInto('daily_habits')
+        .values({
+          user_id: userId,
+          date: targetDate,
+          training_completed: 0,
+          nutrition_completed: 0,
+          movement_completed: 0,
+          meditation_completed: 0,
+          daily_points: 0,
+          steps: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .returning(['id', 'user_id', 'date', 'training_completed', 'nutrition_completed', 'movement_completed', 'meditation_completed', 'daily_points', 'steps', 'created_at', 'updated_at'])
+        .executeTakeFirst();
+
+      res.json(defaultHabits);
+      return;
+    }
+
+    res.json(habits);
+  } catch (error) {
+    console.error('Error fetching daily habits:', error);
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener los hábitos diarios');
+  }
+});
+
+app.put('/api/daily-habits', 
+  authenticateToken,
+  validateRequest(dailyHabitsUpdateSchema),
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const userId = req.user.id;
+      const { date, training_completed, nutrition_completed, movement_completed, meditation_completed, steps } = req.body;
+      
+      console.log(`Updating daily habits for user ${userId}, date: ${date}`);
+
+      // Calculate points based on completed habits
+      let points = 0;
+      if (training_completed) points += 4;
+      if (nutrition_completed) points += 4;
+      if (movement_completed) points += 2;
+      if (meditation_completed) points += 2;
+
+      const updatedHabits = await db
+        .insertInto('daily_habits')
+        .values({
+          user_id: userId,
+          date,
+          training_completed: training_completed ? 1 : 0,
+          nutrition_completed: nutrition_completed ? 1 : 0,
+          movement_completed: movement_completed ? 1 : 0,
+          meditation_completed: meditation_completed ? 1 : 0,
+          daily_points: points,
+          steps: steps || 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({
+          training_completed: training_completed ? 1 : 0,
+          nutrition_completed: nutrition_completed ? 1 : 0,
+          movement_completed: movement_completed ? 1 : 0,
+          meditation_completed: meditation_completed ? 1 : 0,
+          daily_points: points,
+          steps: steps !== undefined ? steps : 0,
+          updated_at: new Date().toISOString()
+        }))
+        .returning(['id', 'user_id', 'date', 'training_completed', 'nutrition_completed', 'movement_completed', 'meditation_completed', 'daily_points', 'steps', 'created_at', 'updated_at'])
+        .executeTakeFirst();
+
+      res.json(updatedHabits);
+    } catch (error) {
+      console.error('Error updating daily habits:', error);
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar los hábitos diarios');
+    }
+  });
+
+// Daily notes endpoints
+app.get('/api/daily-notes', authenticateToken, async (req: express.Request, res: express.Response) => {
+  try {
+    const { date } = req.query;
+    const userId = req.user.id;
+    const targetDate = date as string || new Date().toISOString().split('T')[0];
+
+    const note = await db
+      .selectFrom('user_notes')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', targetDate)
+      .executeTakeFirst();
+
+    res.json(note || null);
+  } catch (error) {
+    console.error('Error fetching daily note:', error);
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener la nota diaria');
+  }
+});
+
+app.post('/api/daily-notes', 
+  authenticateToken,
+  validateRequest(dailyNoteSchema),
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const userId = req.user.id;
+      const { content, date } = req.body;
+      const targetDate = date || new Date().toISOString().split('T')[0];
+      
+      const sanitizedContent = sanitizeContent(content);
+
+      const note = await db
+        .insertInto('user_notes')
+        .values({
+          user_id: userId,
+          content: sanitizedContent,
+          date: targetDate,
+          created_at: new Date().toISOString()
+        })
+        .onConflict((oc) => oc.columns(['user_id', 'date']).doUpdateSet({
+          content: sanitizedContent
+        }))
+        .returning(['id', 'user_id', 'content', 'date', 'created_at'])
+        .executeTakeFirst();
+
+      res.json(note);
+    } catch (error) {
+      console.error('Error saving daily note:', error);
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar la nota diaria');
+    }
+  });
+
+// Meditation session endpoint
+app.post('/api/meditation-sessions',
+  authenticateToken,
+  validateRequest(meditationSessionSchema),
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const userId = req.user.id;
+      const { duration_minutes, meditation_type, comment, breathing_cycle_json } = req.body;
+
+      const session = await db
+        .insertInto('meditation_sessions')
+        .values({
+          user_id: userId,
+          duration_minutes,
+          meditation_type,
+          breathing_cycle_json: breathing_cycle_json || null,
+          comment: comment ? sanitizeContent(comment) : null,
+          completed_at: new Date().toISOString()
+        })
+        .returning(['id', 'user_id', 'duration_minutes', 'meditation_type', 'breathing_cycle_json', 'comment', 'completed_at'])
+        .executeTakeFirst();
+
+      res.status(201).json(session);
+    } catch (error) {
+      console.error('Error saving meditation session:', error);
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar la sesión de meditación');
+    }
+  });
+
+// Setup static file serving and remaining routes
+setupStaticServing(app, DATA_DIRECTORY);
+
+// Start server and initialize background services
+const startServer = async () => {
+  try {
+    // Check VAPID configuration
+    checkVapidConfiguration();
+
+    // Log CORS configuration in development
+    if (NODE_ENV === 'development') {
+      logCorsConfig();
+    }
+
+    // Initialize schedulers
+    resetScheduler = new DailyResetScheduler(db);
+    await resetScheduler.initialize();
+
+    notificationScheduler = new NotificationScheduler(db);
+    await notificationScheduler.initialize();
+
+    const server = app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📁 Data directory: ${DATA_DIRECTORY}`);
+      console.log(`🌍 Environment: ${NODE_ENV}`);
+      console.log(`✅ Server is ready to accept connections`);
+    });
+
+    // Graceful shutdown
+    const gracefulShutdown = (signal: string) => {
+      console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
+      
+      server.close(() => {
+        console.log('🔌 HTTP server closed');
+        
+        // Stop schedulers
+        if (resetScheduler) {
+          resetScheduler.stop();
+          console.log('⏹️  Daily reset scheduler stopped');
+        }
+        
+        if (notificationScheduler) {
+          notificationScheduler.stop();
+          console.log('⏹️  Notification scheduler stopped');
+        }
+        
+        console.log('✅ Graceful shutdown complete');
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    await SystemLogger.logCriticalError('Server startup failed', error as Error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
