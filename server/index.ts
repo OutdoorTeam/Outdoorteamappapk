@@ -447,11 +447,16 @@ app.post('/api/auth/login',
     }
   });
 
-// Verify token endpoint
+// Verify token endpoint (both /api/auth/verify and /api/auth/me for compatibility)
 app.get('/api/auth/verify', authenticateToken, async (req: express.Request, res: express.Response) => {
   res.json({
     user: formatUserResponse(req.user)
   });
+});
+
+app.get('/api/auth/me', authenticateToken, async (req: express.Request, res: express.Response) => {
+  console.log('Token verification requested for user:', req.user?.id);
+  res.json(formatUserResponse(req.user));
 });
 
 // PROTECTED ROUTES (require authentication)
