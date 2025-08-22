@@ -1,35 +1,14 @@
 import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  useTrainingPlan,
-  useEnsureDraftTrainingPlan,
-  useUpdateTrainingPlan,
-  useAddOrUpdateDay,
-  useAddOrUpdateExercise,
-  useDeleteExercise,
-  usePublishTrainingPlan
-} from '@/hooks/api/use-training-plan';
+import { useUserTrainingSchedule, useCreateTrainingSchedule } from '@/hooks/api/use-training-schedule';
 import { useContentLibrary } from '@/hooks/api/use-content-library';
-import { 
-  Dumbbell, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Save, 
-  Eye, 
-  Calendar,
-  Clock,
-  BarChart3,
-  Play,
-  X
-} from 'lucide-react';
+import { Dumbbell, Save, Plus, Trash2, Play } from 'lucide-react';
 
 interface User {
   id: number;
@@ -41,216 +20,145 @@ interface UserTrainingPlanEditorProps {
   user: User;
 }
 
-const DAYS_OF_WEEK = [
-  { index: 0, name: 'Lunes', short: 'Lun' },
-  { index: 1, name: 'Martes', short: 'Mar' },
-  { index: 2, name: 'Miércoles', short: 'Mié' },
-  { index: 3, name: 'Jueves', short: 'Jue' },
-  { index: 4, name: 'Viernes', short: 'Vie' },
-  { index: 5, name: 'Sábado', short: 'Sáb' },
-  { index: 6, name: 'Domingo', short: 'Dom' },
-];
+interface ExerciseRow {
+  id?: number;
+  exercise_name: string;
+  content_library_id: number | null;
+  video_url: string;
+  sets: number | null;
+  reps: string;
+  rest_seconds: number | null;
+  intensity: string;
+  notes: string;
+}
 
 const UserTrainingPlanEditor: React.FC<UserTrainingPlanEditorProps> = ({ user }) => {
   const { toast } = useToast();
-  const [activeDay, setActiveDay] = React.useState<number | null>(null);
-  const [showExerciseForm, setShowExerciseForm] = React.useState(false);
-  const [editingExercise, setEditingExercise] = React.useState<any>(null);
-
-  // Exercise form state
-  const [exerciseName, setExerciseName] = React.useState('');
-  const [contentLibraryId, setContentLibraryId] = React.useState<number | null>(null);
-  const [youtubeUrl, setYoutubeUrl] = React.useState('');
-  const [sets, setSets] = React.useState<number | null>(null);
-  const [reps, setReps] = React.useState('');
-  const [intensity, setIntensity] = React.useState('');
-  const [restSeconds, setRestSeconds] = React.useState<number | null>(null);
-  const [tempo, setTempo] = React.useState('');
-  const [notes, setNotes] = React.useState('');
-
-  // API hooks
-  const { data: trainingPlanData, isLoading } = useTrainingPlan(user.id);
+  const [planTitle, setPlanTitle] = React.useState('');
+  const [exercisesByDay, setExercisesByDay] = React.useState<Record<string, ExerciseRow[]>>({});
+  
+  const { data: scheduleData, isLoading } = useUserTrainingSchedule(user.id);
   const { data: contentLibrary } = useContentLibrary('exercise');
-  const ensureDraftMutation = useEnsureDraftTrainingPlan(user.id);
-  const updatePlanMutation = useUpdateTrainingPlan(user.id);
-  const addDayMutation = useAddOrUpdateDay(user.id);
-  const addExerciseMutation = useAddOrUpdateExercise(user.id);
-  const deleteExerciseMutation = useDeleteExercise(user.id);
-  const publishPlanMutation = usePublishTrainingPlan(user.id);
+  const createScheduleMutation = useCreateTrainingSchedule();
 
-  const plan = trainingPlanData?.plan;
-  const days = trainingPlanData?.days || [];
+  const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const intensityOptions = ['Baja', 'Media', 'Alta', 'RPE6', 'RPE7', 'RPE8', 'RPE9', 'RPE10'];
 
+  // Initialize form with existing data
   React.useEffect(() => {
-    if (!plan && !isLoading) {
-      // Ensure draft plan exists
-      ensureDraftMutation.mutate();
-    }
-  }, [plan, isLoading, ensureDraftMutation]);
-
-  const resetExerciseForm = () => {
-    setExerciseName('');
-    setContentLibraryId(null);
-    setYoutubeUrl('');
-    setSets(null);
-    setReps('');
-    setIntensity('');
-    setRestSeconds(null);
-    setTempo('');
-    setNotes('');
-    setEditingExercise(null);
-  };
-
-  const handleEditExercise = (exercise: any) => {
-    setExerciseName(exercise.exercise_name);
-    setContentLibraryId(exercise.content_library_id);
-    setYoutubeUrl(exercise.youtube_url || '');
-    setSets(exercise.sets);
-    setReps(exercise.reps || '');
-    setIntensity(exercise.intensity || '');
-    setRestSeconds(exercise.rest_seconds);
-    setTempo(exercise.tempo || '');
-    setNotes(exercise.notes || '');
-    setEditingExercise(exercise);
-    setShowExerciseForm(true);
-  };
-
-  const handleAddDay = async (dayIndex: number) => {
-    if (!plan) return;
-
-    try {
-      await addDayMutation.mutateAsync({
-        planId: plan.id,
-        day_index: dayIndex,
-        title: DAYS_OF_WEEK[dayIndex].name,
-        sort_order: dayIndex,
+    if (scheduleData?.schedule && scheduleData?.exercises) {
+      setPlanTitle(scheduleData.schedule.plan_title || '');
+      
+      const formattedExercises: Record<string, ExerciseRow[]> = {};
+      
+      daysOfWeek.forEach(day => {
+        const dayExercises = scheduleData.exercises[day] || [];
+        formattedExercises[day] = dayExercises.map(exercise => ({
+          id: exercise.id,
+          exercise_name: exercise.exercise_name,
+          content_library_id: exercise.content_library_id,
+          video_url: exercise.video_url || '',
+          sets: exercise.sets,
+          reps: exercise.reps || '',
+          rest_seconds: exercise.rest_seconds,
+          intensity: exercise.intensity || '',
+          notes: exercise.notes || ''
+        }));
       });
       
-      setActiveDay(dayIndex);
-      toast({
-        title: "Día agregado",
-        description: `${DAYS_OF_WEEK[dayIndex].name} agregado al plan`,
-        variant: "default",
+      setExercisesByDay(formattedExercises);
+    } else {
+      // Initialize empty structure
+      const emptyStructure: Record<string, ExerciseRow[]> = {};
+      daysOfWeek.forEach(day => {
+        emptyStructure[day] = [];
       });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo agregar el día",
-        variant: "destructive",
-      });
+      setExercisesByDay(emptyStructure);
+    }
+  }, [scheduleData]);
+
+  const addExerciseToDay = (dayName: string) => {
+    setExercisesByDay(prev => ({
+      ...prev,
+      [dayName]: [
+        ...(prev[dayName] || []),
+        {
+          exercise_name: '',
+          content_library_id: null,
+          video_url: '',
+          sets: null,
+          reps: '',
+          rest_seconds: null,
+          intensity: '',
+          notes: ''
+        }
+      ]
+    }));
+  };
+
+  const removeExerciseFromDay = (dayName: string, exerciseIndex: number) => {
+    setExercisesByDay(prev => ({
+      ...prev,
+      [dayName]: prev[dayName]?.filter((_, index) => index !== exerciseIndex) || []
+    }));
+  };
+
+  const updateExercise = (dayName: string, exerciseIndex: number, field: keyof ExerciseRow, value: any) => {
+    setExercisesByDay(prev => ({
+      ...prev,
+      [dayName]: prev[dayName]?.map((exercise, index) => 
+        index === exerciseIndex 
+          ? { ...exercise, [field]: value }
+          : exercise
+      ) || []
+    }));
+  };
+
+  const handleContentLibrarySelect = (dayName: string, exerciseIndex: number, contentId: string) => {
+    if (contentId === 'custom') {
+      updateExercise(dayName, exerciseIndex, 'content_library_id', null);
+      updateExercise(dayName, exerciseIndex, 'video_url', '');
+      return;
+    }
+
+    const contentItem = contentLibrary?.find(item => item.id === parseInt(contentId));
+    if (contentItem) {
+      updateExercise(dayName, exerciseIndex, 'content_library_id', contentItem.id);
+      updateExercise(dayName, exerciseIndex, 'exercise_name', contentItem.title);
+      updateExercise(dayName, exerciseIndex, 'video_url', contentItem.video_url || '');
     }
   };
 
-  const handleSaveExercise = async () => {
-    if (!activeDay || !plan) return;
-
-    if (!exerciseName.trim()) {
+  const handleSavePlan = async () => {
+    if (!planTitle.trim()) {
       toast({
         title: "Error",
-        description: "El nombre del ejercicio es requerido",
+        description: "El título del plan es requerido",
         variant: "destructive",
       });
       return;
     }
 
-    const activeDay_obj = days.find(d => d.day_index === activeDay);
-    if (!activeDay_obj) return;
-
     try {
-      const exerciseData = {
-        exercise_name: exerciseName.trim(),
-        content_library_id: contentLibraryId,
-        youtube_url: youtubeUrl.trim() || null,
-        sets,
-        reps: reps.trim() || null,
-        intensity: intensity.trim() || null,
-        rest_seconds: restSeconds,
-        tempo: tempo.trim() || null,
-        notes: notes.trim() || null,
-        sort_order: editingExercise ? editingExercise.sort_order : (activeDay_obj.exercises?.length || 0),
-      };
-
-      if (editingExercise) {
-        // Update existing exercise - we would need an update endpoint for this
-        // For now, delete and recreate
-        await deleteExerciseMutation.mutateAsync(editingExercise.id);
-      }
-
-      await addExerciseMutation.mutateAsync({
-        dayId: activeDay_obj.id,
-        exerciseData,
+      await createScheduleMutation.mutateAsync({
+        userId: user.id,
+        plan_title: planTitle,
+        exercises_by_day: exercisesByDay
       });
 
-      resetExerciseForm();
-      setShowExerciseForm(false);
-      
       toast({
-        title: editingExercise ? "Ejercicio actualizado" : "Ejercicio agregado",
-        description: `${exerciseName} ${editingExercise ? 'actualizado' : 'agregado'} correctamente`,
+        title: "Plan guardado",
+        description: "El plan de entrenamiento se ha guardado correctamente",
         variant: "default",
       });
     } catch (error) {
+      console.error('Error saving training plan:', error);
       toast({
         title: "Error",
-        description: "No se pudo guardar el ejercicio",
+        description: "No se pudo guardar el plan de entrenamiento",
         variant: "destructive",
       });
     }
-  };
-
-  const handleDeleteExercise = async (exercise: any) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar "${exercise.exercise_name}"?`)) {
-      return;
-    }
-
-    try {
-      await deleteExerciseMutation.mutateAsync(exercise.id);
-      toast({
-        title: "Ejercicio eliminado",
-        description: `${exercise.exercise_name} eliminado del plan`,
-        variant: "default",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el ejercicio",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handlePublishPlan = async () => {
-    if (!plan) return;
-
-    if (!confirm('¿Estás seguro de que quieres publicar este plan? Los usuarios podrán verlo inmediatamente.')) {
-      return;
-    }
-
-    try {
-      await publishPlanMutation.mutateAsync(plan.id);
-      toast({
-        title: "Plan publicado",
-        description: "El plan de entrenamiento está ahora disponible para el usuario",
-        variant: "default",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo publicar el plan",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getDayData = (dayIndex: number) => {
-    return days.find(d => d.day_index === dayIndex);
-  };
-
-  const formatRestTime = (seconds: number) => {
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
   };
 
   if (isLoading) {
@@ -264,358 +172,225 @@ const UserTrainingPlanEditor: React.FC<UserTrainingPlanEditorProps> = ({ user })
 
   return (
     <div className="space-y-6">
-      {/* Plan Header */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Dumbbell className="w-5 h-5" />
-                Plan de Entrenamiento para {user.full_name}
-              </CardTitle>
-              <CardDescription>
-                Crea y edita el plan de entrenamiento semanal
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {plan && (
-                <Badge variant={plan.status === 'published' ? 'default' : 'secondary'}>
-                  {plan.status === 'published' ? 'Publicado' : 'Borrador'}
-                </Badge>
-              )}
-              {plan && plan.status === 'draft' && (
-                <Button 
-                  onClick={handlePublishPlan}
-                  disabled={publishPlanMutation.isPending}
-                >
-                  Publicar Plan
-                </Button>
-              )}
-            </div>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Dumbbell className="w-5 h-5" />
+            Plan de Entrenamiento para {user.full_name}
+          </CardTitle>
         </CardHeader>
-      </Card>
-
-      {/* Days Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Días de la Semana</CardTitle>
-          <CardDescription>
-            Haz clic en un día para agregar o editar ejercicios
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-2">
-            {DAYS_OF_WEEK.map((day) => {
-              const dayData = getDayData(day.index);
-              const exerciseCount = dayData?.exercises?.length || 0;
-              const isActive = activeDay === day.index;
-              
-              return (
-                <Card 
-                  key={day.index} 
-                  className={`cursor-pointer transition-colors ${
-                    isActive ? 'ring-2 ring-primary' : ''
-                  } ${dayData ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'}`}
-                  onClick={() => {
-                    if (dayData) {
-                      setActiveDay(day.index);
-                    } else {
-                      handleAddDay(day.index);
-                    }
-                  }}
-                >
-                  <CardContent className="p-3 text-center">
-                    <div className="text-sm font-medium">{day.short}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {dayData ? `${exerciseCount} ejercicio${exerciseCount !== 1 ? 's' : ''}` : 'Agregar día'}
-                    </div>
-                    {!dayData && (
-                      <Plus className="w-4 h-4 mx-auto mt-1 text-muted-foreground" />
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+        <CardContent className="space-y-6">
+          {/* Plan Title */}
+          <div className="space-y-2">
+            <Label htmlFor="planTitle">Título del Plan</Label>
+            <Input
+              id="planTitle"
+              value={planTitle}
+              onChange={(e) => setPlanTitle(e.target.value)}
+              placeholder="Ej: Plan de Fuerza Básica - Semana 1"
+              className="max-w-md"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Day Details */}
-      {activeDay !== null && getDayData(activeDay) && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                {DAYS_OF_WEEK[activeDay].name}
-              </CardTitle>
-              <Button
-                onClick={() => {
-                  resetExerciseForm();
-                  setShowExerciseForm(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Ejercicio
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Exercise Form */}
-            {showExerciseForm && (
-              <Card className="mb-6">
-                <CardHeader>
+          {/* Days Schedule */}
+          {daysOfWeek.map(dayName => {
+            const dayExercises = exercisesByDay[dayName] || [];
+            
+            return (
+              <Card key={dayName} className="border-2">
+                <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">
-                      {editingExercise ? 'Editar Ejercicio' : 'Nuevo Ejercicio'}
-                    </CardTitle>
+                    <CardTitle className="text-lg">{dayName}</CardTitle>
                     <Button
-                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setShowExerciseForm(false);
-                        resetExerciseForm();
-                      }}
+                      onClick={() => addExerciseToDay(dayName)}
+                      className="flex items-center gap-2"
                     >
-                      <X className="w-4 h-4" />
+                      <Plus className="w-4 h-4" />
+                      Agregar Ejercicio
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="exerciseName">Nombre del Ejercicio *</Label>
-                      <Input
-                        id="exerciseName"
-                        value={exerciseName}
-                        onChange={(e) => setExerciseName(e.target.value)}
-                        placeholder="Ej: Push ups, Sentadillas"
-                      />
+                <CardContent>
+                  {dayExercises.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>Día de descanso - No hay ejercicios programados</p>
                     </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {dayExercises.map((exercise, index) => (
+                        <div key={index} className="border rounded-lg p-4 space-y-4">
+                          <div className="flex items-start justify-between">
+                            <h4 className="font-medium">Ejercicio {index + 1}</h4>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => removeExerciseFromDay(dayName, index)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
 
-                    <div>
-                      <Label htmlFor="contentLibrary">Video de la Biblioteca</Label>
-                      <Select value={contentLibraryId?.toString() || ''} onValueChange={(value) => setContentLibraryId(value ? parseInt(value) : null)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar video" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Sin video</SelectItem>
-                          {contentLibrary?.map((item) => (
-                            <SelectItem key={item.id} value={item.id.toString()}>
-                              {item.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Exercise Selection */}
+                            <div className="space-y-2">
+                              <Label>Ejercicio</Label>
+                              <Select
+                                value={exercise.content_library_id?.toString() || 'custom'}
+                                onValueChange={(value) => handleContentLibrarySelect(dayName, index, value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar ejercicio" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="custom">Ejercicio personalizado</SelectItem>
+                                  {contentLibrary?.map(item => (
+                                    <SelectItem key={item.id} value={item.id.toString()}>
+                                      {item.title}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Custom Exercise Name */}
+                            <div className="space-y-2">
+                              <Label>Nombre del Ejercicio</Label>
+                              <Input
+                                value={exercise.exercise_name}
+                                onChange={(e) => updateExercise(dayName, index, 'exercise_name', e.target.value)}
+                                placeholder="Nombre del ejercicio"
+                              />
+                            </div>
+
+                            {/* Sets */}
+                            <div className="space-y-2">
+                              <Label>Series</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={exercise.sets || ''}
+                                onChange={(e) => updateExercise(dayName, index, 'sets', parseInt(e.target.value) || null)}
+                                placeholder="3"
+                              />
+                            </div>
+
+                            {/* Reps */}
+                            <div className="space-y-2">
+                              <Label>Repeticiones</Label>
+                              <Input
+                                value={exercise.reps}
+                                onChange={(e) => updateExercise(dayName, index, 'reps', e.target.value)}
+                                placeholder="10-12"
+                              />
+                            </div>
+
+                            {/* Rest */}
+                            <div className="space-y-2">
+                              <Label>Descanso (segundos)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="300"
+                                step="15"
+                                value={exercise.rest_seconds || ''}
+                                onChange={(e) => updateExercise(dayName, index, 'rest_seconds', parseInt(e.target.value) || null)}
+                                placeholder="60"
+                              />
+                            </div>
+
+                            {/* Intensity */}
+                            <div className="space-y-2">
+                              <Label>Intensidad</Label>
+                              <Select
+                                value={exercise.intensity}
+                                onValueChange={(value) => updateExercise(dayName, index, 'intensity', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar intensidad" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {intensityOptions.map(intensity => (
+                                    <SelectItem key={intensity} value={intensity}>
+                                      {intensity}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Video URL */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label>URL del Video (opcional)</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  value={exercise.video_url}
+                                  onChange={(e) => updateExercise(dayName, index, 'video_url', e.target.value)}
+                                  placeholder="https://www.youtube.com/watch?v=..."
+                                />
+                                {exercise.video_url && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => window.open(exercise.video_url, '_blank')}
+                                  >
+                                    <Play className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label>Notas</Label>
+                              <Textarea
+                                value={exercise.notes}
+                                onChange={(e) => updateExercise(dayName, index, 'notes', e.target.value)}
+                                placeholder="Notas adicionales sobre el ejercicio..."
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="youtubeUrl">URL de YouTube (opcional)</Label>
-                      <Input
-                        id="youtubeUrl"
-                        value={youtubeUrl}
-                        onChange={(e) => setYoutubeUrl(e.target.value)}
-                        placeholder="https://www.youtube.com/watch?v=..."
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="intensity">Intensidad</Label>
-                      <Select value={intensity} onValueChange={setIntensity}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar intensidad" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Sin especificar</SelectItem>
-                          <SelectItem value="baja">Baja</SelectItem>
-                          <SelectItem value="media">Media</SelectItem>
-                          <SelectItem value="alta">Alta</SelectItem>
-                          <SelectItem value="RPE6">RPE 6</SelectItem>
-                          <SelectItem value="RPE7">RPE 7</SelectItem>
-                          <SelectItem value="RPE8">RPE 8</SelectItem>
-                          <SelectItem value="RPE9">RPE 9</SelectItem>
-                          <SelectItem value="RPE10">RPE 10</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label htmlFor="sets">Series</Label>
-                      <Input
-                        id="sets"
-                        type="number"
-                        value={sets || ''}
-                        onChange={(e) => setSets(e.target.value ? parseInt(e.target.value) : null)}
-                        placeholder="3"
-                        min="1"
-                        max="20"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="reps">Repeticiones</Label>
-                      <Input
-                        id="reps"
-                        value={reps}
-                        onChange={(e) => setReps(e.target.value)}
-                        placeholder="8-12, 30s, etc."
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="restSeconds">Descanso (seg)</Label>
-                      <Input
-                        id="restSeconds"
-                        type="number"
-                        value={restSeconds || ''}
-                        onChange={(e) => setRestSeconds(e.target.value ? parseInt(e.target.value) : null)}
-                        placeholder="60"
-                        min="15"
-                        max="300"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="tempo">Tempo</Label>
-                      <Input
-                        id="tempo"
-                        value={tempo}
-                        onChange={(e) => setTempo(e.target.value)}
-                        placeholder="2-1-2-1"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="notes">Notas</Label>
-                    <Textarea
-                      id="notes"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Instrucciones adicionales, modificaciones, etc."
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button onClick={handleSaveExercise} disabled={addExerciseMutation.isPending}>
-                      <Save className="w-4 h-4 mr-2" />
-                      {addExerciseMutation.isPending ? 'Guardando...' : editingExercise ? 'Actualizar' : 'Agregar'}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setShowExerciseForm(false);
-                        resetExerciseForm();
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
+            );
+          })}
+
+          {/* Save Button */}
+          <div className="flex items-center gap-4 pt-4">
+            <Button 
+              onClick={handleSavePlan}
+              disabled={createScheduleMutation.isPending}
+              className="flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {createScheduleMutation.isPending ? 'Guardando...' : 'Guardar Plan'}
+            </Button>
+            
+            {scheduleData?.schedule && (
+              <div className="text-sm text-muted-foreground">
+                Última actualización: {new Date(scheduleData.schedule.updated_at).toLocaleString()}
+              </div>
             )}
+          </div>
 
-            {/* Exercise List */}
-            <div className="space-y-3">
-              {getDayData(activeDay)?.exercises?.map((exercise, index) => (
-                <Card key={exercise.id} className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-medium">{exercise.exercise_name}</h4>
-                        {exercise.intensity && (
-                          <Badge variant="outline" className="text-xs">
-                            {exercise.intensity}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-muted-foreground">
-                        {exercise.sets && (
-                          <div className="flex items-center gap-1">
-                            <BarChart3 className="w-3 h-3" />
-                            {exercise.sets} series
-                          </div>
-                        )}
-                        {exercise.reps && (
-                          <div>Reps: {exercise.reps}</div>
-                        )}
-                        {exercise.rest_seconds && (
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {formatRestTime(exercise.rest_seconds)}
-                          </div>
-                        )}
-                        {exercise.tempo && (
-                          <div>Tempo: {exercise.tempo}</div>
-                        )}
-                      </div>
-
-                      {exercise.notes && (
-                        <p className="text-sm text-muted-foreground mt-2 italic">
-                          {exercise.notes}
-                        </p>
-                      )}
-
-                      {(exercise.youtube_url || exercise.content_library_id) && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <Play className="w-3 h-3 text-blue-600" />
-                          <span className="text-xs text-blue-600">Video disponible</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditExercise(exercise)}
-                      >
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteExercise(exercise)}
-                        disabled={deleteExerciseMutation.isPending}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              )) || (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Dumbbell className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No hay ejercicios para este día</p>
-                  <p className="text-sm">Haz clic en "Agregar Ejercicio" para comenzar</p>
-                </div>
-              )}
+          {/* Information */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="font-medium text-blue-800 mb-2">ℹ️ Información</h4>
+            <div className="text-sm text-blue-700 space-y-1">
+              <p>• El plan se actualizará automáticamente para el usuario</p>
+              <p>• Los ejercicios de la biblioteca incluyen videos demostrativos</p>
+              <p>• Puedes agregar ejercicios personalizados con URLs de video propias</p>
+              <p>• Los cambios son visibles inmediatamente en la vista del usuario</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeDay === null && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-600 mb-2">
-              Selecciona un día para comenzar
-            </h3>
-            <p className="text-muted-foreground">
-              Haz clic en un día de la semana para agregar ejercicios
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

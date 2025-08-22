@@ -5,280 +5,321 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  useContentLibrary, 
-  useCreateContentLibraryItem, 
-  useUpdateContentLibraryItem, 
-  useDeleteContentLibraryItem 
-} from '@/hooks/api/use-content-library';
-import { Plus, Play, Edit, Trash2, ExternalLink, Save, X } from 'lucide-react';
+import { useContentLibrary, useCreateContent, useUpdateContent, useDeleteContent } from '@/hooks/api/use-content-library';
+import { Plus, Edit, Trash2, Play, Eye } from 'lucide-react';
+
+interface ContentItem {
+  id: number;
+  title: string;
+  description: string | null;
+  video_url: string | null;
+  category: string;
+  subcategory: string | null;
+  is_active: number;
+  created_at: string;
+}
+
+interface ContentFormData {
+  title: string;
+  description: string;
+  video_url: string;
+  category: string;
+  subcategory: string;
+  is_active: boolean;
+}
 
 const ContentManagement: React.FC = () => {
   const { toast } = useToast();
-  const [showForm, setShowForm] = React.useState(false);
-  const [editingItem, setEditingItem] = React.useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [editingContent, setEditingContent] = React.useState<ContentItem | null>(null);
+  const [formData, setFormData] = React.useState<ContentFormData>({
+    title: '',
+    description: '',
+    video_url: '',
+    category: 'exercise',
+    subcategory: '',
+    is_active: true
+  });
 
-  // Form state
-  const [title, setTitle] = React.useState('');
-  const [description, setDescription] = React.useState('');
-  const [videoUrl, setVideoUrl] = React.useState('');
-  const [category, setCategory] = React.useState('');
-  const [subcategory, setSubcategory] = React.useState('');
-
-  // API hooks
   const { data: contentLibrary, isLoading } = useContentLibrary();
-  const createItemMutation = useCreateContentLibraryItem();
-  const updateItemMutation = useUpdateContentLibraryItem();
-  const deleteItemMutation = useDeleteContentLibraryItem();
+  const createContentMutation = useCreateContent();
+  const updateContentMutation = useUpdateContent();
+  const deleteContentMutation = useDeleteContent();
+
+  const categories = [
+    { value: 'exercise', label: 'Ejercicios' },
+    { value: 'active_breaks', label: 'Pausas Activas' },
+    { value: 'meditation', label: 'Meditación' }
+  ];
+
+  // Get video thumbnail from YouTube URL
+  const getYouTubeThumbnail = (url: string | null) => {
+    if (!url) return null;
+    
+    const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(youtubeRegex);
+    
+    if (match && match[1]) {
+      return `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg`;
+    }
+    
+    return null;
+  };
+
+  const filteredContent = contentLibrary?.filter(item => 
+    selectedCategory === 'all' || item.category === selectedCategory
+  ) || [];
 
   const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setVideoUrl('');
-    setCategory('');
-    setSubcategory('');
-    setEditingItem(null);
+    setFormData({
+      title: '',
+      description: '',
+      video_url: '',
+      category: 'exercise',
+      subcategory: '',
+      is_active: true
+    });
+    setEditingContent(null);
+    setIsFormOpen(false);
   };
 
-  const handleShowForm = () => {
-    resetForm();
-    setShowForm(true);
-  };
-
-  const handleEdit = (item: any) => {
-    setTitle(item.title);
-    setDescription(item.description || '');
-    setVideoUrl(item.video_url || '');
-    setCategory(item.category);
-    setSubcategory(item.subcategory || '');
-    setEditingItem(item);
-    setShowForm(true);
+  const handleEdit = (content: ContentItem) => {
+    setEditingContent(content);
+    setFormData({
+      title: content.title,
+      description: content.description || '',
+      video_url: content.video_url || '',
+      category: content.category,
+      subcategory: content.subcategory || '',
+      is_active: Boolean(content.is_active)
+    });
+    setIsFormOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim() || !category) {
+    if (!formData.title.trim()) {
       toast({
         title: "Error",
-        description: "Título y categoría son requeridos",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Basic YouTube URL validation
-    if (videoUrl && !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
-      toast({
-        title: "Error",
-        description: "Por favor ingresa una URL válida de YouTube",
+        description: "El título es requerido",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const itemData = {
-        title: title.trim(),
-        description: description.trim() || null,
-        video_url: videoUrl.trim() || null,
-        category,
-        subcategory: subcategory.trim() || null,
-        is_active: true
-      };
-
-      if (editingItem) {
-        await updateItemMutation.mutateAsync({ id: editingItem.id, ...itemData });
+      if (editingContent) {
+        await updateContentMutation.mutateAsync({
+          id: editingContent.id,
+          ...formData
+        });
         toast({
-          title: "Video actualizado",
-          description: "El video se ha actualizado exitosamente",
-          variant: "default",
+          title: "Contenido actualizado",
+          description: "El contenido se ha actualizado correctamente",
         });
       } else {
-        await createItemMutation.mutateAsync(itemData);
+        await createContentMutation.mutateAsync(formData);
         toast({
-          title: "Video agregado",
-          description: "El video se ha agregado a la biblioteca",
-          variant: "default",
+          title: "Contenido creado",
+          description: "El contenido se ha creado correctamente",
         });
       }
-
       resetForm();
-      setShowForm(false);
     } catch (error) {
       toast({
         title: "Error",
-        description: editingItem ? "No se pudo actualizar el video" : "No se pudo agregar el video",
+        description: editingContent ? "Error al actualizar contenido" : "Error al crear contenido",
         variant: "destructive",
       });
     }
   };
 
-  const handleDelete = async (item: any) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar "${item.title}"?`)) {
+  const handleDelete = async (content: ContentItem) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar "${content.title}"?`)) {
       return;
     }
 
     try {
-      await deleteItemMutation.mutateAsync(item.id);
+      await deleteContentMutation.mutateAsync(content.id);
       toast({
-        title: "Video eliminado",
-        description: "El video se ha eliminado de la biblioteca",
-        variant: "default",
+        title: "Contenido eliminado",
+        description: "El contenido se ha eliminado correctamente",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudo eliminar el video",
+        description: "Error al eliminar contenido",
         variant: "destructive",
       });
     }
   };
 
-  const getCategoryColor = (cat: string) => {
-    switch (cat) {
-      case 'exercise':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'active_breaks':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'meditation':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getCategoryName = (cat: string) => {
-    switch (cat) {
-      case 'exercise':
-        return 'Ejercicio';
-      case 'active_breaks':
-        return 'Pausa Activa';
-      case 'meditation':
-        return 'Meditación';
-      default:
-        return cat;
-    }
+  const openVideo = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Biblioteca de Videos</h3>
-          <p className="text-sm text-muted-foreground">
-            Gestiona los videos que se pueden usar en planes de entrenamiento
-          </p>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Gestión de Contenido</h1>
+        <p className="text-muted-foreground">Administra la biblioteca de videos y contenido</p>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div className="flex items-center gap-4">
+          <Label htmlFor="categoryFilter">Filtrar por categoría:</Label>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorías</SelectItem>
+              {categories.map(cat => (
+                <SelectItem key={cat.value} value={cat.value}>
+                  {cat.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Button onClick={handleShowForm}>
+
+        <Button onClick={() => setIsFormOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Agregar Video
+          Agregar Contenido
         </Button>
       </div>
 
-      {/* Add/Edit Form */}
-      {showForm && (
-        <Card>
+      {/* Content Form */}
+      {isFormOpen && (
+        <Card className="mb-8">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>
-                {editingItem ? 'Editar Video' : 'Agregar Nuevo Video'}
-              </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => {
-                setShowForm(false);
-                resetForm();
-              }}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+            <CardTitle>
+              {editingContent ? 'Editar Contenido' : 'Crear Nuevo Contenido'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Title */}
+                <div className="space-y-2">
                   <Label htmlFor="title">Título *</Label>
                   <Input
                     id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Ej: Push ups básicos"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Nombre del ejercicio o contenido"
                     required
                   />
                 </div>
 
-                <div>
+                {/* Category */}
+                <div className="space-y-2">
                   <Label htmlFor="category">Categoría *</Label>
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="exercise">Ejercicio</SelectItem>
-                      <SelectItem value="active_breaks">Pausa Activa</SelectItem>
-                      <SelectItem value="meditation">Meditación</SelectItem>
+                      {categories.map(cat => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                {/* Subcategory */}
+                <div className="space-y-2">
                   <Label htmlFor="subcategory">Subcategoría</Label>
                   <Input
                     id="subcategory"
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                    placeholder="Ej: Pecho, Espalda, etc."
+                    value={formData.subcategory}
+                    onChange={(e) => setFormData(prev => ({ ...prev, subcategory: e.target.value }))}
+                    placeholder="Ej: Pecho, Espalda, Piernas"
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="videoUrl">URL de YouTube</Label>
-                  <Input
-                    id="videoUrl"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
+                {/* Active Status */}
+                <div className="space-y-2">
+                  <Label htmlFor="isActive">Estado</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="isActive"
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                    />
+                    <span>{formData.is_active ? 'Activo' : 'Inactivo'}</span>
+                  </div>
+                </div>
+
+                {/* Video URL */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="videoUrl">URL del Video</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="videoUrl"
+                      value={formData.video_url}
+                      onChange={(e) => setFormData(prev => ({ ...prev, video_url: e.target.value }))}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                    {formData.video_url && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openVideo(formData.video_url)}
+                      >
+                        <Play className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {getYouTubeThumbnail(formData.video_url) && (
+                    <div className="mt-2">
+                      <img
+                        src={getYouTubeThumbnail(formData.video_url)!}
+                        alt="Video preview"
+                        className="w-32 h-20 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="description">Descripción</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Descripción del ejercicio o instrucciones"
+                    rows={4}
                   />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Descripción del ejercicio, instrucciones, etc."
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button 
-                  type="submit" 
-                  disabled={createItemMutation.isPending || updateItemMutation.isPending}
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {createItemMutation.isPending || updateItemMutation.isPending 
-                    ? 'Guardando...' 
-                    : editingItem 
-                      ? 'Actualizar Video' 
-                      : 'Agregar Video'
-                  }
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowForm(false);
-                    resetForm();
-                  }}
+              {/* Form Actions */}
+              <div className="flex justify-end gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
                 >
                   Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createContentMutation.isPending || updateContentMutation.isPending}
+                >
+                  {editingContent ? 'Actualizar' : 'Crear'}
                 </Button>
               </div>
             </form>
@@ -286,111 +327,117 @@ const ContentManagement: React.FC = () => {
         </Card>
       )}
 
-      {/* Content Library */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Videos en la Biblioteca ({contentLibrary?.length || 0})</CardTitle>
-          <CardDescription>
-            Videos disponibles para usar en planes de entrenamiento
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-              <p className="text-sm text-muted-foreground">Cargando biblioteca...</p>
-            </div>
-          ) : contentLibrary && contentLibrary.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {contentLibrary.map((item) => (
-                <Card key={item.id} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      {/* Header */}
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm line-clamp-2">{item.title}</h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${getCategoryColor(item.category)}`}
-                            >
-                              {getCategoryName(item.category)}
-                            </Badge>
-                            {item.subcategory && (
-                              <Badge variant="outline" className="text-xs">
-                                {item.subcategory}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+      {/* Content List */}
+      {isLoading ? (
+        <div className="text-center py-12">
+          <div className="text-lg">Cargando contenido...</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredContent.map((content) => {
+            const thumbnail = getYouTubeThumbnail(content.video_url);
+            const categoryLabel = categories.find(cat => cat.value === content.category)?.label || content.category;
 
-                      {/* Description */}
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {item.description}
-                        </p>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        {item.video_url && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(item.video_url, '_blank')}
-                            className="flex-1"
-                          >
-                            <Play className="w-3 h-3 mr-1" />
-                            Ver Video
-                          </Button>
-                        )}
-                        
+            return (
+              <Card key={content.id} className="overflow-hidden">
+                <CardHeader className="p-0">
+                  {thumbnail ? (
+                    <div className="relative">
+                      <img
+                        src={thumbnail}
+                        alt={content.title}
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                         <Button
-                          variant="outline"
                           size="sm"
-                          onClick={() => handleEdit(item)}
+                          onClick={() => content.video_url && openVideo(content.video_url)}
                         >
-                          <Edit className="w-3 h-3" />
+                          <Play className="w-4 h-4 mr-2" />
+                          Ver Video
                         </Button>
-                        
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(item)}
-                          disabled={deleteItemMutation.isPending}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-
-                      {/* Created date */}
-                      <div className="text-xs text-muted-foreground">
-                        Creado: {new Date(item.created_at).toLocaleDateString()}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Play className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">
-                No hay videos en la biblioteca
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Comienza agregando videos para usar en los planes de entrenamiento
-              </p>
-              <Button onClick={handleShowForm}>
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Primer Video
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  ) : (
+                    <div className="h-48 bg-gray-200 flex items-center justify-center">
+                      <div className="text-center text-gray-500">
+                        <Eye className="w-8 h-8 mx-auto mb-2" />
+                        <p>Sin vista previa</p>
+                      </div>
+                    </div>
+                  )}
+                </CardHeader>
+                
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <h3 className="font-semibold text-lg line-clamp-2">
+                        {content.title}
+                      </h3>
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEdit(content)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(content)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {categoryLabel}
+                        {content.subcategory && ` • ${content.subcategory}`}
+                      </span>
+                      <div className={`px-2 py-1 rounded-full text-xs ${
+                        content.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {content.is_active ? 'Activo' : 'Inactivo'}
+                      </div>
+                    </div>
+
+                    {content.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {content.description}
+                      </p>
+                    )}
+
+                    <div className="text-xs text-muted-foreground">
+                      Creado: {new Date(content.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {filteredContent.length === 0 && !isLoading && (
+        <div className="text-center py-12">
+          <div className="text-lg mb-2">No hay contenido disponible</div>
+          <p className="text-muted-foreground mb-4">
+            {selectedCategory === 'all' 
+              ? 'Aún no se ha agregado ningún contenido'
+              : `No hay contenido en la categoría seleccionada`
+            }
+          </p>
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar Primer Contenido
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

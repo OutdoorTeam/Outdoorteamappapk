@@ -44,6 +44,21 @@ const TrainingPage: React.FC = () => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const formatRestTime = (seconds: number | null) => {
+    if (!seconds) return '-';
+    
+    if (seconds >= 60) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      if (remainingSeconds === 0) {
+        return `${minutes} min`;
+      }
+      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    
+    return `${seconds}s`;
+  };
+
   // Define days of the week in Spanish
   const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -137,4 +152,128 @@ const TrainingPage: React.FC = () => {
                       <table className="w-full text-white">
                         <thead>
                           <tr className="border-b border-gray-600">
-                            <th className="text-left py-3 px-2 text-[
+                            <th className="text-left py-3 px-2 text-[#D3B869] font-medium">Exercise</th>
+                            <th className="text-center py-3 px-2 text-[#D3B869] font-medium w-16">Sets</th>
+                            <th className="text-center py-3 px-2 text-[#D3B869] font-medium w-16">Reps</th>
+                            <th className="text-center py-3 px-2 text-[#D3B869] font-medium w-20">Rest</th>
+                            <th className="text-center py-3 px-2 text-[#D3B869] font-medium w-20">Intensity</th>
+                            <th className="text-center py-3 px-2 text-[#D3B869] font-medium w-16">Video</th>
+                            <th className="text-left py-3 px-2 text-[#D3B869] font-medium">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dayExercises.map((exercise, index) => {
+                            const videoUrl = getVideoUrl(exercise);
+                            const thumbnail = getYouTubeThumbnail(videoUrl);
+                            
+                            return (
+                              <tr key={exercise.id || index} className="border-b border-gray-700 hover:bg-gray-700/50">
+                                <td className="py-4 px-2">
+                                  <div className="font-medium text-white">
+                                    {exercise.exercise_name}
+                                  </div>
+                                  {exercise.library_title && (
+                                    <div className="text-sm text-gray-400 mt-1">
+                                      {exercise.library_title}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="text-center py-4 px-2">
+                                  <span className="text-sm font-medium">
+                                    {exercise.sets || '-'}
+                                  </span>
+                                </td>
+                                <td className="text-center py-4 px-2">
+                                  <span className="text-sm font-medium">
+                                    {exercise.reps || '-'}
+                                  </span>
+                                </td>
+                                <td className="text-center py-4 px-2">
+                                  <span className="text-sm">
+                                    {formatRestTime(exercise.rest_seconds)}
+                                  </span>
+                                </td>
+                                <td className="text-center py-4 px-2">
+                                  {exercise.intensity && (
+                                    <span className={`text-xs px-2 py-1 rounded-full ${
+                                      exercise.intensity === 'Alta' || exercise.intensity?.startsWith('RPE9') || exercise.intensity?.startsWith('RPE10')
+                                        ? 'bg-red-900 text-red-300'
+                                        : exercise.intensity === 'Media' || exercise.intensity?.startsWith('RPE6') || exercise.intensity?.startsWith('RPE7') || exercise.intensity?.startsWith('RPE8')
+                                          ? 'bg-orange-900 text-orange-300'
+                                          : 'bg-green-900 text-green-300'
+                                    }`}>
+                                      {exercise.intensity}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="text-center py-4 px-2">
+                                  {videoUrl ? (
+                                    <div className="flex justify-center">
+                                      {thumbnail ? (
+                                        <button
+                                          onClick={() => openVideoInNewTab(videoUrl)}
+                                          className="relative group"
+                                        >
+                                          <img
+                                            src={thumbnail}
+                                            alt="Video thumbnail"
+                                            className="w-12 h-8 object-cover rounded border border-gray-600 group-hover:border-[#D3B869] transition-colors"
+                                          />
+                                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Play className="w-4 h-4 text-white" />
+                                          </div>
+                                        </button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => openVideoInNewTab(videoUrl)}
+                                          className="h-8 w-12 p-0 text-[#D3B869] hover:text-white hover:bg-[#D3B869]/20"
+                                        >
+                                          <Play className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="py-4 px-2">
+                                  {exercise.notes ? (
+                                    <div className="text-sm text-gray-300 max-w-xs">
+                                      {exercise.notes}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="mt-8 flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/exercises'}
+            className="bg-gray-700 border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            Ver Biblioteca de Ejercicios
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TrainingPage;
