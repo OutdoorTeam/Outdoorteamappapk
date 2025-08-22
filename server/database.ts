@@ -213,6 +213,30 @@ export interface DatabaseSchema {
     tempo: string | null;
     notes: string | null;
   };
+  training_plan_schedules: {
+    id: number;
+    user_id: number;
+    plan_title: string | null;
+    week_number: number;
+    status: string;
+    created_by: number | null;
+    created_at: string;
+    updated_at: string;
+  };
+  training_plan_exercises: {
+    id: number;
+    schedule_id: number;
+    day_name: string;
+    exercise_name: string;
+    content_library_id: number | null;
+    video_url: string | null;
+    sets: number | null;
+    reps: string | null;
+    rest_seconds: number | null;
+    intensity: string | null;
+    notes: string | null;
+    sort_order: number;
+  };
   user_permissions: {
     id: number;
     user_id: number;

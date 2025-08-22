@@ -133,4 +133,70 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, onClose }) => {
                       className={`flex items-center gap-2 p-2 rounded text-sm ${
                         enabled 
                           ? 'bg-green-50 text-green-800 border border-green-200' 
-                          : 'bg-gray-50 text-gray-
+                          : 'bg-gray-50 text-gray-500 border border-gray-200'
+                      }`}
+                    >
+                      {getFeatureIcon(key, enabled)}
+                      <span>{getFeatureName(key)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Management Tabs */}
+      <Tabs defaultValue="goals" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="goals" className="flex items-center gap-2">
+            <Target className="w-4 h-4" />
+            Metas Personalizadas
+          </TabsTrigger>
+          <TabsTrigger value="training" className="flex items-center gap-2">
+            <Dumbbell className="w-4 h-4" />
+            Plan de Entrenamiento
+          </TabsTrigger>
+          <TabsTrigger value="files" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Archivos
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Goals Tab */}
+        <TabsContent value="goals">
+          <UserGoalsEditor user={user} />
+        </TabsContent>
+
+        {/* Training Tab */}
+        <TabsContent value="training">
+          <UserTrainingPlanEditor user={user} />
+        </TabsContent>
+
+        {/* Files Tab */}
+        <TabsContent value="files">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Gestión de Archivos para {user.full_name}
+              </CardTitle>
+              <CardDescription>
+                Administra los archivos de entrenamiento y nutrición del usuario
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>La gestión de archivos se implementará próximamente</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default UserDetailPanel;

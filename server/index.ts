@@ -15,6 +15,7 @@ import userStatsRoutes from './routes/user-stats-routes.js';
 import notificationRoutes from './routes/notification-routes.js';
 import nutritionPlanRoutes from './routes/nutrition-plan-routes.js';
 import trainingPlanRoutes from './routes/training-plan-routes.js';
+import trainingScheduleRoutes from './routes/training-schedule-routes.js';
 import userManagementRoutes from './routes/user-management-routes.js';
 import userGoalsRoutes from './routes/user-goals-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
@@ -184,6 +185,7 @@ app.use('/api/', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/', nutritionPlanRoutes);
 app.use('/api/', trainingPlanRoutes);
+app.use('/api/', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
 
