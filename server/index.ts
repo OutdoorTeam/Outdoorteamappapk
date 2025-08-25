@@ -61,42 +61,14 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 
-// CRITICAL: Detect deployment environment
-const isDeploymentMode = (): boolean => {
-  return !!(
-    process.env.INSTANCE_APP_BUILD === 'true' ||
-    process.env.NODE_ENV === 'production' ||
-    process.env.BUILD_MODE === 'true' ||
-    process.env.CI === 'true' ||
-    process.env.DEPLOYMENT === 'true'
-  );
-};
+// Enable trust proxy to get real client IPs
+app.set('trust proxy', 1);
 
-// CRITICAL: Enable trust proxy for deployment platforms
-app.set('trust proxy', true);
-
-const deploymentMode = isDeploymentMode();
-
-console.log('🚀 Starting Outdoor Team Server...');
-console.log('📊 Environment Configuration:');
-console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
-console.log('- BUILD_MODE:', process.env.BUILD_MODE || 'false');
-console.log('- INSTANCE_APP_BUILD:', process.env.INSTANCE_APP_BUILD || 'false');
-console.log('- CI:', process.env.CI || 'false');
-console.log('- DEPLOYMENT:', process.env.DEPLOYMENT || 'false');
-console.log('- Deployment Mode:', deploymentMode ? 'ENABLED' : 'DISABLED');
-console.log('- DATA_DIRECTORY:', DATA_DIRECTORY);
-
-// Initialize schedulers only in non-deployment environments
+// Initialize schedulers
 let resetScheduler: DailyResetScheduler;
 let notificationScheduler: NotificationScheduler;
 
 const checkVapidConfiguration = () => {
-  if (deploymentMode) {
-    console.log('⚠️ VAPID check skipped in deployment mode');
-    return false;
-  }
-
   const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
   const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
@@ -108,7 +80,6 @@ const checkVapidConfiguration = () => {
                          VAPID_PUBLIC_KEY.length >= 32);
 
   if (!isConfigured) {
-    console.log('⚠️ VAPID keys not configured - push notifications disabled');
     return false;
   }
 
@@ -116,11 +87,9 @@ const checkVapidConfiguration = () => {
   return true;
 };
 
-// Ensure uploads directory exists
 const uploadsDir = path.join(DATA_DIRECTORY, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log('📁 Created uploads directory:', uploadsDir);
 }
 
 const storage = multer.diskStorage({
@@ -154,55 +123,42 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// CRITICAL: Lightweight middleware setup for deployment
-console.log('🔧 Setting up middleware...');
+// Security headers for all routes (ULTRA-RELAXED for production deployment)
+app.use(securityHeaders);
 
-// Body parsing with reasonable limits
-app.use(express.json({ limit: deploymentMode ? '10mb' : '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: deploymentMode ? '10mb' : '50mb' }));
+// Body parsing middleware with larger limits for builds and production
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Security headers (lightweight in deployment mode)
-if (deploymentMode) {
-  app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    next();
-  });
-} else {
-  app.use(securityHeaders);
-}
-
-// CORS middleware (ultra-permissive in deployment)
+// Apply CORS to all routes
 app.use(corsMiddleware);
 app.use(corsErrorHandler);
 
-// Rate limiting (disabled in deployment mode)
-if (!deploymentMode) {
+// PRODUCTION SAFE: Rate limiting is now completely disabled in production
+const isRateLimitingDisabled = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                              process.env.NODE_ENV === 'production' ||
+                              process.env.BUILD_MODE === 'true' ||
+                              process.env.INSTANCE_APP_BUILD === 'true';
+
+if (!isRateLimitingDisabled) {
   console.log('🚦 Rate limiting enabled for development');
   app.use('/api/', globalApiLimit);
   app.use('/api/', burstLimit);
 } else {
-  console.log('🚫 Rate limiting DISABLED for deployment');
+  console.log('🚫 Rate limiting disabled for production/build');
 }
 
-// CRITICAL: Health check endpoints (always first, never blocked)
+// Health check endpoint (always exempted from rate limiting and CORS)
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
+  res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     app: 'outdoor-team',
-    deployment_mode: deploymentMode,
-    database_ready: true
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    api_status: 'ok', 
-    timestamp: new Date().toISOString(),
-    database_ready: true,
-    deployment_mode: deploymentMode
+    build_mode: process.env.BUILD_MODE || 'false',
+    instance_app_build: process.env.INSTANCE_APP_BUILD || 'false',
+    rate_limiting_disabled: isRateLimitingDisabled.toString(),
+    disable_rate_limiting_env: process.env.DISABLE_RATE_LIMITING || 'not-set'
   });
 });
 
@@ -215,7 +171,7 @@ app.get('/', (req, res) => {
       message: 'Outdoor Team API Server', 
       status: 'running',
       environment: process.env.NODE_ENV || 'development',
-      deployment_mode: deploymentMode
+      rate_limiting_disabled: isRateLimitingDisabled
     });
   }
 });
@@ -249,10 +205,10 @@ const formatUserResponse = (user: any) => {
   };
 };
 
-// CRITICAL: Mount API routes BEFORE static serving
+// CRITICAL: Mount ALL API routes BEFORE static serving
 console.log('🔧 Mounting API routes...');
 
-// Mount API routes with /api prefix
+// Mount API routes with /api prefix - ORDER MATTERS!
 app.use('/api', statsRoutes);
 app.use('/api', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -261,17 +217,13 @@ app.use('/api', trainingPlanRoutes);
 app.use('/api', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
-app.use('/api', apiRoutes);
+app.use('/api', apiRoutes); // This contains users, plans, content-library routes
 
 console.log('✅ API routes mounted successfully');
 
-// Auth Routes with conditional rate limiting
-const authLimiter = deploymentMode ? [] : [registerLimit];
-const loginLimiter = deploymentMode ? [] : [checkLoginBlock, loginLimit];
-const passwordLimiter = deploymentMode ? [] : [passwordResetLimit];
-
+// Auth Routes - Rate limiting is now safely handled
 app.post('/api/auth/register',
-  ...authLimiter,
+  registerLimit,  // This is now a no-op in production
   validateRequest(registerSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -287,9 +239,7 @@ app.post('/api/auth/register',
 
       if (existingUser) {
         console.log('User already exists:', email);
-        if (!deploymentMode) {
-          await SystemLogger.logAuthError('Registration attempt with existing email', email, req);
-        }
+        await SystemLogger.logAuthError('Registration attempt with existing email', email, req);
         sendErrorResponse(res, ERROR_CODES.DUPLICATE_ERROR, 'Ya existe un usuario con este correo electrónico');
         return;
       }
@@ -358,12 +308,10 @@ app.post('/api/auth/register',
       );
 
       console.log('User registered successfully:', newUser.email, 'Role:', newUser.role);
-      if (!deploymentMode) {
-        await SystemLogger.log('info', 'User registered', {
-          userId: newUser.id,
-          metadata: { email: newUser.email, role: newUser.role }
-        });
-      }
+      await SystemLogger.log('info', 'User registered', {
+        userId: newUser.id,
+        metadata: { email: newUser.email, role: newUser.role }
+      });
 
       res.status(201).json({
         user: formatUserResponse(newUser),
@@ -371,15 +319,14 @@ app.post('/api/auth/register',
       });
     } catch (error) {
       console.error('Error registering user:', error);
-      if (!deploymentMode) {
-        await SystemLogger.logCriticalError('Registration error', error as Error);
-      }
+      await SystemLogger.logCriticalError('Registration error', error as Error);
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor al registrar usuario');
     }
   });
 
 app.post('/api/auth/login',
-  ...loginLimiter,
+  checkLoginBlock,  // This is now a no-op in production
+  loginLimit,       // This is now a no-op in production
   validateRequest(loginSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -395,38 +342,33 @@ app.post('/api/auth/login',
 
       if (!user) {
         console.log('User not found:', email);
-        if (!deploymentMode) {
-          await SystemLogger.logAuthError('Login attempt with non-existent email', email, req);
-        }
+        await SystemLogger.logAuthError('Login attempt with non-existent email', email, req);
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
         return;
       }
 
       if (!user.is_active) {
         console.log('User account is inactive:', email);
-        if (!deploymentMode) {
-          await SystemLogger.logAuthError('Login attempt with inactive account', email, req);
-        }
+        await SystemLogger.logAuthError('Login attempt with inactive account', email, req);
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Tu cuenta ha sido desactivada. Contacta al administrador.');
         return;
       }
 
       if (!user.password_hash) {
         console.log('User has no password set:', email);
-        if (!deploymentMode) {
-          await SystemLogger.logAuthError('Login attempt with user having no password', email, req);
-        }
+        await SystemLogger.logAuthError('Login attempt with user having no password', email, req);
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
         return;
       }
 
+      console.log('Checking password for user:', email);
+
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
+      console.log('Password validation result:', isValidPassword);
 
       if (!isValidPassword) {
         console.log('Invalid password for user:', email);
-        if (!deploymentMode) {
-          await SystemLogger.logAuthError('Login attempt with invalid password', email, req);
-        }
+        await SystemLogger.logAuthError('Login attempt with invalid password', email, req);
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
         return;
       }
@@ -448,12 +390,10 @@ app.post('/api/auth/login',
         .execute();
 
       console.log('Login successful for user:', user.email, 'Role:', user.role, 'Plan:', user.plan_type);
-      if (!deploymentMode) {
-        await SystemLogger.log('info', 'User login successful', {
-          userId: user.id,
-          metadata: { email: user.email, role: user.role }
-        });
-      }
+      await SystemLogger.log('info', 'User login successful', {
+        userId: user.id,
+        metadata: { email: user.email, role: user.role }
+      });
 
       res.json({
         user: formatUserResponse(user),
@@ -461,20 +401,16 @@ app.post('/api/auth/login',
       });
     } catch (error) {
       console.error('Error logging in user:', error);
-      if (!deploymentMode) {
-        await SystemLogger.logCriticalError('Login error', error as Error);
-      }
+      await SystemLogger.logCriticalError('Login error', error as Error);
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor al iniciar sesión');
     }
   });
 
 app.post('/api/auth/reset-password',
-  ...passwordLimiter,
+  passwordResetLimit,  // This is now a no-op in production
   async (req: express.Request, res: express.Response) => {
     try {
-      if (!deploymentMode) {
-        await SystemLogger.log('info', 'Password reset requested');
-      }
+      await SystemLogger.log('info', 'Password reset requested');
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Funcionalidad de reset de contraseña aún no implementada');
     } catch (error) {
       console.error('Password reset error:', error);
@@ -486,10 +422,10 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(formatUserResponse(req.user));
 });
 
-// User goals endpoint
 app.get('/api/my-goals', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
+
     console.log('Fetching goals for user:', userId);
 
     let goals = await db
@@ -515,12 +451,415 @@ app.get('/api/my-goals', authenticateToken, async (req: any, res: express.Respon
     res.json(goals);
   } catch (error) {
     console.error('Error fetching user goals:', error);
-    if (!deploymentMode) {
-      await SystemLogger.logCriticalError('User goals fetch error', error as Error, { userId: req.user?.id });
-    }
+    await SystemLogger.logCriticalError('User goals fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener metas del usuario');
   }
 });
+
+app.post('/api/users/:id/assign-plan',
+  authenticateToken,
+  validateRequest(planAssignmentSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      const { planId } = req.body;
+      const requestingUserId = req.user.id;
+      const requestingUserRole = req.user.role;
+
+      if (requestingUserRole !== 'admin' && parseInt(id) !== requestingUserId) {
+        sendErrorResponse(res, ERROR_CODES.AUTHORIZATION_ERROR, 'Acceso denegado');
+        return;
+      }
+
+      console.log('Assigning plan', planId, 'to user', id);
+
+      const plan = await db
+        .selectFrom('plans')
+        .selectAll()
+        .where('id', '=', parseInt(planId))
+        .where('is_active', '=', 1)
+        .executeTakeFirst();
+
+      if (!plan) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Plan no encontrado');
+        return;
+      }
+
+      const updatedUser = await db
+        .updateTable('users')
+        .set({
+          plan_type: plan.name,
+          features_json: plan.features_json,
+          updated_at: new Date().toISOString()
+        })
+        .where('id', '=', parseInt(id))
+        .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at'])
+        .executeTakeFirst();
+
+      if (!updatedUser) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Usuario no encontrado');
+        return;
+      }
+
+      console.log('Plan assigned successfully:', plan.name, 'to user:', updatedUser.email);
+      await SystemLogger.log('info', 'Plan assigned', {
+        userId: updatedUser.id,
+        metadata: { plan_name: plan.name, assigned_by: requestingUserId }
+      });
+
+      res.json(formatUserResponse(updatedUser));
+    } catch (error) {
+      console.error('Error assigning plan:', error);
+      await SystemLogger.logCriticalError('Plan assignment error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al asignar plan');
+    }
+  });
+
+app.put('/api/users/:id/toggle-status',
+  authenticateToken,
+  requireAdmin,
+  validateRequest(toggleUserStatusSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { id } = req.params;
+      const { is_active } = req.body;
+
+      console.log('Admin toggling user status:', id, 'to:', is_active);
+
+      const updatedUser = await db
+        .updateTable('users')
+        .set({
+          is_active: is_active ? 1 : 0,
+          updated_at: new Date().toISOString()
+        })
+        .where('id', '=', parseInt(id))
+        .returning(['id', 'email', 'full_name', 'is_active'])
+        .executeTakeFirst();
+
+      if (!updatedUser) {
+        sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Usuario no encontrado');
+        return;
+      }
+
+      console.log('User status updated successfully:', updatedUser.email, 'Active:', updatedUser.is_active);
+      await SystemLogger.log('info', 'User status toggled', {
+        userId: req.user.id,
+        metadata: { target_user: updatedUser.email, new_status: is_active }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      await SystemLogger.logCriticalError('User status toggle error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al cambiar estado del usuario');
+    }
+  });
+
+// Rest of your existing routes...
+app.get('/api/daily-habits/today', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+
+    console.log('Fetching daily habits for user:', userId, 'date:', today);
+
+    const todayHabits = await db
+      .selectFrom('daily_habits')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', today)
+      .executeTakeFirst();
+
+    if (todayHabits) {
+      res.json(todayHabits);
+    } else {
+      res.json({
+        training_completed: 0,
+        nutrition_completed: 0,
+        movement_completed: 0,
+        meditation_completed: 0,
+        daily_points: 0,
+        steps: 0
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching daily habits:', error);
+    await SystemLogger.logCriticalError('Daily habits fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener hábitos diarios');
+  }
+});
+
+app.get('/api/daily-habits/weekly-points', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+
+    console.log('Fetching weekly points for user:', userId, 'from:', weekStartStr);
+
+    const weeklyData = await db
+      .selectFrom('daily_habits')
+      .select((eb) => [eb.fn.sum('daily_points').as('total_points')])
+      .where('user_id', '=', userId)
+      .where('date', '>=', weekStartStr)
+      .executeTakeFirst();
+
+    res.json({ total_points: weeklyData?.total_points || 0 });
+  } catch (error) {
+    console.error('Error fetching weekly points:', error);
+    await SystemLogger.logCriticalError('Weekly points fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener puntos semanales');
+  }
+});
+
+app.get('/api/daily-habits/calendar', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const startDate = threeMonthsAgo.toISOString().split('T')[0];
+
+    console.log('Fetching calendar data for user:', userId, 'from:', startDate);
+
+    const calendarData = await db
+      .selectFrom('daily_habits')
+      .select(['date', 'daily_points'])
+      .where('user_id', '=', userId)
+      .where('date', '>=', startDate)
+      .execute();
+
+    res.json(calendarData);
+  } catch (error) {
+    console.error('Error fetching calendar data:', error);
+    await SystemLogger.logCriticalError('Calendar data fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener datos del calendario');
+  }
+});
+
+app.put('/api/daily-habits/update',
+  authenticateToken,
+  validateRequest(dailyHabitsUpdateSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const userId = req.user.id;
+      const { date, training_completed, nutrition_completed, movement_completed, meditation_completed, steps } = req.body;
+
+      console.log('Updating daily habits for user:', userId, 'date:', date, 'data:', req.body);
+
+      let currentRecord = await db
+        .selectFrom('daily_habits')
+        .selectAll()
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .executeTakeFirst();
+
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (training_completed !== undefined) {
+        updateData.training_completed = training_completed ? 1 : 0;
+      }
+      if (nutrition_completed !== undefined) {
+        updateData.nutrition_completed = nutrition_completed ? 1 : 0;
+      }
+      if (movement_completed !== undefined) {
+        updateData.movement_completed = movement_completed ? 1 : 0;
+      }
+      if (meditation_completed !== undefined) {
+        updateData.meditation_completed = meditation_completed ? 1 : 0;
+      }
+      if (steps !== undefined) {
+        updateData.steps = steps;
+      }
+
+      const mergedData = {
+        training_completed: updateData.training_completed ?? currentRecord?.training_completed ?? 0,
+        nutrition_completed: updateData.nutrition_completed ?? currentRecord?.nutrition_completed ?? 0,
+        movement_completed: updateData.movement_completed ?? currentRecord?.movement_completed ?? 0,
+        meditation_completed: updateData.meditation_completed ?? currentRecord?.meditation_completed ?? 0
+      };
+
+      const dailyPoints = Object.values(mergedData).reduce((sum, completed) => sum + (completed ? 1 : 0), 0);
+      updateData.daily_points = dailyPoints;
+
+      let result;
+      if (currentRecord) {
+        result = await db
+          .updateTable('daily_habits')
+          .set(updateData)
+          .where('user_id', '=', userId)
+          .where('date', '=', date)
+          .returning(['daily_points'])
+          .executeTakeFirst();
+      } else {
+        result = await db
+          .insertInto('daily_habits')
+          .values({
+            user_id: userId,
+            date,
+            training_completed: updateData.training_completed ?? 0,
+            nutrition_completed: updateData.nutrition_completed ?? 0,
+            movement_completed: updateData.movement_completed ?? 0,
+            meditation_completed: updateData.meditation_completed ?? 0,
+            steps: updateData.steps ?? 0,
+            daily_points: dailyPoints,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .returning(['daily_points'])
+          .executeTakeFirst();
+      }
+
+      console.log('Daily habits updated, points:', dailyPoints);
+      res.json({ daily_points: dailyPoints });
+    } catch (error) {
+      console.error('Error updating daily habits:', error);
+
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        sendErrorResponse(res, ERROR_CODES.DUPLICATE_ERROR, 'Ya existe un registro para esta fecha');
+        return;
+      }
+
+      await SystemLogger.logCriticalError('Daily habits update error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar hábitos diarios');
+    }
+  });
+
+// Daily notes routes
+app.get('/api/daily-notes/today', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+
+    console.log('Fetching daily note for user:', userId, 'date:', today);
+
+    const note = await db
+      .selectFrom('user_notes')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('date', '=', today)
+      .executeTakeFirst();
+
+    if (note) {
+      res.json(note);
+    } else {
+      res.json({ content: '' });
+    }
+  } catch (error) {
+    console.error('Error fetching daily note:', error);
+    await SystemLogger.logCriticalError('Daily note fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener nota diaria');
+  }
+});
+
+app.post('/api/daily-notes',
+  authenticateToken,
+  validateRequest(dailyNoteSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { content, date } = req.body;
+      const userId = req.user.id;
+
+      const sanitizedContent = sanitizeContent(content);
+
+      console.log('Saving note for user:', userId, 'date:', date);
+
+      const existingNote = await db
+        .selectFrom('user_notes')
+        .select(['id'])
+        .where('user_id', '=', userId)
+        .where('date', '=', date)
+        .executeTakeFirst();
+
+      if (existingNote) {
+        const updatedNote = await db
+          .updateTable('user_notes')
+          .set({ content: sanitizedContent })
+          .where('user_id', '=', userId)
+          .where('date', '=', date)
+          .returning(['id', 'content', 'date'])
+          .executeTakeFirst();
+
+        res.json(updatedNote);
+      } else {
+        const note = await db
+          .insertInto('user_notes')
+          .values({
+            user_id: userId,
+            content: sanitizedContent,
+            date: date || new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString()
+          })
+          .returning(['id', 'content', 'date'])
+          .executeTakeFirst();
+
+        res.status(201).json(note);
+      }
+    } catch (error) {
+      console.error('Error saving note:', error);
+      await SystemLogger.logCriticalError('Daily note save error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar nota');
+    }
+  });
+
+// Meditation sessions routes
+app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const userId = req.user.id;
+    console.log('Fetching meditation sessions for user:', userId);
+
+    const sessions = await db
+      .selectFrom('meditation_sessions')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .orderBy('completed_at', 'desc')
+      .limit(50)
+      .execute();
+
+    console.log('Meditation sessions fetched:', sessions.length);
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching meditation sessions:', error);
+    await SystemLogger.logCriticalError('Meditation sessions fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener sesiones de meditación');
+  }
+});
+
+app.post('/api/meditation-sessions',
+  authenticateToken,
+  validateRequest(meditationSessionSchema),
+  async (req: any, res: express.Response) => {
+    try {
+      const { duration_minutes, meditation_type, comment, breathing_cycle_json } = req.body;
+      const userId = req.user.id;
+
+      const sanitizedComment = comment ? sanitizeContent(comment) : null;
+
+      console.log('Saving meditation session for user:', userId);
+
+      const session = await db
+        .insertInto('meditation_sessions')
+        .values({
+          user_id: userId,
+          duration_minutes: duration_minutes || 0,
+          meditation_type: meditation_type || 'free',
+          comment: sanitizedComment,
+          breathing_cycle_json: breathing_cycle_json || null,
+          completed_at: new Date().toISOString()
+        })
+        .returning(['id', 'duration_minutes', 'meditation_type'])
+        .executeTakeFirst();
+
+      res.status(201).json(session);
+    } catch (error) {
+      console.error('Error saving meditation session:', error);
+      await SystemLogger.logCriticalError('Meditation session save error', error as Error, { userId: req.user?.id });
+      sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al guardar sesión de meditación');
+    }
+  });
 
 // CRITICAL: Setup static serving AFTER all API routes
 if (process.env.NODE_ENV === 'production') {
@@ -535,7 +874,7 @@ app.use('/api/*splat', (req, res) => {
   sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
 });
 
-// Ultra-permissive global error handler for deployment
+// Global error handler
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled error:', error);
   
@@ -543,71 +882,56 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
     return next(error);
   }
   
-  // In deployment mode, be more permissive with errors
-  if (deploymentMode) {
-    console.log('⚠️ Error in deployment mode - responding with generic error');
-    res.status(500).json({ error: 'Internal server error' });
-    return;
-  }
-  
   sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor');
 });
 
 export const startServer = async (port = 3001) => {
   try {
-    // Test database connection
     await db.selectFrom('users').select('id').limit(1).execute();
     console.log('✅ Database connection established');
 
-    // Only check VAPID and initialize schedulers in non-deployment mode
-    let vapidConfigured = false;
-    if (!deploymentMode) {
-      vapidConfigured = checkVapidConfiguration();
+    const vapidConfigured = checkVapidConfiguration();
 
-      console.log('🔄 Initializing daily reset scheduler...');
-      resetScheduler = new DailyResetScheduler(db);
-      await resetScheduler.initialize();
+    console.log('🔄 Initializing daily reset scheduler...');
+    resetScheduler = new DailyResetScheduler(db);
+    await resetScheduler.initialize();
 
-      console.log('🔔 Initializing notification scheduler...');
-      notificationScheduler = new NotificationScheduler();
-    } else {
-      console.log('⚠️ Skipping scheduler initialization in deployment mode');
-    }
+    console.log('🔔 Initializing notification scheduler...');
+    notificationScheduler = new NotificationScheduler();
 
     const server = app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
-      console.log(`🚦 Rate limiting: ${deploymentMode ? 'DISABLED' : 'ENABLED'}`);
-      console.log(`🔧 Deployment mode: ${deploymentMode ? 'YES' : 'NO'}`);
-      console.log(`🌍 CORS: ${deploymentMode ? 'Ultra-permissive' : 'Standard'} mode`);
+      console.log(`🚦 Rate limiting: ${isRateLimitingDisabled ? 'DISABLED' : 'ENABLED'}`);
+      console.log(`🔧 DISABLE_RATE_LIMITING: ${process.env.DISABLE_RATE_LIMITING || 'not-set'}`);
       
       if (process.env.NODE_ENV !== 'production') {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
         console.log(`🔌 API server: http://localhost:${port}`);
       }
       
-      if (!deploymentMode) {
-        logCorsConfig();
-        
-        if (vapidConfigured) {
-          console.log('📱 Push notifications: Ready');
-        } else {
-          console.log('📱 Push notifications: Disabled (not configured)');
-        }
+      logCorsConfig();
+      
+      if (vapidConfigured) {
+        console.log('📱 Push notifications: Ready');
       } else {
-        console.log('📱 Push notifications: Disabled (deployment mode)');
+        console.log('📱 Push notifications: Disabled');
+        console.log('   To enable: npm run generate-vapid && restart server');
       }
 
+      // Log all mounted API routes for debugging
       console.log('📋 API Routes Summary:');
-      console.log('   - /health - Health check (always available)');
-      console.log('   - /api/health - API health check');
+      console.log('   - /api/users (GET) - Get all users');
+      console.log('   - /api/plans (GET/POST) - Plans management');
+      console.log('   - /api/content-library (GET/POST/PUT/DELETE) - Content management');
       console.log('   - /api/auth/* - Authentication routes');
-      console.log('   - /api/users - Users management');
-      console.log('   - /api/plans - Plans management');
-      console.log('   - /api/admin/* - Admin routes');
-      console.log(`   - Rate limiting: ${deploymentMode ? 'DISABLED' : 'ENABLED'}`);
-      console.log(`   - CORS: ${deploymentMode ? 'Ultra-permissive' : 'Standard'}`);
+      console.log('   - /api/daily-habits/* - Daily habits tracking');
+      console.log('   - /api/meditation-sessions - Meditation tracking');
+      console.log('   - /api/notifications/* - Notification settings');
+      console.log('   - /api/nutrition-plan/* - Nutrition plans');
+      console.log('   - /api/training-plan/* - Training plans');
+      console.log('   - /api/admin/* - Admin management');
     });
 
     const gracefulShutdown = async (signal: string) => {
@@ -636,7 +960,7 @@ export const startServer = async (port = 3001) => {
         setTimeout(() => {
           console.error('❌ Could not close connections in time, forcefully shutting down');
           process.exit(1);
-        }, 10000); // Reduced timeout for faster deployment
+        }, 30000);
         
       } catch (error) {
         console.error('Error during graceful shutdown:', error);

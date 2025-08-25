@@ -58,63 +58,7 @@ const AdminPage: React.FC = () => {
   };
 
   const handleUserClick = (clickedUser: any) => {
-    // Ensure user has proper features structure before setting
-    const userWithFeatures = {
-      ...clickedUser,
-      features: getUserFeatures(clickedUser)
-    };
-    setSelectedUser(userWithFeatures);
-  };
-
-  // Safe function to get user features with proper null checking
-  const getUserFeatures = (userItem: any) => {
-    // Handle null, undefined, or non-object features
-    if (!userItem?.features || typeof userItem.features !== 'object') {
-      return {
-        habits: false,
-        training: false,
-        nutrition: false,
-        meditation: false,
-        active_breaks: false
-      };
-    }
-    
-    // Ensure all expected properties exist with boolean values
-    return {
-      habits: Boolean(userItem.features.habits),
-      training: Boolean(userItem.features.training),
-      nutrition: Boolean(userItem.features.nutrition),
-      meditation: Boolean(userItem.features.meditation),
-      active_breaks: Boolean(userItem.features.active_breaks)
-    };
-  };
-
-  const getFeatureIcon = (featureKey: string, enabled: boolean) => {
-    const icons = {
-      training: '💪',
-      nutrition: '🥗',
-      meditation: '🧘',
-      active_breaks: '☕',
-      habits: '📈'
-    };
-    
-    return (
-      <span className={enabled ? 'text-green-600' : 'text-gray-400'}>
-        {icons[featureKey as keyof typeof icons] || '📋'}
-      </span>
-    );
-  };
-
-  const getFeatureName = (featureKey: string) => {
-    const names = {
-      training: 'Entrenamiento',
-      nutrition: 'Nutrición',
-      meditation: 'Meditación',
-      active_breaks: 'Pausas Activas',
-      habits: 'Hábitos'
-    };
-    
-    return names[featureKey as keyof typeof names] || featureKey;
+    setSelectedUser(clickedUser);
   };
 
   if (user?.role !== 'admin') {
@@ -194,90 +138,79 @@ const AdminPage: React.FC = () => {
                 </div>
               ) : users && users.length > 0 ? (
                 <div className="space-y-4">
-                  {users.map((userItem) => {
-                    const features = getUserFeatures(userItem);
-                    
-                    return (
-                      <Card key={userItem.id} className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              userItem.role === 'admin' ? 'bg-yellow-100' : 'bg-blue-100'
-                            }`}>
-                              {userItem.role === 'admin' ? (
-                                <Crown className="w-5 h-5 text-yellow-600" />
-                              ) : (
-                                <Users className="w-5 h-5 text-blue-600" />
-                              )}
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-medium">{userItem.full_name}</h3>
-                                <Badge variant={userItem.role === 'admin' ? 'default' : 'secondary'}>
-                                  {userItem.role === 'admin' ? 'Administrador' : 'Usuario'}
-                                </Badge>
-                                <Badge variant={userItem.is_active ? 'default' : 'destructive'}>
-                                  {userItem.is_active ? 'Activo' : 'Inactivo'}
-                                </Badge>
-                              </div>
-                              
-                              <p className="text-sm text-muted-foreground">{userItem.email}</p>
-                              
-                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                <span>Plan: {userItem.plan_type || 'Sin plan'}</span>
-                                <span>Registrado: {new Date(userItem.created_at).toLocaleDateString()}</span>
-                              </div>
-                              
-                              {/* Features */}
-                              <div className="flex items-center gap-2 mt-2">
-                                {Object.entries(features).map(([key, enabled]) => (
-                                  enabled && (
-                                    <Badge key={key} variant="outline" className="text-xs">
-                                      {getFeatureName(key)}
-                                    </Badge>
-                                  )
-                                ))}
-                                {Object.values(features).every(val => !val) && (
-                                  <Badge variant="outline" className="text-xs text-gray-500">
-                                    Sin características activas
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleUserClick(userItem)}
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              Ver Detalles
-                            </Button>
-                            
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={userItem.is_active}
-                                onCheckedChange={() => handleToggleUserStatus(userItem.id, userItem.is_active)}
-                                disabled={toggleUserStatusMutation.isPending || userItem.role === 'admin'}
-                              />
-                              <span className="text-sm text-muted-foreground">
-                                {userItem.is_active ? 'Activo' : 'Inactivo'}
-                              </span>
-                            </div>
-                            
-                            {userItem.is_active ? (
-                              <UserCheck className="w-5 h-5 text-green-600" />
+                  {users.map((userItem) => (
+                    <Card key={userItem.id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            userItem.role === 'admin' ? 'bg-yellow-100' : 'bg-blue-100'
+                          }`}>
+                            {userItem.role === 'admin' ? (
+                              <Crown className="w-5 h-5 text-yellow-600" />
                             ) : (
-                              <UserX className="w-5 h-5 text-red-600" />
+                              <Users className="w-5 h-5 text-blue-600" />
                             )}
                           </div>
+                          
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium">{userItem.full_name}</h3>
+                              <Badge variant={userItem.role === 'admin' ? 'default' : 'secondary'}>
+                                {userItem.role === 'admin' ? 'Administrador' : 'Usuario'}
+                              </Badge>
+                              <Badge variant={userItem.is_active ? 'default' : 'destructive'}>
+                                {userItem.is_active ? 'Activo' : 'Inactivo'}
+                              </Badge>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground">{userItem.email}</p>
+                            
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              <span>Plan: {userItem.plan_type || 'Sin plan'}</span>
+                              <span>Registrado: {new Date(userItem.created_at).toLocaleDateString()}</span>
+                            </div>
+                            
+                            {/* Features */}
+                            <div className="flex items-center gap-2 mt-2">
+                              {userItem.features.habits && <Badge variant="outline" className="text-xs">Hábitos</Badge>}
+                              {userItem.features.training && <Badge variant="outline" className="text-xs">Entrenamiento</Badge>}
+                              {userItem.features.nutrition && <Badge variant="outline" className="text-xs">Nutrición</Badge>}
+                              {userItem.features.meditation && <Badge variant="outline" className="text-xs">Meditación</Badge>}
+                              {userItem.features.active_breaks && <Badge variant="outline" className="text-xs">Pausas Activas</Badge>}
+                            </div>
+                          </div>
                         </div>
-                      </Card>
-                    );
-                  })}
+                        
+                        <div className="flex items-center gap-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUserClick(userItem)}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Ver Detalles
+                          </Button>
+                          
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={userItem.is_active}
+                              onCheckedChange={() => handleToggleUserStatus(userItem.id, userItem.is_active)}
+                              disabled={toggleUserStatusMutation.isPending || userItem.role === 'admin'}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              {userItem.is_active ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </div>
+                          
+                          {userItem.is_active ? (
+                            <UserCheck className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <UserX className="w-5 h-5 text-red-600" />
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-12">

@@ -7,16 +7,13 @@ import { SystemLogger } from '../utils/logging.js';
 const getAllowedOrigins = (): string[] => {
   const origins = [];
   
-  // Production domains - CRITICAL: Add both preview and production URLs
-  origins.push('https://briskly-playful-sandwich.instance.app');
-  origins.push('https://preview--briskly-playful-sandwich.instance.app');
+  // Production domains
   origins.push('https://app.mioutdoorteam.com');
+  origins.push('https://briskly-playful-sandwich.instance.app');
   
-  // Instance.app deployment patterns - ULTRA PERMISSIVE
+  // More permissive instance.app patterns for builds
+  origins.push('https://preview--briskly-playful-sandwich.instance.app');
   origins.push('https://staging--briskly-playful-sandwich.instance.app');
-  origins.push('https://dev--briskly-playful-sandwich.instance.app');
-  origins.push('https://build--briskly-playful-sandwich.instance.app');
-  origins.push('https://deploy--briskly-playful-sandwich.instance.app');
   
   // Development origins (only in non-production environments)
   if (process.env.NODE_ENV !== 'production') {
@@ -26,7 +23,7 @@ const getAllowedOrigins = (): string[] => {
     origins.push('http://127.0.0.1:3000');
     origins.push('http://localhost:3001');
     origins.push('http://127.0.0.1:3001');
-    origins.push('http://localhost:5000');
+    origins.push('http://localhost:5000'); // Additional dev ports
     origins.push('http://127.0.0.1:5000');
     origins.push('http://localhost:8080');
     origins.push('http://127.0.0.1:8080');
@@ -35,28 +32,11 @@ const getAllowedOrigins = (): string[] => {
   return origins;
 };
 
-// CRITICAL: Check deployment environment
-const isDeploymentMode = (): boolean => {
-  return !!(
-    process.env.INSTANCE_APP_BUILD === 'true' ||
-    process.env.NODE_ENV === 'production' ||
-    process.env.BUILD_MODE === 'true' ||
-    process.env.CI === 'true' ||
-    process.env.DEPLOYMENT === 'true'
-  );
-};
-
-// ULTRA-PERMISSIVE origin validation for deployment
+// Custom origin validation function with VERY permissive instance.app support
 const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-  // CRITICAL: Always allow in deployment mode
-  if (isDeploymentMode()) {
-    callback(null, true);
-    return;
-  }
-
   const allowedOrigins = getAllowedOrigins();
   
-  // Allow requests with no origin (server-to-server, same-origin, build processes)
+  // Allow requests with no origin (e.g., mobile apps, server-to-server, same-origin)
   if (!origin) {
     callback(null, true);
     return;
@@ -68,10 +48,8 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
     return;
   }
   
-  // CRITICAL: Ultra-permissive instance.app domain matching
-  if (origin.includes('instance.app') || 
-      origin.includes('briskly-playful-sandwich')) {
-    console.log(`✅ CORS: Allowing instance.app domain: ${origin}`);
+  // SUPER PERMISSIVE: Allow any instance.app domain
+  if (origin.includes('instance.app')) {
     callback(null, true);
     return;
   }
@@ -86,44 +64,33 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
     return;
   }
   
-  // ULTRA-PERMISSIVE: Allow all major deployment platforms
-  const allowedPlatforms = [
-    'vercel.app',
-    'netlify.app', 
-    'instance.app',
-    'herokuapp.com',
-    'railway.app',
-    'fly.dev',
-    'render.com',
-    'cloudflare.com',
-    'amazonaws.com',
-    'azure.com',
-    'googlecloud.com'
-  ];
-  
-  if (allowedPlatforms.some(platform => origin.includes(platform))) {
-    console.log(`✅ CORS: Allowing deployment platform: ${origin}`);
+  // In production or during builds, be very lenient with build processes
+  if (origin.includes('vercel.app') || 
+      origin.includes('netlify.app') || 
+      origin.includes('instance.app') ||
+      origin.includes('herokuapp.com') ||
+      origin.includes('railway.app') ||
+      origin.includes('fly.dev') ||
+      origin.includes('render.com')) {
     callback(null, true);
     return;
   }
   
-  // Log blocked origin attempt only in development
-  if (process.env.NODE_ENV !== 'production') {
-    console.warn(`❌ CORS: Blocked origin: ${origin}`);
-    SystemLogger.log('warn', 'CORS origin blocked', {
-      metadata: {
-        blocked_origin: origin,
-        allowed_origins: allowedOrigins,
-        timestamp: new Date().toISOString()
-      }
-    });
-  }
+  // Log blocked origin attempt with more context
+  console.warn(`CORS: Blocked origin attempt: ${origin}`);
+  console.warn(`CORS: Allowed origins:`, allowedOrigins);
+  SystemLogger.log('warn', 'CORS origin blocked', {
+    metadata: {
+      blocked_origin: origin,
+      allowed_origins: allowedOrigins,
+      timestamp: new Date().toISOString()
+    }
+  });
   
-  // In production/deployment, always allow to prevent failures
-  callback(null, true);
+  callback(new Error(`Origin ${origin} not allowed by CORS policy`), false);
 };
 
-// ULTRA-PERMISSIVE CORS configuration for deployment success
+// CORS configuration - VERY PERMISSIVE for deployment issues
 export const corsOptions: CorsOptions = {
   origin: validateOrigin,
   credentials: true,
@@ -144,10 +111,7 @@ export const corsOptions: CorsOptions = {
     'Host',
     'Connection',
     'Accept-Encoding',
-    'Accept-Language',
-    'X-Frame-Options',
-    'X-Content-Type-Options',
-    'Referrer-Policy'
+    'Accept-Language'
   ],
   exposedHeaders: [
     'Content-Disposition',
@@ -155,7 +119,7 @@ export const corsOptions: CorsOptions = {
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset'
   ],
-  maxAge: 86400, // 24 hours
+  maxAge: 86400, // Increased to 24 hours for better performance
   optionsSuccessStatus: 200,
   preflightContinue: false
 };
@@ -163,27 +127,17 @@ export const corsOptions: CorsOptions = {
 // Create CORS middleware
 export const corsMiddleware = cors(corsOptions);
 
-// Ultra-lenient CORS error handler
+// Custom CORS error handler middleware
 export const corsErrorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   if (err && err.message && err.message.includes('not allowed by CORS policy')) {
-    console.warn('⚠️ CORS Error - Allowing anyway for deployment:', {
+    console.warn('CORS Error Details:', {
       origin: req.headers.origin,
       host: req.headers.host,
       userAgent: req.headers['user-agent'],
       method: req.method,
       path: req.path,
-      isDeployment: isDeploymentMode()
+      allowedOrigins: getAllowedOrigins()
     });
-    
-    // In deployment mode, always allow CORS
-    if (isDeploymentMode()) {
-      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
-      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Requested-With, Origin');
-      res.setHeader('Vary', 'Origin');
-      return next();
-    }
     
     SystemLogger.log('warn', 'CORS request blocked', {
       req,
@@ -206,50 +160,22 @@ export const corsErrorHandler = (err: any, req: Request, res: Response, next: Ne
   next(err);
 };
 
-// Middleware to add Vary header
+// Middleware to add Vary header to all responses
 export const addVaryHeader = (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Vary', 'Origin');
   next();
 };
 
-// Ultra-permissive security headers for deployment compatibility
-export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
-  // Ultra-permissive CSP for deployment
-  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; font-src 'self' data: *; frame-src *; object-src 'none';");
-  
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  
-  // Ultra-permissive CORS headers as fallback for deployment
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Requested-With, Origin');
-  
-  next();
-};
-
-// Helper functions for debugging
+// Helper function to check if origin is allowed (for logging purposes)
 export const isOriginAllowed = (origin: string | undefined): boolean => {
-  // Always allow in deployment mode
-  if (isDeploymentMode()) return true;
-  
   if (!origin) return true;
   
   const allowedOrigins = getAllowedOrigins();
   
   if (allowedOrigins.includes(origin)) return true;
   
-  // Ultra permissive checks
+  // Super permissive check for various deployment platforms
   if (origin.includes('instance.app') ||
-      origin.includes('briskly-playful-sandwich') ||
       origin.includes('vercel.app') ||
       origin.includes('netlify.app') ||
       origin.includes('herokuapp.com') ||
@@ -268,25 +194,22 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   return false;
 };
 
+// Debug function to log CORS configuration
 export const logCorsConfig = () => {
-  const deploymentMode = isDeploymentMode();
-  console.log('🌐 CORS Configuration:');
-  console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
-  console.log('- BUILD_MODE:', process.env.BUILD_MODE || 'false');
-  console.log('- INSTANCE_APP_BUILD:', process.env.INSTANCE_APP_BUILD || 'false');
-  console.log('- CI:', process.env.CI || 'false');
-  console.log('- Deployment Mode:', deploymentMode ? 'ENABLED' : 'DISABLED');
-  console.log('- CORS Mode:', deploymentMode ? 'ULTRA-PERMISSIVE' : 'STANDARD');
-  
-  if (!deploymentMode) {
-    console.log('- Allowed origins:', getAllowedOrigins());
-  }
-  
+  console.log('CORS Configuration:');
+  console.log('- NODE_ENV:', process.env.NODE_ENV);
+  console.log('- Allowed origins:', getAllowedOrigins());
+  console.log('- Instance.app wildcard: ANY *.instance.app domain');
+  console.log('- Build platforms: vercel.app, netlify.app, herokuapp.com, railway.app, fly.dev, render.com');
   console.log('- Credentials:', corsOptions.credentials);
   console.log('- Methods:', corsOptions.methods);
+  console.log('- Allowed headers:', corsOptions.allowedHeaders);
+  console.log('- Exposed headers:', corsOptions.exposedHeaders);
+  console.log('- Max age:', corsOptions.maxAge);
+  console.log('- Very permissive mode for deployment compatibility');
 };
 
-// Middleware factory for ultra-permissive CORS
+// Middleware factory for applying CORS to specific routes
 export const createCorsMiddleware = (routePattern?: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (routePattern && !req.path.startsWith(routePattern)) {
@@ -295,12 +218,6 @@ export const createCorsMiddleware = (routePattern?: string) => {
     
     corsMiddleware(req, res, (err) => {
       if (err) {
-        // In deployment mode, ignore CORS errors completely
-        if (isDeploymentMode()) {
-          console.warn('⚠️ CORS error ignored in deployment mode:', err.message);
-          addVaryHeader(req, res, next);
-          return;
-        }
         corsErrorHandler(err, req, res, next);
         return;
       }
@@ -308,4 +225,23 @@ export const createCorsMiddleware = (routePattern?: string) => {
       addVaryHeader(req, res, next);
     });
   };
+};
+
+// Ultra-relaxed security headers middleware for build compatibility
+export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
+  // Ultra-permissive CSP for deployment compatibility
+  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; font-src 'self' data: *; frame-src *; object-src 'none';");
+  
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // Add permissive CORS headers as fallback
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Requested-With, Origin');
+  
+  next();
 };
