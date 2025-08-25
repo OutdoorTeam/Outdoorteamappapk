@@ -145,7 +145,26 @@ app.use('/api/', burstLimit);
 
 // Health check endpoint (exempted from rate limiting and CORS)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    app: 'outdoor-team'
+  });
+});
+
+// Simple root endpoint for basic connectivity test
+app.get('/', (req, res) => {
+  // In production, this will be handled by static serving
+  if (process.env.NODE_ENV === 'production') {
+    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+  } else {
+    res.json({ 
+      message: 'Outdoor Team API Server', 
+      status: 'running',
+      environment: process.env.NODE_ENV || 'development'
+    });
+  }
 });
 
 // Helper function to parse user features
@@ -1304,6 +1323,38 @@ if (process.env.NODE_ENV === 'production') {
   console.log('📁 Static file serving configured for production');
 }
 
+// Error handling middleware for unhandled routes
+app.use((req, res, next) => {
+  // If we reach here, route was not found
+  console.warn(`404 - Route not found: ${req.method} ${req.path}`);
+  
+  // For API routes, return JSON error
+  if (req.path.startsWith('/api/')) {
+    sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
+    return;
+  }
+  
+  // For non-API routes in production, let static serving handle it
+  if (process.env.NODE_ENV === 'production') {
+    res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+    return;
+  }
+  
+  // For development, return 404
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Global error handler
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled error:', error);
+  
+  if (res.headersSent) {
+    return next(error);
+  }
+  
+  sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor');
+});
+
 // Server initialization
 export const startServer = async (port = 3001) => {
   try {
@@ -1323,9 +1374,11 @@ export const startServer = async (port = 3001) => {
     notificationScheduler = new NotificationScheduler();
 
     // Start server
-    const server = app.listen(port, () => {
+    const server = app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 Listening on: 0.0.0.0:${port}`);
+      
       if (process.env.NODE_ENV !== 'production') {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
         console.log(`🔌 API server: http://localhost:${port}`);
