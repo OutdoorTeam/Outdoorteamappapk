@@ -58,11 +58,17 @@ const AdminPage: React.FC = () => {
   };
 
   const handleUserClick = (clickedUser: any) => {
-    setSelectedUser(clickedUser);
+    // Ensure user has proper features structure before setting
+    const userWithFeatures = {
+      ...clickedUser,
+      features: getUserFeatures(clickedUser)
+    };
+    setSelectedUser(userWithFeatures);
   };
 
   // Safe function to get user features with proper null checking
   const getUserFeatures = (userItem: any) => {
+    // Handle null, undefined, or non-object features
     if (!userItem?.features || typeof userItem.features !== 'object') {
       return {
         habits: false,
@@ -73,6 +79,7 @@ const AdminPage: React.FC = () => {
       };
     }
     
+    // Ensure all expected properties exist with boolean values
     return {
       habits: Boolean(userItem.features.habits),
       training: Boolean(userItem.features.training),
@@ -80,6 +87,34 @@ const AdminPage: React.FC = () => {
       meditation: Boolean(userItem.features.meditation),
       active_breaks: Boolean(userItem.features.active_breaks)
     };
+  };
+
+  const getFeatureIcon = (featureKey: string, enabled: boolean) => {
+    const icons = {
+      training: '💪',
+      nutrition: '🥗',
+      meditation: '🧘',
+      active_breaks: '☕',
+      habits: '📈'
+    };
+    
+    return (
+      <span className={enabled ? 'text-green-600' : 'text-gray-400'}>
+        {icons[featureKey as keyof typeof icons] || '📋'}
+      </span>
+    );
+  };
+
+  const getFeatureName = (featureKey: string) => {
+    const names = {
+      training: 'Entrenamiento',
+      nutrition: 'Nutrición',
+      meditation: 'Meditación',
+      active_breaks: 'Pausas Activas',
+      habits: 'Hábitos'
+    };
+    
+    return names[featureKey as keyof typeof names] || featureKey;
   };
 
   if (user?.role !== 'admin') {
@@ -196,11 +231,18 @@ const AdminPage: React.FC = () => {
                               
                               {/* Features */}
                               <div className="flex items-center gap-2 mt-2">
-                                {features.habits && <Badge variant="outline" className="text-xs">Hábitos</Badge>}
-                                {features.training && <Badge variant="outline" className="text-xs">Entrenamiento</Badge>}
-                                {features.nutrition && <Badge variant="outline" className="text-xs">Nutrición</Badge>}
-                                {features.meditation && <Badge variant="outline" className="text-xs">Meditación</Badge>}
-                                {features.active_breaks && <Badge variant="outline" className="text-xs">Pausas Activas</Badge>}
+                                {Object.entries(features).map(([key, enabled]) => (
+                                  enabled && (
+                                    <Badge key={key} variant="outline" className="text-xs">
+                                      {getFeatureName(key)}
+                                    </Badge>
+                                  )
+                                ))}
+                                {Object.values(features).every(val => !val) && (
+                                  <Badge variant="outline" className="text-xs text-gray-500">
+                                    Sin características activas
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
