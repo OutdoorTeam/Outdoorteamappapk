@@ -13,7 +13,7 @@ export function markdownToSafeHtml(markdown: string): string {
 
   try {
     // Convert markdown to HTML
-    const html = marked(markdown);
+    const html = marked(markdown) as string;
     
     // Basic HTML sanitization - removing dangerous tags and attributes
     const safeHtml = html
@@ -36,7 +36,7 @@ export function stripMarkdown(markdown: string): string {
 
   try {
     // Convert to HTML first
-    const html = marked(markdown);
+    const html = marked(markdown) as string;
     // Strip all HTML tags
     return html.replace(/<[^>]*>/g, '').trim();
   } catch (error) {

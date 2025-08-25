@@ -92,7 +92,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
       publicPath,
       indexExists: fs.existsSync(indexPath),
       publicDirExists: fs.existsSync(publicPath),
-      files: [],
+      files: [] as string[],
       timestamp: new Date().toISOString()
     };
 
@@ -182,7 +182,7 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
   }));
 
   // Fallback SPA simple
-  app.get('*', (req, res) => {
+  app.get('/*splat', (req, res) => {
     if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'API endpoint not found' });
     }
