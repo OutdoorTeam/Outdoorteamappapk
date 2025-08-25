@@ -194,16 +194,21 @@ const formatUserResponse = (user: any) => {
   };
 };
 
-// Mount API routes FIRST - this is critical for the content-library route to work
-app.use('/api/', statsRoutes);
-app.use('/api/', userStatsRoutes);
+// CRITICAL: Mount ALL API routes BEFORE static serving
+console.log('🔧 Mounting API routes...');
+
+// Mount API routes with /api prefix - ORDER MATTERS!
+app.use('/api', statsRoutes);
+app.use('/api', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/', nutritionPlanRoutes);
-app.use('/api/', trainingPlanRoutes);
-app.use('/api/', trainingScheduleRoutes);
+app.use('/api', nutritionPlanRoutes);
+app.use('/api', trainingPlanRoutes);
+app.use('/api', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
-app.use('/api/', apiRoutes); // This contains the content-library routes
+app.use('/api', apiRoutes); // This contains users, plans, content-library routes
+
+console.log('✅ API routes mounted successfully');
 
 // Auth Routes with CONDITIONAL Rate Limiting
 const authRateLimit = process.env.BUILD_MODE === 'true' ? 
@@ -724,7 +729,7 @@ app.put('/api/daily-habits/update',
     }
   });
 
-// Rest of existing routes with minimal changes...
+// Daily notes routes
 app.get('/api/daily-notes/today', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
@@ -801,7 +806,7 @@ app.post('/api/daily-notes',
     }
   });
 
-// Continue with all existing routes but skip rate limiting if needed...
+// Meditation sessions routes
 app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
@@ -857,32 +862,17 @@ app.post('/api/meditation-sessions',
     }
   });
 
-// Setup static serving for production
+// CRITICAL: Setup static serving AFTER all API routes
 if (process.env.NODE_ENV === 'production') {
+  console.log('🗂️ Setting up static file serving for production...');
   setupStaticServing(app);
-  console.log('📁 Static file serving configured for production');
+  console.log('✅ Static file serving configured for production');
 }
 
-// More permissive error handling
-app.use((req, res, next) => {
-  console.warn(`404 - Route not found: ${req.method} ${req.path}`);
-  
-  if (req.path.startsWith('/api/')) {
-    sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
-    return;
-  }
-  
-  if (process.env.NODE_ENV === 'production') {
-    const indexPath = path.join(process.cwd(), 'public', 'index.html');
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).json({ error: 'App not built' });
-    }
-    return;
-  }
-  
-  res.status(404).json({ error: 'Route not found' });
+// API route fallback - must be AFTER all specific API routes but BEFORE static serving
+app.use('/api/*', (req, res) => {
+  console.warn(`404 - API route not found: ${req.method} ${req.path}`);
+  sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
 });
 
 // Global error handler
@@ -928,6 +918,19 @@ export const startServer = async (port = 3001) => {
         console.log('📱 Push notifications: Disabled');
         console.log('   To enable: npm run generate-vapid && restart server');
       }
+
+      // Log all mounted API routes for debugging
+      console.log('📋 API Routes Summary:');
+      console.log('   - /api/users (GET) - Get all users');
+      console.log('   - /api/plans (GET/POST) - Plans management');
+      console.log('   - /api/content-library (GET/POST/PUT/DELETE) - Content management');
+      console.log('   - /api/auth/* - Authentication routes');
+      console.log('   - /api/daily-habits/* - Daily habits tracking');
+      console.log('   - /api/meditation-sessions - Meditation tracking');
+      console.log('   - /api/notifications/* - Notification settings');
+      console.log('   - /api/nutrition-plan/* - Nutrition plans');
+      console.log('   - /api/training-plan/* - Training plans');
+      console.log('   - /api/admin/* - Admin management');
     });
 
     const gracefulShutdown = async (signal: string) => {

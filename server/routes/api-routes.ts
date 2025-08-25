@@ -10,6 +10,81 @@ import {
 
 const router = express.Router();
 
+// Users routes
+router.get('/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all users');
+    
+    const users = await db
+      .selectFrom('users')
+      .select(['id', 'email', 'full_name', 'role', 'plan_type', 'is_active', 'created_at'])
+      .orderBy('created_at', 'desc')
+      .execute();
+    
+    console.log('Users fetched:', users.length);
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
+  }
+});
+
+// Plans routes
+router.get('/plans', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching plans for user:', req.user.email);
+    
+    const plans = await db
+      .selectFrom('plans')
+      .selectAll()
+      .where('is_active', '=', 1)
+      .orderBy('price', 'asc')
+      .execute();
+    
+    console.log('Plans fetched:', plans.length);
+    res.json(plans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
+  }
+});
+
+router.post('/plans', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    const { name, description, price, services_included, features_json } = req.body;
+    
+    console.log('Admin creating plan:', name);
+    
+    const plan = await db
+      .insertInto('plans')
+      .values({
+        name,
+        description,
+        price: price || 0,
+        services_included,
+        features_json: features_json || '{"habits": true, "training": true, "nutrition": false, "meditation": false, "active_breaks": true}',
+        is_active: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .returning(['id', 'name', 'price'])
+      .executeTakeFirst();
+    
+    await SystemLogger.log('info', 'Plan created', {
+      userId: req.user.id,
+      metadata: { plan_id: plan?.id, name }
+    });
+    
+    res.status(201).json(plan);
+  } catch (error) {
+    console.error('Error creating plan:', error);
+    await SystemLogger.logCriticalError('Plan creation error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al crear plan');
+  }
+});
+
 // Content Library Routes
 router.get('/content-library', authenticateToken, async (req: any, res: express.Response) => {
   try {

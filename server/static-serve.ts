@@ -51,11 +51,13 @@ export function setupStaticServing(app: express.Application) {
       console.error('Could not read current directory:', err);
     }
     
-    // Fallback: serve a simple message for debugging
+    // Fallback: ONLY handle non-API routes for debugging
     app.get('/*splat', (req, res) => {
+      // CRITICAL: Never interfere with API routes
       if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ error: 'API endpoint not found' });
+        return res.status(404).json({ error: 'API endpoint not found - static fallback should not handle this' });
       }
+      
       res.status(404).json({ 
         error: 'Static files not found',
         message: 'The application build files are missing',
@@ -73,43 +75,52 @@ export function setupStaticServing(app: express.Application) {
 function setupWithPath(app: express.Application, publicPath: string, indexPath: string) {
   console.log('🚀 Configuring static serving with path:', publicPath);
 
-  // Configurar express.static con opciones optimizadas para producción
-  app.use(express.static(publicPath, {
-    maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
-    etag: true,
-    lastModified: true,
-    index: false, // No servir index.html automáticamente desde static
-    setHeaders: (res, filePath) => {
-      const ext = path.extname(filePath).toLowerCase();
-      
-      // Cache agresivo para assets con hash (js, css con hash en el nombre)
-      if (ext === '.js' || ext === '.css') {
-        if (filePath.includes('-') || filePath.includes('.')) {
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 año
-        } else {
-          res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hora
-        }
-      }
-      // Cache moderado para imágenes y fuentes
-      else if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'].includes(ext)) {
-        res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 día
-      }
-      // No cache para HTML
-      else if (ext === '.html') {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-      }
-
-      // Headers de seguridad básicos para todos los archivos
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      
-      // Ultra-permissive CORS for static files (for deployment compatibility)
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', '*');
+  // CRITICAL: Configure express.static to NOT interfere with API routes
+  // This middleware will only handle file requests that don't start with /api/
+  app.use((req, res, next) => {
+    // BYPASS static serving for ALL API routes
+    if (req.path.startsWith('/api/')) {
+      return next(); // Let API routes handle it
     }
-  }));
+    
+    // For non-API routes, use express.static
+    express.static(publicPath, {
+      maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
+      etag: true,
+      lastModified: true,
+      index: false, // No servir index.html automáticamente desde static
+      setHeaders: (res, filePath) => {
+        const ext = path.extname(filePath).toLowerCase();
+        
+        // Cache agresivo para assets con hash (js, css con hash en el nombre)
+        if (ext === '.js' || ext === '.css') {
+          if (filePath.includes('-') || filePath.includes('.')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 año
+          } else {
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hora
+          }
+        }
+        // Cache moderado para imágenes y fuentes
+        else if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'].includes(ext)) {
+          res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 día
+        }
+        // No cache para HTML
+        else if (ext === '.html') {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+
+        // Headers de seguridad básicos para todos los archivos
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        
+        // Ultra-permissive CORS for static files (for deployment compatibility)
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', '*');
+      }
+    })(req, res, next);
+  });
 
   // Endpoint de health check para verificar que los archivos estáticos están disponibles
   app.get('/static-health', (req, res) => {
@@ -135,13 +146,14 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
     res.json(stats);
   });
 
-  // **CRÍTICO**: Fallback para SPA - debe ir DESPUÉS de todas las rutas API
+  // CRITICAL: SPA fallback - MUST be LAST and MUST NOT interfere with API routes
   app.get('/*splat', (req, res, next) => {
     const requestPath = req.path;
     
-    // Skip API routes
+    // CRITICAL: NEVER handle API routes in static serving
     if (requestPath.startsWith('/api/')) {
-      return next(); // Continuar al próximo middleware (probablemente 404 de API)
+      console.warn(`⚠️ Static fallback received API request: ${requestPath} - this should not happen!`);
+      return next(); // Pass to next middleware (should be 404 handler)
     }
 
     // Skip health checks
@@ -208,6 +220,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
   console.log('✅ Static serving configured successfully');
   console.log(`📂 Serving static files from: ${publicPath}`);
   console.log(`🏠 SPA fallback to: ${indexPath}`);
+  console.log('🔒 API routes protected: /api/* will NOT be handled by static serving');
 }
 
 // Función alternativa más simple para casos específicos
@@ -218,17 +231,23 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
   console.log('🔧 Setting up simple static serving');
   console.log('📁 Static path:', staticPath);
 
-  // Servir archivos estáticos con permisos ultra-amplios
-  app.use(express.static(staticPath, {
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
-    setHeaders: (res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', '*');
+  // CRITICAL: Only handle non-API routes
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next(); // Never interfere with API routes
     }
-  }));
+    
+    express.static(staticPath, {
+      maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
+      setHeaders: (res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', '*');
+      }
+    })(req, res, next);
+  });
 
-  // Fallback SPA simple
+  // Fallback SPA simple - NEVER handle API routes
   app.get('/*splat', (req, res) => {
     if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'API endpoint not found' });
