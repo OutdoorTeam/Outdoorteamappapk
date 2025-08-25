@@ -3,8 +3,7 @@ import express from 'express';
 import fs from 'fs';
 
 export function setupStaticServing(app: express.Application) {
-  // En producción, los archivos estáticos están en public/ (no dist/public)
-  // porque el build de Vite genera en dist/public y luego se copia a public/
+  // En producción, los archivos estáticos están en public/ 
   const publicPath = path.join(process.cwd(), 'public');
   const indexPath = path.join(publicPath, 'index.html');
   
@@ -22,24 +21,49 @@ export function setupStaticServing(app: express.Application) {
       path.join(process.cwd(), 'dist', 'public'),
       path.join(process.cwd(), 'client', 'dist'),
       path.join(__dirname, '..', 'public'),
-      path.join(__dirname, '..', '..', 'public')
+      path.join(__dirname, '..', '..', 'public'),
+      path.join(__dirname, '..', '..', 'dist', 'public'),
+      // For instance.app deployment structure
+      '/app/public',
+      '/app/dist/public',
+      './build',
+      './dist'
     ];
     
     for (const altPath of alternativePaths) {
       if (fs.existsSync(altPath)) {
         console.log('✅ Found alternative path:', altPath);
-        // Recrear variables con el path correcto
-        const altPublicPath = altPath;
-        const altIndexPath = path.join(altPublicPath, 'index.html');
+        const altIndexPath = path.join(altPath, 'index.html');
         
         if (fs.existsSync(altIndexPath)) {
-          console.log('✅ Using alternative public path:', altPublicPath);
-          return setupWithPath(app, altPublicPath, altIndexPath);
+          console.log('✅ Using alternative public path:', altPath);
+          return setupWithPath(app, altPath, altIndexPath);
         }
       }
     }
     
     console.error('❌ No valid public directory found!');
+    console.log('Available directories:');
+    try {
+      const currentDir = fs.readdirSync(process.cwd());
+      console.log('Current directory contents:', currentDir);
+    } catch (err) {
+      console.error('Could not read current directory:', err);
+    }
+    
+    // Fallback: serve a simple message for debugging
+    app.get('/*splat', (req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+      }
+      res.status(404).json({ 
+        error: 'Static files not found',
+        message: 'The application build files are missing',
+        searchedPaths: alternativePaths,
+        currentWorkingDirectory: process.cwd(),
+        nodeEnv: process.env.NODE_ENV
+      });
+    });
     return;
   }
 
@@ -51,8 +75,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
 
   // Configurar express.static con opciones optimizadas para producción
   app.use(express.static(publicPath, {
-    // Cache control para diferentes tipos de archivos
-    maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0', // 1 año para assets con hash
+    maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
     etag: true,
     lastModified: true,
     index: false, // No servir index.html automáticamente desde static
@@ -67,12 +90,10 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
           res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hora
         }
       }
-      
       // Cache moderado para imágenes y fuentes
       else if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'].includes(ext)) {
         res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 día
       }
-      
       // No cache para HTML
       else if (ext === '.html') {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -82,6 +103,11 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
 
       // Headers de seguridad básicos para todos los archivos
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      
+      // Ultra-permissive CORS for static files (for deployment compatibility)
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', '*');
     }
   }));
 
@@ -93,7 +119,9 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
       indexExists: fs.existsSync(indexPath),
       publicDirExists: fs.existsSync(publicPath),
       files: [] as string[],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      workingDirectory: process.cwd()
     };
 
     // Listar algunos archivos para debug
@@ -108,11 +136,10 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
   });
 
   // **CRÍTICO**: Fallback para SPA - debe ir DESPUÉS de todas las rutas API
-  // y DESPUÉS del middleware de archivos estáticos
   app.get('/*splat', (req, res, next) => {
     const requestPath = req.path;
     
-    // Skip API routes - estos deben manejarse antes que este middleware
+    // Skip API routes
     if (requestPath.startsWith('/api/')) {
       return next(); // Continuar al próximo middleware (probablemente 404 de API)
     }
@@ -127,27 +154,40 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
     const isAssetFile = [
       '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', 
       '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.json', '.xml',
-      '.txt', '.map'
+      '.txt', '.map', '.wasm'
     ].includes(fileExtension);
 
     if (isAssetFile) {
       // Si es un archivo asset que no existe, devolver 404
-      return next();
+      return res.status(404).json({ 
+        error: 'Asset not found',
+        path: requestPath,
+        type: 'asset'
+      });
     }
 
     // Para todo lo demás (rutas SPA), servir index.html
     console.log(`📝 SPA fallback for route: ${requestPath}`);
     
     if (fs.existsSync(indexPath)) {
-      res.setHeader('Content-Type', 'text/html');
+      // Set headers for SPA routing
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      // Ultra-permissive CORS for SPA
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      
       res.sendFile(indexPath, (err) => {
         if (err) {
           console.error('❌ Error serving index.html:', err);
           res.status(500).json({ 
             error: 'Error loading application',
             message: err.message,
-            path: requestPath
+            path: requestPath,
+            indexPath
           });
         }
       });
@@ -158,7 +198,9 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
         message: 'The application build files are missing',
         indexPath,
         publicPath,
-        requestedPath: requestPath
+        requestedPath: requestPath,
+        environment: process.env.NODE_ENV,
+        workingDirectory: process.cwd()
       });
     }
   });
@@ -176,9 +218,14 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
   console.log('🔧 Setting up simple static serving');
   console.log('📁 Static path:', staticPath);
 
-  // Servir archivos estáticos
+  // Servir archivos estáticos con permisos ultra-amplios
   app.use(express.static(staticPath, {
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0'
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+    }
   }));
 
   // Fallback SPA simple
@@ -188,9 +235,16 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
     }
     
     if (fs.existsSync(indexFile)) {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.sendFile(indexFile);
     } else {
-      res.status(404).json({ error: 'Application not built' });
+      res.status(404).json({ 
+        error: 'Application not built',
+        staticPath,
+        indexFile,
+        exists: fs.existsSync(staticPath)
+      });
     }
   });
 

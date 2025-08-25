@@ -18,6 +18,7 @@ import trainingPlanRoutes from './routes/training-plan-routes.js';
 import trainingScheduleRoutes from './routes/training-schedule-routes.js';
 import userManagementRoutes from './routes/user-management-routes.js';
 import userGoalsRoutes from './routes/user-goals-routes.js';
+import apiRoutes from './routes/api-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -193,7 +194,7 @@ const formatUserResponse = (user: any) => {
   };
 };
 
-// Mount routes
+// Mount API routes FIRST - this is critical for the content-library route to work
 app.use('/api/', statsRoutes);
 app.use('/api/', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -202,6 +203,7 @@ app.use('/api/', trainingPlanRoutes);
 app.use('/api/', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
+app.use('/api/', apiRoutes); // This contains the content-library routes
 
 // Auth Routes with CONDITIONAL Rate Limiting
 const authRateLimit = process.env.BUILD_MODE === 'true' ? 
