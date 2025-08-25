@@ -1,42 +1,91 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/assets/logo-gold.png" />
+    <link rel="apple-touch-icon" href="/assets/logo-gold.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#D3B869" />
-    <meta name="description" content="Outdoor Team - Academia de Hábitos Saludables. Entrenamiento, Nutrición, Meditación y más." />
+    <meta name="description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral" />
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- OpenGraph Meta Tags -->
+    <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="Outdoor Team - Academia de Hábitos Saludables" />
-    <meta property="og:description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar." />
-    <meta property="og:type" content="website" />
+    <meta property="og:description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral" />
     <meta property="og:image" content="/assets/logo-gold.png" />
+    <meta property="og:type" content="website" />
     
-    <title>Outdoor Team - Academia de Hábitos Saludables</title>
+    <title>Outdoor Team</title>
+    
+    <style>
+      /* Loading spinner for better UX */
+      .loading-spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(211, 184, 105, 0.3);
+        border-radius: 50%;
+        border-top-color: #D3B869;
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      
+      /* Hide loading screen when React app loads */
+      body.loaded .loading-screen {
+        display: none;
+      }
+    </style>
   </head>
   <body>
+    <!-- Loading screen -->
+    <div class="loading-screen">
+      <div class="loading-spinner"></div>
+    </div>
+    
+    <!-- React app root -->
     <div id="root"></div>
+    
     <script type="module" src="/src/main.tsx"></script>
     
     <!-- Service Worker Registration -->
     <script>
+      // Register service worker for PWA functionality
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-              console.log('Service Worker registered successfully:', registration.scope);
+              console.log('SW registered: ', registration);
             })
-            .catch((error) => {
-              console.log('Service Worker registration failed:', error);
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
             });
         });
       }
+      
+      // Hide loading screen when React app loads
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          document.body.classList.add('loaded');
+        }, 100);
+      });
     </script>
   </body>
 </html>

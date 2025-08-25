@@ -11,18 +11,24 @@ const getAllowedOrigins = (): string[] => {
   origins.push('https://app.mioutdoorteam.com');
   origins.push('https://briskly-playful-sandwich.instance.app');
   
+  // Include preview deployments for instance.app (common pattern)
+  origins.push('https://preview--briskly-playful-sandwich.instance.app');
+  origins.push('https://staging--briskly-playful-sandwich.instance.app');
+  
   // Development origins (only in non-production environments)
   if (process.env.NODE_ENV !== 'production') {
     origins.push('http://localhost:5173');
     origins.push('http://127.0.0.1:5173');
     origins.push('http://localhost:3000');
     origins.push('http://127.0.0.1:3000');
+    origins.push('http://localhost:3001');
+    origins.push('http://127.0.0.1:3001');
   }
   
   return origins;
 };
 
-// Custom origin validation function
+// Custom origin validation function with wildcard support for instance.app
 const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
   const allowedOrigins = getAllowedOrigins();
   
@@ -34,6 +40,23 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
   
   // Check if origin is in allowlist
   if (allowedOrigins.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+  
+  // Allow any subdomain of briskly-playful-sandwich.instance.app for deployments
+  if (origin.endsWith('.briskly-playful-sandwich.instance.app') || 
+      origin === 'https://briskly-playful-sandwich.instance.app') {
+    callback(null, true);
+    return;
+  }
+  
+  // Allow localhost in development with any port
+  if (process.env.NODE_ENV !== 'production' && 
+      (origin.startsWith('http://localhost:') || 
+       origin.startsWith('http://127.0.0.1:') ||
+       origin.startsWith('https://localhost:') ||
+       origin.startsWith('https://127.0.0.1:'))) {
     callback(null, true);
     return;
   }
@@ -126,7 +149,26 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   if (!origin) return true; // Allow requests with no origin
   
   const allowedOrigins = getAllowedOrigins();
-  return allowedOrigins.includes(origin);
+  
+  // Check explicit allowlist
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Check instance.app pattern
+  if (origin.endsWith('.briskly-playful-sandwich.instance.app') || 
+      origin === 'https://briskly-playful-sandwich.instance.app') {
+    return true;
+  }
+  
+  // Check localhost in development
+  if (process.env.NODE_ENV !== 'production' && 
+      (origin.startsWith('http://localhost:') || 
+       origin.startsWith('http://127.0.0.1:') ||
+       origin.startsWith('https://localhost:') ||
+       origin.startsWith('https://127.0.0.1:'))) {
+    return true;
+  }
+  
+  return false;
 };
 
 // Debug function to log CORS configuration (development only)
@@ -134,6 +176,7 @@ export const logCorsConfig = () => {
   console.log('CORS Configuration:');
   console.log('- NODE_ENV:', process.env.NODE_ENV);
   console.log('- Allowed origins:', getAllowedOrigins());
+  console.log('- Instance.app wildcard: *.briskly-playful-sandwich.instance.app');
   console.log('- Credentials:', corsOptions.credentials);
   console.log('- Methods:', corsOptions.methods);
   console.log('- Allowed headers:', corsOptions.allowedHeaders);

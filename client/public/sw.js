@@ -184,4 +184,36 @@ self.addEventListener('sync', (event) => {
   }
 });
 
+// Handle CORS issues in service worker
+self.addEventListener('fetch', (event) => {
+  // Only handle requests to the same origin or instance.app domains
+  const url = new URL(event.request.url);
+  const allowedOrigins = [
+    self.location.origin,
+    'https://briskly-playful-sandwich.instance.app',
+    'https://preview--briskly-playful-sandwich.instance.app'
+  ];
+  
+  if (!allowedOrigins.some(origin => url.origin === origin) && 
+      !url.hostname.endsWith('.briskly-playful-sandwich.instance.app')) {
+    return;
+  }
+
+  // Add CORS headers to API requests in service worker context
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Clone response to add headers
+          const responseClone = response.clone();
+          return responseClone;
+        })
+        .catch(error => {
+          console.error('Service Worker API fetch error:', error);
+          throw error;
+        })
+    );
+  }
+});
+
 console.log('Service Worker script loaded');
