@@ -18,7 +18,6 @@ import trainingPlanRoutes from './routes/training-plan-routes.js';
 import trainingScheduleRoutes from './routes/training-schedule-routes.js';
 import userManagementRoutes from './routes/user-management-routes.js';
 import userGoalsRoutes from './routes/user-goals-routes.js';
-import apiRoutes from './routes/api-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -123,10 +122,10 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Security headers for all routes (ULTRA-RELAXED for production deployment)
+// Security headers for all routes (RELAXED)
 app.use(securityHeaders);
 
-// Body parsing middleware with larger limits for builds and production
+// Body parsing middleware with larger limits for builds
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -134,21 +133,13 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(corsMiddleware);
 app.use(corsErrorHandler);
 
-// PRODUCTION SAFE: Rate limiting is now completely disabled in production
-const isRateLimitingDisabled = process.env.DISABLE_RATE_LIMITING === 'true' || 
-                              process.env.NODE_ENV === 'production' ||
-                              process.env.BUILD_MODE === 'true' ||
-                              process.env.INSTANCE_APP_BUILD === 'true';
-
-if (!isRateLimitingDisabled) {
-  console.log('🚦 Rate limiting enabled for development');
+// CONDITIONAL rate limiting - disabled for build processes
+if (process.env.BUILD_MODE !== 'true' && process.env.INSTANCE_APP_BUILD !== 'true') {
   app.use('/api/', globalApiLimit);
   app.use('/api/', burstLimit);
-} else {
-  console.log('🚫 Rate limiting disabled for production/build');
 }
 
-// Health check endpoint (always exempted from rate limiting and CORS)
+// Health check endpoint (exempted from rate limiting and CORS)
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -156,9 +147,7 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     app: 'outdoor-team',
     build_mode: process.env.BUILD_MODE || 'false',
-    instance_app_build: process.env.INSTANCE_APP_BUILD || 'false',
-    rate_limiting_disabled: isRateLimitingDisabled.toString(),
-    disable_rate_limiting_env: process.env.DISABLE_RATE_LIMITING || 'not-set'
+    instance_app_build: process.env.INSTANCE_APP_BUILD || 'false'
   });
 });
 
@@ -170,8 +159,7 @@ app.get('/', (req, res) => {
     res.json({ 
       message: 'Outdoor Team API Server', 
       status: 'running',
-      environment: process.env.NODE_ENV || 'development',
-      rate_limiting_disabled: isRateLimitingDisabled
+      environment: process.env.NODE_ENV || 'development'
     });
   }
 });
@@ -205,25 +193,31 @@ const formatUserResponse = (user: any) => {
   };
 };
 
-// CRITICAL: Mount ALL API routes BEFORE static serving
-console.log('🔧 Mounting API routes...');
-
-// Mount API routes with /api prefix - ORDER MATTERS!
-app.use('/api', statsRoutes);
-app.use('/api', userStatsRoutes);
+// Mount routes
+app.use('/api/', statsRoutes);
+app.use('/api/', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api', nutritionPlanRoutes);
-app.use('/api', trainingPlanRoutes);
-app.use('/api', trainingScheduleRoutes);
+app.use('/api/', nutritionPlanRoutes);
+app.use('/api/', trainingPlanRoutes);
+app.use('/api/', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
-app.use('/api', apiRoutes); // This contains users, plans, content-library routes
 
-console.log('✅ API routes mounted successfully');
+// Auth Routes with CONDITIONAL Rate Limiting
+const authRateLimit = process.env.BUILD_MODE === 'true' ? 
+  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
+  registerLimit;
 
-// Auth Routes - Rate limiting is now safely handled
+const loginRateLimit = process.env.BUILD_MODE === 'true' ? 
+  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
+  loginLimit;
+
+const loginBlockCheck = process.env.BUILD_MODE === 'true' ? 
+  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
+  checkLoginBlock;
+
 app.post('/api/auth/register',
-  registerLimit,  // This is now a no-op in production
+  authRateLimit,
   validateRequest(registerSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -325,8 +319,8 @@ app.post('/api/auth/register',
   });
 
 app.post('/api/auth/login',
-  checkLoginBlock,  // This is now a no-op in production
-  loginLimit,       // This is now a no-op in production
+  loginBlockCheck,
+  loginRateLimit,
   validateRequest(loginSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -407,7 +401,7 @@ app.post('/api/auth/login',
   });
 
 app.post('/api/auth/reset-password',
-  passwordResetLimit,  // This is now a no-op in production
+  passwordResetLimit,
   async (req: express.Request, res: express.Response) => {
     try {
       await SystemLogger.log('info', 'Password reset requested');
@@ -728,7 +722,7 @@ app.put('/api/daily-habits/update',
     }
   });
 
-// Daily notes routes
+// Rest of existing routes with minimal changes...
 app.get('/api/daily-notes/today', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
@@ -805,7 +799,7 @@ app.post('/api/daily-notes',
     }
   });
 
-// Meditation sessions routes
+// Continue with all existing routes but skip rate limiting if needed...
 app.get('/api/meditation-sessions', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
@@ -861,17 +855,32 @@ app.post('/api/meditation-sessions',
     }
   });
 
-// CRITICAL: Setup static serving AFTER all API routes
+// Setup static serving for production
 if (process.env.NODE_ENV === 'production') {
-  console.log('🗂️ Setting up static file serving for production...');
   setupStaticServing(app);
-  console.log('✅ Static file serving configured for production');
+  console.log('📁 Static file serving configured for production');
 }
 
-// API route fallback - must be AFTER all specific API routes but BEFORE static serving
-app.use('/api/*splat', (req, res) => {
-  console.warn(`404 - API route not found: ${req.method} ${req.path}`);
-  sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
+// More permissive error handling
+app.use((req, res, next) => {
+  console.warn(`404 - Route not found: ${req.method} ${req.path}`);
+  
+  if (req.path.startsWith('/api/')) {
+    sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
+    return;
+  }
+  
+  if (process.env.NODE_ENV === 'production') {
+    const indexPath = path.join(process.cwd(), 'public', 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({ error: 'App not built' });
+    }
+    return;
+  }
+  
+  res.status(404).json({ error: 'Route not found' });
 });
 
 // Global error handler
@@ -903,8 +912,6 @@ export const startServer = async (port = 3001) => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
-      console.log(`🚦 Rate limiting: ${isRateLimitingDisabled ? 'DISABLED' : 'ENABLED'}`);
-      console.log(`🔧 DISABLE_RATE_LIMITING: ${process.env.DISABLE_RATE_LIMITING || 'not-set'}`);
       
       if (process.env.NODE_ENV !== 'production') {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
@@ -919,19 +926,6 @@ export const startServer = async (port = 3001) => {
         console.log('📱 Push notifications: Disabled');
         console.log('   To enable: npm run generate-vapid && restart server');
       }
-
-      // Log all mounted API routes for debugging
-      console.log('📋 API Routes Summary:');
-      console.log('   - /api/users (GET) - Get all users');
-      console.log('   - /api/plans (GET/POST) - Plans management');
-      console.log('   - /api/content-library (GET/POST/PUT/DELETE) - Content management');
-      console.log('   - /api/auth/* - Authentication routes');
-      console.log('   - /api/daily-habits/* - Daily habits tracking');
-      console.log('   - /api/meditation-sessions - Meditation tracking');
-      console.log('   - /api/notifications/* - Notification settings');
-      console.log('   - /api/nutrition-plan/* - Nutrition plans');
-      console.log('   - /api/training-plan/* - Training plans');
-      console.log('   - /api/admin/* - Admin management');
     });
 
     const gracefulShutdown = async (signal: string) => {

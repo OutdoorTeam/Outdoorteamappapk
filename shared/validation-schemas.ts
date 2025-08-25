@@ -61,7 +61,7 @@ export const contentLibrarySchema = z.object({
   video_url: z.string().url('URL del video inválida').optional(),
   category: z.enum(['exercise', 'active_breaks', 'meditation'], {
     required_error: 'La categoría es requerida',
-    message: 'La categoría es requerida'
+    invalid_type_error: 'Categoría inválida'
   }),
   subcategory: z.string().max(50).optional(),
   is_active: z.boolean().optional()
