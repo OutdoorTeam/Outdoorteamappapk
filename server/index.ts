@@ -152,6 +152,82 @@ app.get('/health', (req, res) => {
   });
 });
 
+// System logs endpoint for debugging (admin only)
+app.get('/api/system-logs', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching system logs');
+
+    const { level, limit = 100 } = req.query;
+    
+    let query = db
+      .selectFrom('system_logs')
+      .selectAll()
+      .orderBy('created_at', 'desc')
+      .limit(parseInt(limit as string));
+
+    if (level) {
+      query = query.where('level', '=', level as string);
+    }
+
+    const logs = await query.execute();
+
+    console.log('System logs fetched:', logs.length);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching system logs:', error);
+    await SystemLogger.logCriticalError('System logs fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener logs del sistema');
+  }
+});
+
+// Diagnostic endpoint (admin only)
+app.get('/api/diagnostics', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin requesting diagnostics');
+
+    // Check database connection
+    const dbTest = await db.selectFrom('users').select('id').limit(1).execute();
+    
+    // Check file system
+    const dataExists = fs.existsSync(DATA_DIRECTORY);
+    const uploadsExists = fs.existsSync(uploadsDir);
+    
+    // Get environment info
+    const envInfo = {
+      NODE_ENV: process.env.NODE_ENV,
+      BUILD_MODE: process.env.BUILD_MODE,
+      INSTANCE_APP_BUILD: process.env.INSTANCE_APP_BUILD,
+      DATA_DIRECTORY: DATA_DIRECTORY,
+      VAPID_CONFIGURED: checkVapidConfiguration()
+    };
+
+    const diagnostics = {
+      database: {
+        connected: true,
+        test_query_rows: dbTest.length
+      },
+      filesystem: {
+        data_directory_exists: dataExists,
+        uploads_directory_exists: uploadsExists,
+        data_path: DATA_DIRECTORY,
+        uploads_path: uploadsDir
+      },
+      environment: envInfo,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log('Diagnostics completed:', diagnostics);
+    res.json(diagnostics);
+  } catch (error) {
+    console.error('Error running diagnostics:', error);
+    await SystemLogger.logCriticalError('Diagnostics error', error as Error, { userId: req.user?.id });
+    res.status(500).json({
+      error: 'Diagnostics failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Simple root endpoint
 app.get('/', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
@@ -245,6 +321,32 @@ app.get('/api/plans', authenticateToken, async (req: any, res: express.Response)
     console.error('Error fetching plans:', error);
     await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
+  }
+});
+
+// Content Library Route (Critical for AdminPage)
+app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    const { category } = req.query;
+    console.log('Fetching content library for user:', req.user.email, 'category:', category);
+    
+    let query = db
+      .selectFrom('content_library')
+      .selectAll()
+      .where('is_active', '=', 1);
+    
+    if (category) {
+      query = query.where('category', '=', category as string);
+    }
+    
+    const content = await query.execute();
+    
+    console.log('Content library items fetched:', content.length);
+    res.json(content);
+  } catch (error) {
+    console.error('Error fetching content library:', error);
+    await SystemLogger.logCriticalError('Content library fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener biblioteca de contenido');
   }
 });
 
@@ -941,6 +1043,13 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 
 export const startServer = async (port = 3001) => {
   try {
+    console.log('🔄 Starting server initialization...');
+    console.log('📂 Data directory:', DATA_DIRECTORY);
+    console.log('🏗️  Build mode:', process.env.BUILD_MODE || 'false');
+    console.log('🌐 Instance app build:', process.env.INSTANCE_APP_BUILD || 'false');
+
+    // Test database connection with detailed logging
+    console.log('🔌 Testing database connection...');
     await db.selectFrom('users').select('id').limit(1).execute();
     console.log('✅ Database connection established');
 
@@ -957,6 +1066,8 @@ export const startServer = async (port = 3001) => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
+      console.log(`📂 Current working directory: ${process.cwd()}`);
+      console.log(`📁 Data directory: ${DATA_DIRECTORY}`);
       
       if (process.env.NODE_ENV !== 'production') {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
@@ -971,6 +1082,8 @@ export const startServer = async (port = 3001) => {
         console.log('📱 Push notifications: Disabled');
         console.log('   To enable: npm run generate-vapid && restart server');
       }
+
+      console.log('✅ Server startup completed successfully');
     });
 
     const gracefulShutdown = async (signal: string) => {
@@ -1013,6 +1126,14 @@ export const startServer = async (port = 3001) => {
     return server;
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      name: error instanceof Error ? error.name : 'Unknown',
+      cwd: process.cwd(),
+      dataDir: DATA_DIRECTORY,
+      env: process.env.NODE_ENV
+    });
     process.exit(1);
   }
 };

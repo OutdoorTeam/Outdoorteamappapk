@@ -12,6 +12,7 @@ import BroadcastNotifications from '@/components/admin/BroadcastNotifications';
 import UserDetailPanel from '@/components/admin/UserDetailPanel';
 import ContentManagement from '@/components/admin/ContentManagement';
 import PlansManagementPage from '@/pages/admin/PlansManagementPage';
+import DiagnosticsPage from '@/pages/admin/DiagnosticsPage';
 import { 
   Users, 
   Shield, 
@@ -23,7 +24,8 @@ import {
   Dumbbell,
   Mail,
   Play,
-  Eye
+  Eye,
+  Activity
 } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
@@ -31,8 +33,8 @@ const AdminPage: React.FC = () => {
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = React.useState<any>(null);
   
-  const { data: users, isLoading: usersLoading } = useUsers();
-  const { data: plans } = usePlans();
+  const { data: users, isLoading: usersLoading, error: usersError } = useUsers();
+  const { data: plans, error: plansError } = usePlans();
   const toggleUserStatusMutation = useToggleUserStatus();
 
   const handleToggleUserStatus = async (userId: number, currentStatus: boolean) => {
@@ -95,7 +97,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
@@ -116,6 +118,10 @@ const AdminPage: React.FC = () => {
             <Settings className="w-4 h-4" />
             Configuración
           </TabsTrigger>
+          <TabsTrigger value="diagnostics" className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            Diagnósticos
+          </TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
@@ -135,6 +141,14 @@ const AdminPage: React.FC = () => {
                 <div className="text-center py-8">
                   <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
                   <p className="text-sm text-muted-foreground">Cargando usuarios...</p>
+                </div>
+              ) : usersError ? (
+                <div className="text-center py-8">
+                  <div className="text-red-600 mb-4">
+                    <Shield className="w-12 h-12 mx-auto mb-2" />
+                    <p className="text-lg font-medium">Error al cargar usuarios</p>
+                    <p className="text-sm">Revisa la pestaña "Diagnósticos" para más detalles</p>
+                  </div>
                 </div>
               ) : users && users.length > 0 ? (
                 <div className="space-y-4">
@@ -235,6 +249,11 @@ const AdminPage: React.FC = () => {
               </CardTitle>
               <CardDescription>
                 Administra la biblioteca de videos para entrenamientos
+                {plansError && (
+                  <div className="text-red-600 text-sm mt-2">
+                    ⚠️ Error al cargar contenido. Revisa la pestaña "Diagnósticos"
+                  </div>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -245,7 +264,22 @@ const AdminPage: React.FC = () => {
 
         {/* Plans Tab */}
         <TabsContent value="plans">
-          <PlansManagementPage />
+          <div className="space-y-4">
+            {plansError && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-red-800">
+                    <Shield className="w-5 h-5" />
+                    <span className="font-medium">Error al cargar planes</span>
+                  </div>
+                  <p className="text-sm text-red-700 mt-1">
+                    No se pudieron cargar los planes desde la base de datos. Revisa la pestaña "Diagnósticos" para más información.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            <PlansManagementPage />
+          </div>
         </TabsContent>
 
         {/* Notifications Tab */}
@@ -307,11 +341,21 @@ const AdminPage: React.FC = () => {
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center justify-between">
                           <span>Base de datos:</span>
-                          <Badge variant="default">Conectada</Badge>
+                          <Badge variant={users ? "default" : "destructive"}>
+                            {users ? "Conectada" : "Error"}
+                          </Badge>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>Notificaciones Push:</span>
-                          <Badge variant="default">Configuradas</Badge>
+                          <span>API de usuarios:</span>
+                          <Badge variant={usersError ? "destructive" : "default"}>
+                            {usersError ? "Error" : "OK"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>API de planes:</span>
+                          <Badge variant={plansError ? "destructive" : "default"}>
+                            {plansError ? "Error" : "OK"}
+                          </Badge>
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Versión:</span>
@@ -320,10 +364,35 @@ const AdminPage: React.FC = () => {
                       </div>
                     </Card>
                   </div>
+
+                  {/* Error Messages */}
+                  {(usersError || plansError) && (
+                    <Card className="border-red-200 bg-red-50">
+                      <CardContent className="p-4">
+                        <h4 className="font-medium text-red-800 mb-2">Errores del Sistema</h4>
+                        <div className="space-y-2 text-sm text-red-700">
+                          {usersError && (
+                            <div>• Error de usuarios: No se pueden cargar los usuarios</div>
+                          )}
+                          {plansError && (
+                            <div>• Error de planes: No se pueden cargar los planes</div>
+                          )}
+                          <div className="mt-3 p-2 bg-red-100 rounded text-xs">
+                            💡 Revisa la pestaña "Diagnósticos" para información detallada del problema
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Diagnostics Tab */}
+        <TabsContent value="diagnostics">
+          <DiagnosticsPage />
         </TabsContent>
       </Tabs>
     </div>
