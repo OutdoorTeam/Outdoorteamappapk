@@ -52,10 +52,11 @@ export function setupStaticServing(app: express.Application) {
     }
     
     // Fallback: ONLY handle non-API routes for debugging
-    app.get('/*splat', (req, res) => {
+    app.get('/*splat', (req: express.Request, res: express.Response) => {
       // CRITICAL: Never interfere with API routes
       if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ error: 'API endpoint not found - static fallback should not handle this' });
+        res.status(404).json({ error: 'API endpoint not found - static fallback should not handle this' });
+        return;
       }
       
       res.status(404).json({ 
@@ -77,7 +78,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
 
   // CRITICAL: Configure express.static to NOT interfere with API routes
   // This middleware will only handle file requests that don't start with /api/
-  app.use((req, res, next) => {
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     // BYPASS static serving for ALL API routes
     if (req.path.startsWith('/api/')) {
       return next(); // Let API routes handle it
@@ -125,7 +126,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
   });
 
   // Endpoint de health check para verificar que los archivos estáticos están disponibles
-  app.get('/static-health', (req, res) => {
+  app.get('/static-health', (req: express.Request, res: express.Response) => {
     const stats = {
       status: 'ok',
       publicPath,
@@ -149,7 +150,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
   });
 
   // CRITICAL: SPA fallback - MUST be LAST and MUST NOT interfere with API routes
-  app.get('/*splat', (req, res, next) => {
+  app.get('/*splat', (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const requestPath = req.path;
     
     // CRITICAL: NEVER handle API routes in static serving
@@ -173,11 +174,12 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
 
     if (isAssetFile) {
       // Si es un archivo asset que no existe, devolver 404
-      return res.status(404).json({ 
+      res.status(404).json({ 
         error: 'Asset not found',
         path: requestPath,
         type: 'asset'
       });
+      return;
     }
 
     // Para todo lo demás (rutas SPA), servir index.html
@@ -234,7 +236,7 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
   console.log('📁 Static path:', staticPath);
 
   // CRITICAL: Only handle non-API routes
-  app.use((req, res, next) => {
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (req.path.startsWith('/api/')) {
       return next(); // Never interfere with API routes
     }
@@ -252,9 +254,10 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
   });
 
   // Fallback SPA simple - NEVER handle API routes
-  app.get('/*splat', (req, res) => {
+  app.get('/*splat', (req: express.Request, res: express.Response) => {
     if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'API endpoint not found' });
+      res.status(404).json({ error: 'API endpoint not found' });
+      return;
     }
     
     if (fs.existsSync(indexFile)) {
