@@ -105,12 +105,18 @@ class RateLimiter {
   createMiddleware(config: RateLimitConfig) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
-        // PRODUCTION SAFE: Always skip rate limiting in production and when explicitly disabled
+        // CRITICAL FIX: Completely disable rate limiting in production, build mode, or instance.app
         if (process.env.DISABLE_RATE_LIMITING === 'true' || 
             process.env.NODE_ENV === 'production' ||
             process.env.BUILD_MODE === 'true' ||
             process.env.INSTANCE_APP_BUILD === 'true' ||
+            req.hostname?.includes('instance.app') ||
             this.shouldSkipRateLimit(req)) {
+          return next();
+        }
+        
+        // Only apply rate limiting in development
+        if (process.env.NODE_ENV !== 'development') {
           return next();
         }
         
@@ -190,7 +196,7 @@ class RateLimiter {
         next();
       } catch (error) {
         console.error('Rate limiting error:', error);
-        // Always continue on rate limiting errors to prevent build failures
+        // Always continue on rate limiting errors to prevent deployment failures
         next();
       }
     };
@@ -213,14 +219,15 @@ class RateLimiter {
   private shouldSkipRateLimit(req: Request): boolean {
     const path = req.path;
     
-    // Skip ALL paths in production and build environments
+    // Skip ALL requests in production, build mode, or instance.app environments
     if (process.env.NODE_ENV === 'production' ||
         process.env.BUILD_MODE === 'true' ||
-        process.env.INSTANCE_APP_BUILD === 'true') {
+        process.env.INSTANCE_APP_BUILD === 'true' ||
+        req.hostname?.includes('instance.app')) {
       return true;
     }
     
-    // Skip many paths for builds and health checks
+    // Skip health checks, static files, and build-related paths
     if (path === '/health' || 
         path === '/api/health' ||
         path === '/static-health' ||
@@ -229,6 +236,8 @@ class RateLimiter {
         path.startsWith('/webhook/') || 
         path.startsWith('/api/webhook/') ||
         path.startsWith('/static/') ||
+        path.startsWith('/assets/') ||
+        path.startsWith('/public/') ||
         path.includes('.js') ||
         path.includes('.css') ||
         path.includes('.png') ||
@@ -237,7 +246,10 @@ class RateLimiter {
         path.includes('.map') ||
         path.includes('.woff') ||
         path.includes('.ttf') ||
-        path.includes('.svg')) {
+        path.includes('.svg') ||
+        path.includes('.json') ||
+        path.includes('.xml') ||
+        path.includes('.txt')) {
       return true;
     }
     
@@ -296,19 +308,27 @@ class RateLimiter {
 
 export const rateLimiter = new RateLimiter();
 
-// Create no-op middleware functions when rate limiting is disabled
+// Create no-op middleware functions for production/build environments
 const createNoOpMiddleware = (customMessage?: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Always pass through when rate limiting is disabled
+    // Always pass through - no rate limiting
     next();
   };
 };
 
-// PRODUCTION SAFE: Export either actual rate limiters or no-op functions
-export const globalApiLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
+// CRITICAL FIX: Always disable rate limiting in production or instance.app
+const isRateLimitingDisabled = process.env.DISABLE_RATE_LIMITING === 'true' || 
                               process.env.NODE_ENV === 'production' ||
                               process.env.BUILD_MODE === 'true' ||
-                              process.env.INSTANCE_APP_BUILD === 'true'
+                              process.env.INSTANCE_APP_BUILD === 'true' ||
+                              process.env.NODE_ENV !== 'development';
+
+console.log(`🚦 Rate Limiting Status: ${isRateLimitingDisabled ? 'DISABLED' : 'ENABLED'}`);
+console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🔧 Build Mode: ${process.env.BUILD_MODE || 'false'}`);
+console.log(`🌐 Instance App: ${process.env.INSTANCE_APP_BUILD || 'false'}`);
+
+export const globalApiLimit = isRateLimitingDisabled
   ? createNoOpMiddleware('Rate limiting disabled for production')
   : rateLimiter.createMiddleware({
       windowMs: 60 * 1000,
@@ -316,10 +336,7 @@ export const globalApiLimit = process.env.DISABLE_RATE_LIMITING === 'true' ||
       customMessage: 'Too many API requests. Please slow down.'
     });
 
-export const burstLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
-                         process.env.NODE_ENV === 'production' ||
-                         process.env.BUILD_MODE === 'true' ||
-                         process.env.INSTANCE_APP_BUILD === 'true'
+export const burstLimit = isRateLimitingDisabled
   ? createNoOpMiddleware('Rate limiting disabled for production')
   : rateLimiter.createMiddleware({
       windowMs: 1000,
@@ -327,10 +344,7 @@ export const burstLimit = process.env.DISABLE_RATE_LIMITING === 'true' ||
       customMessage: 'Too many requests in a short time. Please wait a moment.'
     });
 
-export const loginLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
-                         process.env.NODE_ENV === 'production' ||
-                         process.env.BUILD_MODE === 'true' ||
-                         process.env.INSTANCE_APP_BUILD === 'true'
+export const loginLimit = isRateLimitingDisabled
   ? createNoOpMiddleware('Rate limiting disabled for production')
   : rateLimiter.createMiddleware({
       windowMs: 15 * 60 * 1000,
@@ -345,6 +359,8 @@ export const loginLimit = process.env.DISABLE_RATE_LIMITING === 'true' ||
       },
       customMessage: 'Too many login attempts. Please try again in 15 minutes.',
       onLimitReached: async (req) => {
+        if (isRateLimitingDisabled) return;
+        
         const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
         const email = req.body?.email?.toLowerCase() || 'no-email';
         const extendedBlockMs = 15 * 60 * 1000;
@@ -353,10 +369,7 @@ export const loginLimit = process.env.DISABLE_RATE_LIMITING === 'true' ||
       }
     });
 
-export const registerLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
-                            process.env.NODE_ENV === 'production' ||
-                            process.env.BUILD_MODE === 'true' ||
-                            process.env.INSTANCE_APP_BUILD === 'true'
+export const registerLimit = isRateLimitingDisabled
   ? createNoOpMiddleware('Rate limiting disabled for production')
   : rateLimiter.createMiddleware({
       windowMs: 60 * 1000,
@@ -364,10 +377,7 @@ export const registerLimit = process.env.DISABLE_RATE_LIMITING === 'true' ||
       customMessage: 'Too many registration attempts. Please try again later.'
     });
 
-export const passwordResetLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
-                                 process.env.NODE_ENV === 'production' ||
-                                 process.env.BUILD_MODE === 'true' ||
-                                 process.env.INSTANCE_APP_BUILD === 'true'
+export const passwordResetLimit = isRateLimitingDisabled
   ? createNoOpMiddleware('Rate limiting disabled for production')
   : rateLimiter.createMiddleware({
       windowMs: 60 * 60 * 1000,
@@ -375,10 +385,7 @@ export const passwordResetLimit = process.env.DISABLE_RATE_LIMITING === 'true' |
       customMessage: 'Too many password reset requests. Please try again in an hour.'
     });
 
-export const checkLoginBlock = process.env.DISABLE_RATE_LIMITING === 'true' || 
-                              process.env.NODE_ENV === 'production' ||
-                              process.env.BUILD_MODE === 'true' ||
-                              process.env.INSTANCE_APP_BUILD === 'true'
+export const checkLoginBlock = isRateLimitingDisabled
   ? createNoOpMiddleware('Login block check disabled for production')
   : rateLimiter.createMiddleware({
       mode: 'check',
