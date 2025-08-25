@@ -84,7 +84,7 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
     }
     
     // For non-API routes, use express.static
-    express.static(publicPath, {
+    const staticMiddleware = express.static(publicPath, {
       maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0',
       etag: true,
       lastModified: true,
@@ -119,7 +119,9 @@ function setupWithPath(app: express.Application, publicPath: string, indexPath: 
         res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', '*');
       }
-    })(req, res, next);
+    });
+    
+    staticMiddleware(req, res, next);
   });
 
   // Endpoint de health check para verificar que los archivos estáticos están disponibles
@@ -237,14 +239,16 @@ export function setupSimpleStatic(app: express.Application, buildPath?: string) 
       return next(); // Never interfere with API routes
     }
     
-    express.static(staticPath, {
+    const staticMiddleware = express.static(staticPath, {
       maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
       setHeaders: (res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', '*');
       }
-    })(req, res, next);
+    });
+    
+    staticMiddleware(req, res, next);
   });
 
   // Fallback SPA simple - NEVER handle API routes
