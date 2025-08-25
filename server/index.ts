@@ -870,7 +870,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // API route fallback - must be AFTER all specific API routes but BEFORE static serving
-app.use('/api/*', (req, res) => {
+app.use('/api/*splat', (req, res) => {
   console.warn(`404 - API route not found: ${req.method} ${req.path}`);
   sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
 });
