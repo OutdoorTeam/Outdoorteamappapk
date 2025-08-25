@@ -8,7 +8,7 @@ export interface Plan {
   price: number;
   services_included: string;
   features_json: string;
-  is_active: boolean;
+  is_active: number;
   created_at: string;
   updated_at: string;
 }
@@ -18,7 +18,7 @@ export const PLANS_KEYS = {
   all: ['plans'] as const,
 };
 
-// Hook to get all plans
+// Hook to get all active plans
 export function usePlans() {
   return useQuery({
     queryKey: PLANS_KEYS.all,

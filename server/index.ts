@@ -18,6 +18,7 @@ import trainingPlanRoutes from './routes/training-plan-routes.js';
 import trainingScheduleRoutes from './routes/training-schedule-routes.js';
 import userManagementRoutes from './routes/user-management-routes.js';
 import userGoalsRoutes from './routes/user-goals-routes.js';
+import apiRoutes from './routes/api-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -194,14 +195,58 @@ const formatUserResponse = (user: any) => {
 };
 
 // Mount routes
-app.use('/api/', statsRoutes);
-app.use('/api/', userStatsRoutes);
+app.use('/api', statsRoutes);
+app.use('/api', userStatsRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/', nutritionPlanRoutes);
-app.use('/api/', trainingPlanRoutes);
-app.use('/api/', trainingScheduleRoutes);
+app.use('/api', nutritionPlanRoutes);
+app.use('/api', trainingPlanRoutes);
+app.use('/api', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
+app.use('/api', apiRoutes);
+
+// Admin Users Route (Critical for AdminPage)
+app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+  try {
+    console.log('Admin fetching all users');
+
+    const users = await db
+      .selectFrom('users')
+      .selectAll()
+      .orderBy('created_at', 'desc')
+      .execute();
+
+    console.log('Users fetched:', users.length);
+
+    const formattedUsers = users.map(user => formatUserResponse(user));
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    await SystemLogger.logCriticalError('Users fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener usuarios');
+  }
+});
+
+// Plans Route (Critical for AdminPage)
+app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
+  try {
+    console.log('Fetching plans for user:', req.user.email);
+
+    const plans = await db
+      .selectFrom('plans')
+      .selectAll()
+      .where('is_active', '=', 1)
+      .orderBy('created_at', 'desc')
+      .execute();
+
+    console.log('Plans fetched:', plans.length);
+    res.json(plans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
+  }
+});
 
 // Auth Routes with CONDITIONAL Rate Limiting
 const authRateLimit = process.env.BUILD_MODE === 'true' ? 
