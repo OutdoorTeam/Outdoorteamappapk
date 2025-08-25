@@ -174,7 +174,7 @@ router.post('/training-plan/:userId/draft', authenticateToken, requireAdmin, asy
   }
 });
 
-// Ensure draft training plan exists (admin only) - NEW ROUTE
+// Ensure draft training plan exists (admin only)
 router.post('/training-plan/user/:userId/ensure-draft', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const { userId } = req.params;
