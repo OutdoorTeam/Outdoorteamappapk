@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "DISABLE_RATE_LIMITING=true BUILD_MODE=true vite build && tsc --project tsconfig.server.json",
+    "build": "DISABLE_RATE_LIMITING=true BUILD_MODE=true INSTANCE_APP_BUILD=true vite build && DISABLE_RATE_LIMITING=true BUILD_MODE=true INSTANCE_APP_BUILD=true tsc --project tsconfig.server.json",
     "start": "tsx watch scripts/dev.ts",
     "generate-vapid": "node scripts/generate-vapid.js",
-    "build:production": "NODE_ENV=production DISABLE_RATE_LIMITING=true BUILD_MODE=true INSTANCE_APP_BUILD=true vite build && NODE_ENV=production tsc --project tsconfig.server.json",
-    "start:production": "NODE_ENV=production DISABLE_RATE_LIMITING=true node dist/server/index.js"
+    "build:production": "NODE_ENV=production DISABLE_RATE_LIMITING=true BUILD_MODE=true INSTANCE_APP_BUILD=true DEPLOYMENT=true vite build && NODE_ENV=production DISABLE_RATE_LIMITING=true BUILD_MODE=true INSTANCE_APP_BUILD=true DEPLOYMENT=true tsc --project tsconfig.server.json",
+    "start:production": "NODE_ENV=production DISABLE_RATE_LIMITING=true DEPLOYMENT=true node dist/server/index.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

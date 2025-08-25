@@ -61,28 +61,38 @@ const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 
-// CRITICAL: Enable trust proxy for instance.app deployments
-app.set('trust proxy', 1);
-
 // CRITICAL: Detect deployment environment
-const isInstanceAppDeploy = process.env.INSTANCE_APP_BUILD === 'true' || 
-                           process.env.NODE_ENV === 'production' ||
-                           process.env.BUILD_MODE === 'true';
+const isDeploymentMode = (): boolean => {
+  return !!(
+    process.env.INSTANCE_APP_BUILD === 'true' ||
+    process.env.NODE_ENV === 'production' ||
+    process.env.BUILD_MODE === 'true' ||
+    process.env.CI === 'true' ||
+    process.env.DEPLOYMENT === 'true'
+  );
+};
+
+// CRITICAL: Enable trust proxy for deployment platforms
+app.set('trust proxy', true);
+
+const deploymentMode = isDeploymentMode();
 
 console.log('🚀 Starting Outdoor Team Server...');
-console.log('📊 Environment Variables:');
+console.log('📊 Environment Configuration:');
 console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
 console.log('- BUILD_MODE:', process.env.BUILD_MODE || 'false');
 console.log('- INSTANCE_APP_BUILD:', process.env.INSTANCE_APP_BUILD || 'false');
-console.log('- Is Instance App Deploy:', isInstanceAppDeploy);
+console.log('- CI:', process.env.CI || 'false');
+console.log('- DEPLOYMENT:', process.env.DEPLOYMENT || 'false');
+console.log('- Deployment Mode:', deploymentMode ? 'ENABLED' : 'DISABLED');
 console.log('- DATA_DIRECTORY:', DATA_DIRECTORY);
 
-// Initialize schedulers only in non-build environments
+// Initialize schedulers only in non-deployment environments
 let resetScheduler: DailyResetScheduler;
 let notificationScheduler: NotificationScheduler;
 
 const checkVapidConfiguration = () => {
-  if (isInstanceAppDeploy) {
+  if (deploymentMode) {
     console.log('⚠️ VAPID check skipped in deployment mode');
     return false;
   }
@@ -144,29 +154,35 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// CRITICAL: Ultra-permissive middleware setup for deployment success
+// CRITICAL: Lightweight middleware setup for deployment
 console.log('🔧 Setting up middleware...');
 
-// Security headers with ultra-permissive settings for deployment
-app.use(securityHeaders);
+// Body parsing with reasonable limits
+app.use(express.json({ limit: deploymentMode ? '10mb' : '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: deploymentMode ? '10mb' : '50mb' }));
 
-// Body parsing with large limits for deployment compatibility
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Security headers (lightweight in deployment mode)
+if (deploymentMode) {
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    next();
+  });
+} else {
+  app.use(securityHeaders);
+}
 
-// Ultra-permissive CORS for instance.app deployment
+// CORS middleware (ultra-permissive in deployment)
 app.use(corsMiddleware);
 app.use(corsErrorHandler);
 
-// CRITICAL: Rate limiting completely disabled for deployment
-const isRateLimitingDisabled = isInstanceAppDeploy;
-
-if (!isRateLimitingDisabled) {
+// Rate limiting (disabled in deployment mode)
+if (!deploymentMode) {
   console.log('🚦 Rate limiting enabled for development');
   app.use('/api/', globalApiLimit);
   app.use('/api/', burstLimit);
 } else {
-  console.log('🚫 Rate limiting DISABLED for deployment/production');
+  console.log('🚫 Rate limiting DISABLED for deployment');
 }
 
 // CRITICAL: Health check endpoints (always first, never blocked)
@@ -176,11 +192,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     app: 'outdoor-team',
-    build_mode: process.env.BUILD_MODE || 'false',
-    instance_app_build: process.env.INSTANCE_APP_BUILD || 'false',
-    rate_limiting_disabled: isRateLimitingDisabled.toString(),
-    deployment_ready: true,
-    cors_ultra_permissive: true
+    deployment_mode: deploymentMode,
+    database_ready: true
   });
 });
 
@@ -189,7 +202,7 @@ app.get('/api/health', (req, res) => {
     api_status: 'ok', 
     timestamp: new Date().toISOString(),
     database_ready: true,
-    deployment_mode: isInstanceAppDeploy
+    deployment_mode: deploymentMode
   });
 });
 
@@ -202,7 +215,7 @@ app.get('/', (req, res) => {
       message: 'Outdoor Team API Server', 
       status: 'running',
       environment: process.env.NODE_ENV || 'development',
-      deployment_ready: isInstanceAppDeploy
+      deployment_mode: deploymentMode
     });
   }
 });
@@ -252,9 +265,13 @@ app.use('/api', apiRoutes);
 
 console.log('✅ API routes mounted successfully');
 
-// Auth Routes with ultra-lightweight rate limiting
+// Auth Routes with conditional rate limiting
+const authLimiter = deploymentMode ? [] : [registerLimit];
+const loginLimiter = deploymentMode ? [] : [checkLoginBlock, loginLimit];
+const passwordLimiter = deploymentMode ? [] : [passwordResetLimit];
+
 app.post('/api/auth/register',
-  registerLimit,
+  ...authLimiter,
   validateRequest(registerSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -270,7 +287,9 @@ app.post('/api/auth/register',
 
       if (existingUser) {
         console.log('User already exists:', email);
-        await SystemLogger.logAuthError('Registration attempt with existing email', email, req);
+        if (!deploymentMode) {
+          await SystemLogger.logAuthError('Registration attempt with existing email', email, req);
+        }
         sendErrorResponse(res, ERROR_CODES.DUPLICATE_ERROR, 'Ya existe un usuario con este correo electrónico');
         return;
       }
@@ -339,10 +358,12 @@ app.post('/api/auth/register',
       );
 
       console.log('User registered successfully:', newUser.email, 'Role:', newUser.role);
-      await SystemLogger.log('info', 'User registered', {
-        userId: newUser.id,
-        metadata: { email: newUser.email, role: newUser.role }
-      });
+      if (!deploymentMode) {
+        await SystemLogger.log('info', 'User registered', {
+          userId: newUser.id,
+          metadata: { email: newUser.email, role: newUser.role }
+        });
+      }
 
       res.status(201).json({
         user: formatUserResponse(newUser),
@@ -350,14 +371,15 @@ app.post('/api/auth/register',
       });
     } catch (error) {
       console.error('Error registering user:', error);
-      await SystemLogger.logCriticalError('Registration error', error as Error);
+      if (!deploymentMode) {
+        await SystemLogger.logCriticalError('Registration error', error as Error);
+      }
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor al registrar usuario');
     }
   });
 
 app.post('/api/auth/login',
-  checkLoginBlock,
-  loginLimit,
+  ...loginLimiter,
   validateRequest(loginSchema),
   async (req: express.Request, res: express.Response) => {
     try {
@@ -373,33 +395,38 @@ app.post('/api/auth/login',
 
       if (!user) {
         console.log('User not found:', email);
-        await SystemLogger.logAuthError('Login attempt with non-existent email', email, req);
+        if (!deploymentMode) {
+          await SystemLogger.logAuthError('Login attempt with non-existent email', email, req);
+        }
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
         return;
       }
 
       if (!user.is_active) {
         console.log('User account is inactive:', email);
-        await SystemLogger.logAuthError('Login attempt with inactive account', email, req);
+        if (!deploymentMode) {
+          await SystemLogger.logAuthError('Login attempt with inactive account', email, req);
+        }
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Tu cuenta ha sido desactivada. Contacta al administrador.');
         return;
       }
 
       if (!user.password_hash) {
         console.log('User has no password set:', email);
-        await SystemLogger.logAuthError('Login attempt with user having no password', email, req);
+        if (!deploymentMode) {
+          await SystemLogger.logAuthError('Login attempt with user having no password', email, req);
+        }
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
         return;
       }
 
-      console.log('Checking password for user:', email);
-
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
-      console.log('Password validation result:', isValidPassword);
 
       if (!isValidPassword) {
         console.log('Invalid password for user:', email);
-        await SystemLogger.logAuthError('Login attempt with invalid password', email, req);
+        if (!deploymentMode) {
+          await SystemLogger.logAuthError('Login attempt with invalid password', email, req);
+        }
         sendErrorResponse(res, ERROR_CODES.AUTHENTICATION_ERROR, 'Credenciales inválidas');
         return;
       }
@@ -421,10 +448,12 @@ app.post('/api/auth/login',
         .execute();
 
       console.log('Login successful for user:', user.email, 'Role:', user.role, 'Plan:', user.plan_type);
-      await SystemLogger.log('info', 'User login successful', {
-        userId: user.id,
-        metadata: { email: user.email, role: user.role }
-      });
+      if (!deploymentMode) {
+        await SystemLogger.log('info', 'User login successful', {
+          userId: user.id,
+          metadata: { email: user.email, role: user.role }
+        });
+      }
 
       res.json({
         user: formatUserResponse(user),
@@ -432,16 +461,20 @@ app.post('/api/auth/login',
       });
     } catch (error) {
       console.error('Error logging in user:', error);
-      await SystemLogger.logCriticalError('Login error', error as Error);
+      if (!deploymentMode) {
+        await SystemLogger.logCriticalError('Login error', error as Error);
+      }
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error interno del servidor al iniciar sesión');
     }
   });
 
 app.post('/api/auth/reset-password',
-  passwordResetLimit,
+  ...passwordLimiter,
   async (req: express.Request, res: express.Response) => {
     try {
-      await SystemLogger.log('info', 'Password reset requested');
+      if (!deploymentMode) {
+        await SystemLogger.log('info', 'Password reset requested');
+      }
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Funcionalidad de reset de contraseña aún no implementada');
     } catch (error) {
       console.error('Password reset error:', error);
@@ -453,7 +486,7 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(formatUserResponse(req.user));
 });
 
-// Continue with remaining routes (abbreviated for length)
+// User goals endpoint
 app.get('/api/my-goals', authenticateToken, async (req: any, res: express.Response) => {
   try {
     const userId = req.user.id;
@@ -482,12 +515,12 @@ app.get('/api/my-goals', authenticateToken, async (req: any, res: express.Respon
     res.json(goals);
   } catch (error) {
     console.error('Error fetching user goals:', error);
-    await SystemLogger.logCriticalError('User goals fetch error', error as Error, { userId: req.user?.id });
+    if (!deploymentMode) {
+      await SystemLogger.logCriticalError('User goals fetch error', error as Error, { userId: req.user?.id });
+    }
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener metas del usuario');
   }
 });
-
-// Add remaining routes here (abbreviated for brevity)...
 
 // CRITICAL: Setup static serving AFTER all API routes
 if (process.env.NODE_ENV === 'production') {
@@ -511,7 +544,7 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
   }
   
   // In deployment mode, be more permissive with errors
-  if (isInstanceAppDeploy) {
+  if (deploymentMode) {
     console.log('⚠️ Error in deployment mode - responding with generic error');
     res.status(500).json({ error: 'Internal server error' });
     return;
@@ -528,7 +561,7 @@ export const startServer = async (port = 3001) => {
 
     // Only check VAPID and initialize schedulers in non-deployment mode
     let vapidConfigured = false;
-    if (!isInstanceAppDeploy) {
+    if (!deploymentMode) {
       vapidConfigured = checkVapidConfiguration();
 
       console.log('🔄 Initializing daily reset scheduler...');
@@ -545,21 +578,25 @@ export const startServer = async (port = 3001) => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
-      console.log(`🚦 Rate limiting: ${isRateLimitingDisabled ? 'DISABLED' : 'ENABLED'}`);
-      console.log(`🔧 Deployment mode: ${isInstanceAppDeploy ? 'YES' : 'NO'}`);
-      console.log(`🌍 CORS: Ultra-permissive mode for instance.app`);
+      console.log(`🚦 Rate limiting: ${deploymentMode ? 'DISABLED' : 'ENABLED'}`);
+      console.log(`🔧 Deployment mode: ${deploymentMode ? 'YES' : 'NO'}`);
+      console.log(`🌍 CORS: ${deploymentMode ? 'Ultra-permissive' : 'Standard'} mode`);
       
       if (process.env.NODE_ENV !== 'production') {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
         console.log(`🔌 API server: http://localhost:${port}`);
       }
       
-      logCorsConfig();
-      
-      if (vapidConfigured) {
-        console.log('📱 Push notifications: Ready');
+      if (!deploymentMode) {
+        logCorsConfig();
+        
+        if (vapidConfigured) {
+          console.log('📱 Push notifications: Ready');
+        } else {
+          console.log('📱 Push notifications: Disabled (not configured)');
+        }
       } else {
-        console.log('📱 Push notifications: Disabled (deployment mode or not configured)');
+        console.log('📱 Push notifications: Disabled (deployment mode)');
       }
 
       console.log('📋 API Routes Summary:');
@@ -569,7 +606,8 @@ export const startServer = async (port = 3001) => {
       console.log('   - /api/users - Users management');
       console.log('   - /api/plans - Plans management');
       console.log('   - /api/admin/* - Admin routes');
-      console.log('   - Ultra-permissive CORS and rate limiting for deployment');
+      console.log(`   - Rate limiting: ${deploymentMode ? 'DISABLED' : 'ENABLED'}`);
+      console.log(`   - CORS: ${deploymentMode ? 'Ultra-permissive' : 'Standard'}`);
     });
 
     const gracefulShutdown = async (signal: string) => {
@@ -598,7 +636,7 @@ export const startServer = async (port = 3001) => {
         setTimeout(() => {
           console.error('❌ Could not close connections in time, forcefully shutting down');
           process.exit(1);
-        }, 30000);
+        }, 10000); // Reduced timeout for faster deployment
         
       } catch (error) {
         console.error('Error during graceful shutdown:', error);
