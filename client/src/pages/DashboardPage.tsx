@@ -139,6 +139,10 @@ const DashboardPage: React.FC = () => {
   const getAllHabits = () => {
     const habits = [];
 
+    if (!user?.features) {
+      return habits;
+    }
+
     // Always show Exercise if user has training feature or is admin
     if (user?.features.training || user?.role === "admin") {
       habits.push({
