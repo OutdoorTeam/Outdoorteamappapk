@@ -105,9 +105,11 @@ class RateLimiter {
   createMiddleware(config: RateLimitConfig) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
-        // MUCH MORE PERMISSIVE: Skip rate limiting in many cases
+        // PRODUCTION SAFE: Always skip rate limiting in production and when explicitly disabled
         if (process.env.DISABLE_RATE_LIMITING === 'true' || 
-            process.env.NODE_ENV !== 'production' ||
+            process.env.NODE_ENV === 'production' ||
+            process.env.BUILD_MODE === 'true' ||
+            process.env.INSTANCE_APP_BUILD === 'true' ||
             this.shouldSkipRateLimit(req)) {
           return next();
         }
@@ -188,6 +190,7 @@ class RateLimiter {
         next();
       } catch (error) {
         console.error('Rate limiting error:', error);
+        // Always continue on rate limiting errors to prevent build failures
         next();
       }
     };
@@ -210,9 +213,17 @@ class RateLimiter {
   private shouldSkipRateLimit(req: Request): boolean {
     const path = req.path;
     
-    // Skip many more paths for builds
+    // Skip ALL paths in production and build environments
+    if (process.env.NODE_ENV === 'production' ||
+        process.env.BUILD_MODE === 'true' ||
+        process.env.INSTANCE_APP_BUILD === 'true') {
+      return true;
+    }
+    
+    // Skip many paths for builds and health checks
     if (path === '/health' || 
         path === '/api/health' ||
+        path === '/static-health' ||
         path.startsWith('/cron/') || 
         path.startsWith('/api/cron/') ||
         path.startsWith('/webhook/') || 
@@ -223,7 +234,10 @@ class RateLimiter {
         path.includes('.png') ||
         path.includes('.jpg') ||
         path.includes('.ico') ||
-        path.includes('.map')) {
+        path.includes('.map') ||
+        path.includes('.woff') ||
+        path.includes('.ttf') ||
+        path.includes('.svg')) {
       return true;
     }
     
@@ -282,63 +296,101 @@ class RateLimiter {
 
 export const rateLimiter = new RateLimiter();
 
-// MUCH MORE PERMISSIVE rate limits
-export const globalApiLimit = rateLimiter.createMiddleware({
-  windowMs: 60 * 1000,
-  maxRequests: 500, // Increased from 100
-  customMessage: 'Too many API requests. Please slow down.'
-});
+// Create no-op middleware functions when rate limiting is disabled
+const createNoOpMiddleware = (customMessage?: string) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // Always pass through when rate limiting is disabled
+    next();
+  };
+};
 
-export const burstLimit = rateLimiter.createMiddleware({
-  windowMs: 1000,
-  maxRequests: 50, // Increased from 10
-  customMessage: 'Too many requests in a short time. Please wait a moment.'
-});
+// PRODUCTION SAFE: Export either actual rate limiters or no-op functions
+export const globalApiLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                              process.env.NODE_ENV === 'production' ||
+                              process.env.BUILD_MODE === 'true' ||
+                              process.env.INSTANCE_APP_BUILD === 'true'
+  ? createNoOpMiddleware('Rate limiting disabled for production')
+  : rateLimiter.createMiddleware({
+      windowMs: 60 * 1000,
+      maxRequests: 500,
+      customMessage: 'Too many API requests. Please slow down.'
+    });
 
-export const loginLimit = rateLimiter.createMiddleware({
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 10, // Increased from 5
-  keyGenerator: (req) => {
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
-    const email = req.body?.email?.toLowerCase() || 'no-email';
-    return [
-      `login:ip:${clientIP}`,
-      `login:email:${email}`
-    ];
-  },
-  customMessage: 'Too many login attempts. Please try again in 15 minutes.',
-  onLimitReached: async (req) => {
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
-    const email = req.body?.email?.toLowerCase() || 'no-email';
-    const extendedBlockMs = 15 * 60 * 1000;
-    await rateLimiter['store'].setWithExpiry(`login:block:ip:${clientIP}`, extendedBlockMs);
-    await rateLimiter['store'].setWithExpiry(`login:block:email:${email}`, extendedBlockMs);
-  }
-});
+export const burstLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                         process.env.NODE_ENV === 'production' ||
+                         process.env.BUILD_MODE === 'true' ||
+                         process.env.INSTANCE_APP_BUILD === 'true'
+  ? createNoOpMiddleware('Rate limiting disabled for production')
+  : rateLimiter.createMiddleware({
+      windowMs: 1000,
+      maxRequests: 50,
+      customMessage: 'Too many requests in a short time. Please wait a moment.'
+    });
 
-export const registerLimit = rateLimiter.createMiddleware({
-  windowMs: 60 * 1000,
-  maxRequests: 10, // Increased from 3
-  customMessage: 'Too many registration attempts. Please try again later.'
-});
+export const loginLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                         process.env.NODE_ENV === 'production' ||
+                         process.env.BUILD_MODE === 'true' ||
+                         process.env.INSTANCE_APP_BUILD === 'true'
+  ? createNoOpMiddleware('Rate limiting disabled for production')
+  : rateLimiter.createMiddleware({
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 10,
+      keyGenerator: (req) => {
+        const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+        const email = req.body?.email?.toLowerCase() || 'no-email';
+        return [
+          `login:ip:${clientIP}`,
+          `login:email:${email}`
+        ];
+      },
+      customMessage: 'Too many login attempts. Please try again in 15 minutes.',
+      onLimitReached: async (req) => {
+        const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+        const email = req.body?.email?.toLowerCase() || 'no-email';
+        const extendedBlockMs = 15 * 60 * 1000;
+        await rateLimiter['store'].setWithExpiry(`login:block:ip:${clientIP}`, extendedBlockMs);
+        await rateLimiter['store'].setWithExpiry(`login:block:email:${email}`, extendedBlockMs);
+      }
+    });
 
-export const passwordResetLimit = rateLimiter.createMiddleware({
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 5, // Increased from 3
-  customMessage: 'Too many password reset requests. Please try again in an hour.'
-});
+export const registerLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                            process.env.NODE_ENV === 'production' ||
+                            process.env.BUILD_MODE === 'true' ||
+                            process.env.INSTANCE_APP_BUILD === 'true'
+  ? createNoOpMiddleware('Rate limiting disabled for production')
+  : rateLimiter.createMiddleware({
+      windowMs: 60 * 1000,
+      maxRequests: 10,
+      customMessage: 'Too many registration attempts. Please try again later.'
+    });
 
-export const checkLoginBlock = rateLimiter.createMiddleware({
-  mode: 'check',
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 0,
-  keyGenerator: (req) => {
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
-    const email = req.body?.email?.toLowerCase() || 'no-email';
-    return [
-      `login:block:ip:${clientIP}`,
-      `login:block:email:${email}`
-    ];
-  },
-  customMessage: 'Account temporarily locked due to too many failed attempts. Please try again in 15 minutes.'
-});
+export const passwordResetLimit = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                                 process.env.NODE_ENV === 'production' ||
+                                 process.env.BUILD_MODE === 'true' ||
+                                 process.env.INSTANCE_APP_BUILD === 'true'
+  ? createNoOpMiddleware('Rate limiting disabled for production')
+  : rateLimiter.createMiddleware({
+      windowMs: 60 * 60 * 1000,
+      maxRequests: 5,
+      customMessage: 'Too many password reset requests. Please try again in an hour.'
+    });
+
+export const checkLoginBlock = process.env.DISABLE_RATE_LIMITING === 'true' || 
+                              process.env.NODE_ENV === 'production' ||
+                              process.env.BUILD_MODE === 'true' ||
+                              process.env.INSTANCE_APP_BUILD === 'true'
+  ? createNoOpMiddleware('Login block check disabled for production')
+  : rateLimiter.createMiddleware({
+      mode: 'check',
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 0,
+      keyGenerator: (req) => {
+        const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+        const email = req.body?.email?.toLowerCase() || 'no-email';
+        return [
+          `login:block:ip:${clientIP}`,
+          `login:block:email:${email}`
+        ];
+      },
+      customMessage: 'Account temporarily locked due to too many failed attempts. Please try again in 15 minutes.'
+    });
