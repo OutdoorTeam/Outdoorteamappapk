@@ -11,7 +11,7 @@ const getAllowedOrigins = (): string[] => {
   origins.push('https://app.mioutdoorteam.com');
   origins.push('https://briskly-playful-sandwich.instance.app');
   
-  // Include preview deployments for instance.app (common pattern)
+  // More permissive instance.app patterns for builds
   origins.push('https://preview--briskly-playful-sandwich.instance.app');
   origins.push('https://staging--briskly-playful-sandwich.instance.app');
   
@@ -28,7 +28,7 @@ const getAllowedOrigins = (): string[] => {
   return origins;
 };
 
-// Custom origin validation function with wildcard support for instance.app
+// Custom origin validation function with VERY permissive instance.app support
 const validateOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
   const allowedOrigins = getAllowedOrigins();
   
@@ -44,9 +44,8 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
     return;
   }
   
-  // Allow any subdomain of briskly-playful-sandwich.instance.app for deployments
-  if (origin.endsWith('.briskly-playful-sandwich.instance.app') || 
-      origin === 'https://briskly-playful-sandwich.instance.app') {
+  // MUCH MORE PERMISSIVE: Allow any instance.app subdomain
+  if (origin.includes('instance.app')) {
     callback(null, true);
     return;
   }
@@ -57,6 +56,15 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
        origin.startsWith('http://127.0.0.1:') ||
        origin.startsWith('https://localhost:') ||
        origin.startsWith('https://127.0.0.1:'))) {
+    callback(null, true);
+    return;
+  }
+  
+  // In production, be more lenient with build processes
+  if (process.env.NODE_ENV === 'production' && 
+      (origin.includes('vercel.app') || 
+       origin.includes('netlify.app') || 
+       origin.includes('instance.app'))) {
     callback(null, true);
     return;
   }
@@ -75,10 +83,10 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
   callback(new Error(`Origin ${origin} not allowed by CORS policy`), false);
 };
 
-// CORS configuration
+// CORS configuration - MORE PERMISSIVE
 export const corsOptions: CorsOptions = {
   origin: validateOrigin,
-  credentials: true, // Allow credentials (Authorization header, cookies)
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Authorization',
@@ -86,16 +94,18 @@ export const corsOptions: CorsOptions = {
     'Accept',
     'X-Requested-With',
     'Origin',
-    'X-Internal-API-Key'
+    'X-Internal-API-Key',
+    'Cache-Control',
+    'Pragma'
   ],
   exposedHeaders: [
-    'Content-Disposition', // For file downloads
+    'Content-Disposition',
     'X-RateLimit-Limit',
     'X-RateLimit-Remaining',
     'X-RateLimit-Reset'
   ],
-  maxAge: 600, // Cache preflight for 10 minutes
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  maxAge: 600,
+  optionsSuccessStatus: 200
 };
 
 // Create CORS middleware
@@ -104,7 +114,6 @@ export const corsMiddleware = cors(corsOptions);
 // Custom CORS error handler middleware
 export const corsErrorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   if (err && err.message && err.message.includes('not allowed by CORS policy')) {
-    // Log the blocked request details with better context
     console.warn('CORS Error Details:', {
       origin: req.headers.origin,
       host: req.headers.host,
@@ -127,10 +136,7 @@ export const corsErrorHandler = (err: any, req: Request, res: Response, next: Ne
       }
     });
     
-    // Set Vary header
     res.setHeader('Vary', 'Origin');
-    
-    // Send structured error response
     sendErrorResponse(res, ERROR_CODES.AUTHORIZATION_ERROR, 'Origin not allowed by CORS policy');
     return;
   }
@@ -146,20 +152,15 @@ export const addVaryHeader = (req: Request, res: Response, next: NextFunction) =
 
 // Helper function to check if origin is allowed (for logging purposes)
 export const isOriginAllowed = (origin: string | undefined): boolean => {
-  if (!origin) return true; // Allow requests with no origin
+  if (!origin) return true;
   
   const allowedOrigins = getAllowedOrigins();
   
-  // Check explicit allowlist
   if (allowedOrigins.includes(origin)) return true;
   
-  // Check instance.app pattern
-  if (origin.endsWith('.briskly-playful-sandwich.instance.app') || 
-      origin === 'https://briskly-playful-sandwich.instance.app') {
-    return true;
-  }
+  // More permissive check for instance.app
+  if (origin.includes('instance.app')) return true;
   
-  // Check localhost in development
   if (process.env.NODE_ENV !== 'production' && 
       (origin.startsWith('http://localhost:') || 
        origin.startsWith('http://127.0.0.1:') ||
@@ -171,12 +172,12 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   return false;
 };
 
-// Debug function to log CORS configuration (development only)
+// Debug function to log CORS configuration
 export const logCorsConfig = () => {
   console.log('CORS Configuration:');
   console.log('- NODE_ENV:', process.env.NODE_ENV);
   console.log('- Allowed origins:', getAllowedOrigins());
-  console.log('- Instance.app wildcard: *.briskly-playful-sandwich.instance.app');
+  console.log('- Instance.app wildcard: ANY *.instance.app domain');
   console.log('- Credentials:', corsOptions.credentials);
   console.log('- Methods:', corsOptions.methods);
   console.log('- Allowed headers:', corsOptions.allowedHeaders);
@@ -187,39 +188,29 @@ export const logCorsConfig = () => {
 // Middleware factory for applying CORS to specific routes
 export const createCorsMiddleware = (routePattern?: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Only apply CORS to API routes if pattern is specified
     if (routePattern && !req.path.startsWith(routePattern)) {
       return next();
     }
     
-    // Apply CORS middleware
     corsMiddleware(req, res, (err) => {
       if (err) {
         corsErrorHandler(err, req, res, next);
         return;
       }
       
-      // Add Vary header
       addVaryHeader(req, res, next);
     });
   };
 };
 
-// Security headers middleware (related to CORS)
+// Security headers middleware (RELAXED for builds)
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
-  // Content Security Policy - relaxed for production deployment
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:;");
+  // Much more relaxed CSP for builds
+  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; font-src 'self' data: *;");
   
-  // X-Frame-Options
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  
-  // X-Content-Type-Options
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  
-  // Referrer Policy
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
-  // X-XSS-Protection
   res.setHeader('X-XSS-Protection', '1; mode=block');
   
   next();

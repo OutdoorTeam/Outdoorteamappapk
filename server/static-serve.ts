@@ -2,10 +2,6 @@ import path from 'path';
 import express from 'express';
 import fs from 'fs';
 
-/**
- * Sets up static file serving for the Express app
- * @param app Express application instance
- */
 export function setupStaticServing(app: express.Application) {
   const publicPath = path.join(process.cwd(), 'public');
   const indexPath = path.join(publicPath, 'index.html');
@@ -13,23 +9,23 @@ export function setupStaticServing(app: express.Application) {
   console.log('Setting up static serving from:', publicPath);
   console.log('Index file exists:', fs.existsSync(indexPath));
 
-  // Serve static files from the public directory with proper headers
+  // MUCH MORE PERMISSIVE static serving
   app.use(express.static(publicPath, {
-    maxAge: '1d', // Cache static assets for 1 day
+    maxAge: '1d',
     etag: true,
     lastModified: true,
     setHeaders: (res, filePath) => {
-      // Set appropriate cache headers based on file type
       if (filePath.endsWith('.html')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       } else if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
-        res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day
+        res.setHeader('Cache-Control', 'public, max-age=86400');
       }
       
-      // Add CORS headers for static assets to support instance.app deployments
+      // Very permissive CORS for static assets
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS, POST, PUT, DELETE');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
   }));
 
@@ -43,7 +39,7 @@ export function setupStaticServing(app: express.Application) {
     });
   });
 
-  // Catch-all handler for SPA routing - must be last
+  // More permissive catch-all handler
   app.get('/*splat', (req, res, next) => {
     // Skip API routes
     if (req.path.startsWith('/api/')) {
@@ -55,32 +51,33 @@ export function setupStaticServing(app: express.Application) {
       return next();
     }
 
-    // Skip files that should return 404 if not found
-    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|pdf|json|xml|txt|map)$/)) {
-      return next();
+    // More permissive file handling - serve index.html for most routes
+    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|pdf|json|xml|txt)$/)) {
+      // For missing assets, still try to serve index.html in some cases
+      if (req.path.includes('chunk') || req.path.includes('vendor')) {
+        return next(); // Let these 404 properly
+      }
     }
 
-    // Check if index.html exists
-    if (!fs.existsSync(indexPath)) {
+    // Always try to serve index.html if it exists
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error('Error serving index.html:', err);
+          res.status(500).json({ 
+            error: 'Error loading application',
+            message: err.message
+          });
+        }
+      });
+    } else {
       console.error('index.html not found at:', indexPath);
-      res.status(500).json({ 
-        error: 'Application not properly built',
+      res.status(404).json({ 
+        error: 'Application not built',
         message: 'Missing index.html',
         path: indexPath,
         publicPath
       });
-      return;
     }
-
-    // Serve index.html for all other routes (SPA routing)
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error('Error serving index.html:', err);
-        res.status(500).json({ 
-          error: 'Error loading application',
-          message: err.message
-        });
-      }
-    });
   });
 }
