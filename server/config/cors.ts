@@ -44,8 +44,8 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
     return;
   }
   
-  // MUCH MORE PERMISSIVE: Allow any instance.app subdomain
-  if (origin.includes('instance.app')) {
+  // VERY permissive: Allow any instance.app subdomain or build preview
+  if (origin.includes('.instance.app') || origin.includes('instance.app')) {
     callback(null, true);
     return;
   }
@@ -64,7 +64,9 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
   if (process.env.NODE_ENV === 'production' && 
       (origin.includes('vercel.app') || 
        origin.includes('netlify.app') || 
-       origin.includes('instance.app'))) {
+       origin.includes('instance.app') ||
+       origin.includes('mimo.run') ||
+       origin.includes('github.io'))) {
     callback(null, true);
     return;
   }
@@ -83,7 +85,7 @@ const validateOrigin = (origin: string | undefined, callback: (err: Error | null
   callback(new Error(`Origin ${origin} not allowed by CORS policy`), false);
 };
 
-// CORS configuration - MORE PERMISSIVE
+// CORS configuration - VERY PERMISSIVE for deployment
 export const corsOptions: CorsOptions = {
   origin: validateOrigin,
   credentials: true,
@@ -96,7 +98,10 @@ export const corsOptions: CorsOptions = {
     'Origin',
     'X-Internal-API-Key',
     'Cache-Control',
-    'Pragma'
+    'Pragma',
+    'X-Forwarded-For',
+    'X-Forwarded-Host',
+    'X-Forwarded-Proto'
   ],
   exposedHeaders: [
     'Content-Disposition',
@@ -158,8 +163,12 @@ export const isOriginAllowed = (origin: string | undefined): boolean => {
   
   if (allowedOrigins.includes(origin)) return true;
   
-  // More permissive check for instance.app
-  if (origin.includes('instance.app')) return true;
+  // Very permissive check for instance.app and build platforms
+  if (origin.includes('.instance.app') || 
+      origin.includes('instance.app') ||
+      origin.includes('mimo.run') ||
+      origin.includes('vercel.app') ||
+      origin.includes('netlify.app')) return true;
   
   if (process.env.NODE_ENV !== 'production' && 
       (origin.startsWith('http://localhost:') || 
@@ -178,6 +187,7 @@ export const logCorsConfig = () => {
   console.log('- NODE_ENV:', process.env.NODE_ENV);
   console.log('- Allowed origins:', getAllowedOrigins());
   console.log('- Instance.app wildcard: ANY *.instance.app domain');
+  console.log('- Build platforms: vercel.app, netlify.app, mimo.run');
   console.log('- Credentials:', corsOptions.credentials);
   console.log('- Methods:', corsOptions.methods);
   console.log('- Allowed headers:', corsOptions.allowedHeaders);
@@ -203,15 +213,20 @@ export const createCorsMiddleware = (routePattern?: string) => {
   };
 };
 
-// Security headers middleware (RELAXED for builds)
+// Security headers middleware (VERY RELAXED for builds and deployment)
 export const securityHeaders = (req: Request, res: Response, next: NextFunction) => {
-  // Much more relaxed CSP for builds
-  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; font-src 'self' data: *;");
+  // Very relaxed CSP for deployment and builds
+  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: blob: *; connect-src 'self' *; font-src 'self' data: *; media-src 'self' data: blob: *;");
   
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // Add deployment-friendly headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   
   next();
 };

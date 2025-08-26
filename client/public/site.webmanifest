@@ -1,19 +1,47 @@
 {
-  "name": "",
-  "short_name": "",
+  "name": "Outdoor Team - Academia de Hábitos Saludables",
+  "short_name": "OutdoorTeam",
+  "description": "Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#D3B869",
+  "background_color": "#000000",
+  "scope": "/",
+  "lang": "es",
   "icons": [
     {
-      "src": "/android-chrome-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
     },
     {
-      "src": "/android-chrome-512x512.png",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
-  "display": "standalone"
+  "categories": ["health", "fitness", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Accede a tu panel principal",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Entrenamiento",
+      "short_name": "Training",
+      "description": "Ver plan de entrenamiento",
+      "url": "/training"
+    }
+  ],
+  "prefer_related_applications": false
 }

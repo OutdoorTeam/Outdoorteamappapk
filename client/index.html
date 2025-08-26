@@ -2,20 +2,32 @@
 <html lang="es" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/assets/logo-gold.png" />
-    <link rel="apple-touch-icon" href="/assets/logo-gold.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#D3B869" />
     <meta name="description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral" />
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/site.webmanifest" />
+    
+    <!-- Apple PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="OutdoorTeam" />
     
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="Outdoor Team - Academia de Hábitos Saludables" />
     <meta property="og:description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral" />
-    <meta property="og:image" content="/assets/logo-gold.png" />
+    <meta property="og:image" content="/icon-512.png" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://briskly-playful-sandwich.instance.app" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Outdoor Team - Academia de Hábitos Saludables" />
+    <meta name="twitter:description" content="Transforma tu vida con nuestros programas de entrenamiento, nutrición y bienestar integral" />
+    <meta name="twitter:image" content="/icon-512.png" />
     
     <title>Outdoor Team</title>
     
@@ -43,14 +55,33 @@
         height: 100%;
         background: #000;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         z-index: 9999;
+        font-family: system-ui, -apple-system, sans-serif;
+        color: #D3B869;
+      }
+      
+      .loading-text {
+        margin-top: 1rem;
+        font-size: 1.1rem;
+        font-weight: 500;
       }
       
       /* Hide loading screen when React app loads */
       body.loaded .loading-screen {
         display: none;
+      }
+      
+      /* Prevent FOUC */
+      body:not(.loaded) #root {
+        opacity: 0;
+      }
+      
+      body.loaded #root {
+        opacity: 1;
+        transition: opacity 0.3s ease;
       }
     </style>
   </head>
@@ -58,6 +89,7 @@
     <!-- Loading screen -->
     <div class="loading-screen">
       <div class="loading-spinner"></div>
+      <div class="loading-text">Cargando Outdoor Team...</div>
     </div>
     
     <!-- React app root -->
@@ -70,9 +102,16 @@
       // Register service worker for PWA functionality
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          navigator.serviceWorker.register('/sw.js', {
+            scope: '/'
+          })
             .then((registration) => {
               console.log('SW registered: ', registration);
+              
+              // Check for updates
+              registration.addEventListener('updatefound', () => {
+                console.log('New service worker version available');
+              });
             })
             .catch((registrationError) => {
               console.log('SW registration failed: ', registrationError);
@@ -81,11 +120,44 @@
       }
       
       // Hide loading screen when React app loads
+      let loadingTimeout;
+      
+      const hideLoading = () => {
+        clearTimeout(loadingTimeout);
+        document.body.classList.add('loaded');
+      };
+      
+      // Hide loading after React loads or after 5 seconds max
       window.addEventListener('load', () => {
-        setTimeout(() => {
-          document.body.classList.add('loaded');
-        }, 100);
+        loadingTimeout = setTimeout(hideLoading, 5000);
       });
+      
+      // Also try to hide when DOM content is loaded
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(hideLoading, 1000);
+      });
+      
+      // Function to be called by React when it's ready
+      window.hideLoadingScreen = hideLoading;
+      
+      // PWA Install prompt handling
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('PWA install prompt available');
+        deferredPrompt = e;
+        e.preventDefault();
+      });
+      
+      // Function to trigger PWA install (can be called by React)
+      window.showInstallPrompt = () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then((choiceResult) => {
+            console.log('PWA install choice:', choiceResult.outcome);
+            deferredPrompt = null;
+          });
+        }
+      };
     </script>
   </body>
 </html>
