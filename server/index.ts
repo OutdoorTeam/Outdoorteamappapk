@@ -18,6 +18,10 @@ import trainingPlanRoutes from './routes/training-plan-routes.js';
 import trainingScheduleRoutes from './routes/training-schedule-routes.js';
 import userManagementRoutes from './routes/user-management-routes.js';
 import userGoalsRoutes from './routes/user-goals-routes.js';
+import plansManagementRoutes from './routes/plans-management-routes.js';
+import dailyHabitsRoutes from './routes/daily-habits-routes.js';
+import dailyNotesRoutes from './routes/daily-notes-routes.js';
+import myGoalsRoutes from './routes/my-goals-routes.js';
 import apiRoutes from './routes/api-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
@@ -317,6 +321,10 @@ app.use('/api', trainingPlanRoutes);
 app.use('/api', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
+app.use('/api/admin', plansManagementRoutes);
+app.use('/api', dailyHabitsRoutes);
+app.use('/api', dailyNotesRoutes);
+app.use('/api', myGoalsRoutes);
 app.use('/api', apiRoutes);
 
 // Admin Users Route (Critical for AdminPage)
@@ -600,9 +608,6 @@ app.post('/api/auth/reset-password',
 app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => {
   res.json(formatUserResponse(req.user));
 });
-
-// Continue with existing routes (abbreviated for space)...
-// [Rest of your existing routes remain the same]
 
 // Setup static serving for production (ALWAYS in production)
 if (process.env.NODE_ENV === 'production') {
