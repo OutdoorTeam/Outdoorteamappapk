@@ -59,9 +59,8 @@ export const contentLibrarySchema = z.object({
   title: z.string().min(1, 'El título es requerido').max(200, 'El título no puede exceder 200 caracteres'),
   description: z.string().max(1000, 'La descripción no puede exceder 1000 caracteres').optional(),
   video_url: z.string().url('URL del video inválida').optional(),
-  category: z.enum(['exercise', 'active_breaks', 'meditation'], {
-    required_error: 'La categoría es requerida',
-    invalid_type_error: 'Categoría inválida'
+   category: z.enum(['exercise', 'active_breaks', 'meditation'], {
+    message: 'La categoría es requerida'
   }),
   subcategory: z.string().max(50).optional(),
   is_active: z.boolean().optional()

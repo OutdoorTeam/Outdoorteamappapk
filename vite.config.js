@@ -63,6 +63,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: path.join(process.cwd(), 'dist/public'),
       emptyOutDir: true,
+      chunkSizeWarningLimit: 2000,
     },
     clearScreen: false,
     server: {

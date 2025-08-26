@@ -6,14 +6,15 @@ marked.setOptions({
   gfm: true,
 });
 
-export function markdownToSafeHtml(markdown: string): string {
+export async function markdownToSafeHtml(markdown: string): Promise<string> {
   if (!markdown || typeof markdown !== 'string') {
     return '';
   }
 
   try {
     // Convert markdown to HTML
-    const html = marked(markdown);
+        // Convert markdown to HTML
+    const html = await marked(markdown);
     
     // Basic HTML sanitization - removing dangerous tags and attributes
     const safeHtml = html
@@ -29,14 +30,14 @@ export function markdownToSafeHtml(markdown: string): string {
   }
 }
 
-export function stripMarkdown(markdown: string): string {
+export async function stripMarkdown(markdown: string): Promise<string> {
   if (!markdown || typeof markdown !== 'string') {
     return '';
   }
 
   try {
     // Convert to HTML first
-    const html = marked(markdown);
+    const html = await marked(markdown);
     // Strip all HTML tags
     return html.replace(/<[^>]*>/g, '').trim();
   } catch (error) {
