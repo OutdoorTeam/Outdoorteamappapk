@@ -161,7 +161,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   if (user && user.role === "user") {
     return (
       <div className="min-h-screen bg-background">
-        <nav className="border-b bg-[#D3B869] shadow-sm">
+        {/* Top Navigation for Mobile */}
+        <div className="md:hidden fixed top-0 left-0 right-0 bg-[#D3B869] border-b shadow-lg px-1 py-2 z-50">
+          <div className="grid grid-cols-4 gap-0.5">
+            {navigationItems.slice(0, 8).map((item) => (
+              <Link
+                key={item.path}
+                to={item.available ? item.path : "#"}
+                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
+                  isActive(item.path)
+                    ? "text-black bg-black/10 font-bold"
+                    : item.available
+                      ? "text-black hover:text-black hover:bg-black/5"
+                      : "text-gray-600 cursor-not-allowed"
+                }`}
+                onClick={(e) => {
+                  if (!item.available) {
+                    e.preventDefault();
+                    alert(
+                      "Esta funcionalidad no está disponible en tu plan actual",
+                    );
+                  }
+                }}
+              >
+                <item.icon size={16} />
+                <span className="text-xs">{item.label}</span>
+                {!item.available && (
+                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav className="border-b bg-[#D3B869] shadow-sm hidden md:block">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center">
@@ -172,8 +206,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 />
               </Link>
 
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex items-center space-x-6">
+              {/* Desktop Navigation Links */}
+              <div className="flex items-center space-x-6">
                 {navigationItems.map((item) => (
                   <Link
                     key={item.path}
@@ -215,61 +249,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </Button>
                 </div>
               </div>
-
-              {/* Mobile Navigation */}
-              <div className="md:hidden">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-black font-medium">
-                    {user.full_name.split(" ")[0]}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="border-black text-[#D3B869] bg-black hover:bg-gray-800 hover:text-[#D3B869]"
-                  >
-                    Salir
-                  </Button>
-                </div>
-              </div>
             </div>
           </div>
         </nav>
 
-        <main className="flex-1 pb-20 md:pb-0">{children}</main>
-
-        {/* Bottom Navigation for Mobile */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#D3B869] border-t shadow-lg px-1 py-2 z-50">
-          <div className="grid grid-cols-4 gap-0.5">
-            {navigationItems.slice(0, 8).map((item) => (
-              <Link
-                key={item.path}
-                to={item.available ? item.path : "#"}
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
-                  isActive(item.path)
-                    ? "text-black bg-black/10 font-bold"
-                    : item.available
-                      ? "text-black hover:text-black hover:bg-black/5"
-                      : "text-gray-600 cursor-not-allowed"
-                }`}
-                onClick={(e) => {
-                  if (!item.available) {
-                    e.preventDefault();
-                    alert(
-                      "Esta funcionalidad no está disponible en tu plan actual",
-                    );
-                  }
-                }}
-              >
-                <item.icon size={16} />
-                <span className="text-xs">{item.label}</span>
-                {!item.available && (
-                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <main className="flex-1 pt-20 md:pt-0">{children}</main>
       </div>
     );
   }

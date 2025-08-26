@@ -20,11 +20,12 @@ const DashboardPage: React.FC = () => {
   const { toast } = useToast();
   const [dailyNote, setDailyNote] = React.useState("");
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
+  const [isUpdating, setIsUpdating] = React.useState<string | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
 
-  // React Query hooks
-  const { data: todayHabits, isLoading: habitsLoading } = useTodayHabits();
+  // React Query hooks with better error handling
+  const { data: todayHabits, isLoading: habitsLoading, refetch: refetchHabits } = useTodayHabits();
   const { data: weeklyPointsData, isLoading: weeklyLoading } = useWeeklyPoints();
   const { data: calendarData, isLoading: calendarLoading } = useCalendarData();
   const { data: todayNoteData, isLoading: noteLoading } = useTodayNote();
@@ -47,23 +48,31 @@ const DashboardPage: React.FC = () => {
   }, [todayNoteData]);
 
   const handleUpdateHabit = async (habitType: string, completed: boolean) => {
+    setIsUpdating(habitType);
+    
     try {
       await updateHabitMutation.mutateAsync({
         date: today,
         [habitType]: completed,
       });
       
+      // Refetch habits to ensure UI is updated
+      await refetchHabits();
+      
       toast({
-        title: completed ? "Hábito completado" : "Hábito desmarcado",
-        description: `${habitType.replace('_completed', '')} ${completed ? 'marcado como completado' : 'desmarcado'}`,
-        variant: "success",
+        title: completed ? "¡Hábito completado!" : "Hábito desmarcado",
+        description: completed ? "¡Excelente trabajo!" : "Hábito desmarcado correctamente",
+        variant: "default",
       });
     } catch (error) {
+      console.error("Error updating habit:", error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el hábito",
+        description: "No se pudo actualizar el hábito. Intenta nuevamente.",
         variant: "destructive",
       });
+    } finally {
+      setIsUpdating(null);
     }
   };
 
@@ -78,6 +87,7 @@ const DashboardPage: React.FC = () => {
         movement_completed: newSteps >= stepGoal,
       });
     } catch (error) {
+      console.error("Error updating steps:", error);
       toast({
         title: "Error",
         description: "No se pudo actualizar el contador de pasos",
@@ -87,6 +97,8 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleSaveNote = async () => {
+    if (!dailyNote.trim()) return;
+    
     try {
       await saveNoteMutation.mutateAsync({
         content: dailyNote,
@@ -96,9 +108,10 @@ const DashboardPage: React.FC = () => {
       toast({
         title: "Nota guardada",
         description: "Tu nota del día ha sido guardada exitosamente",
-        variant: "success",
+        variant: "default",
       });
     } catch (error) {
+      console.error("Error saving note:", error);
       toast({
         title: "Error",
         description: "No se pudo guardar la nota",
@@ -125,9 +138,10 @@ const DashboardPage: React.FC = () => {
       toast({
         title: "¡Meditación completada!",
         description: "Se agregó 1 punto a tu progreso diario",
-        variant: "success",
+        variant: "default",
       });
     } catch (error) {
+      console.error("Error completing meditation:", error);
       toast({
         title: "Error",
         description: "No se pudo completar la meditación",
@@ -237,7 +251,8 @@ const DashboardPage: React.FC = () => {
 
   const isLoading = habitsLoading || weeklyLoading || calendarLoading || noteLoading || goalsLoading;
 
-  if (isLoading && user?.role === "user") {
+  // Show loading screen only on initial load
+  if (isLoading && user?.role === "user" && !todayHabits) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-lg text-white">Cargando tu panel...</div>
@@ -438,11 +453,19 @@ const DashboardPage: React.FC = () => {
                             habit.completed
                               ? "bg-[#D3B869] border-[#D3B869] text-black"
                               : "border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869]/20"
-                          } ${updateHabitMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${
+                            isUpdating === habit.key || updateHabitMutation.isPending 
+                              ? 'opacity-50 cursor-not-allowed' 
+                              : ''
+                          }`}
                           onClick={() => handleUpdateHabit(habit.key, !habit.completed)}
-                          disabled={updateHabitMutation.isPending}
+                          disabled={isUpdating === habit.key || updateHabitMutation.isPending}
                         >
-                          {habit.completed && <Check size={18} />}
+                          {(isUpdating === habit.key) ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : habit.completed ? (
+                            <Check size={18} />
+                          ) : null}
                         </button>
                       </div>
                     </div>
@@ -467,7 +490,7 @@ const DashboardPage: React.FC = () => {
                 />
                 <Button
                   onClick={handleSaveNote}
-                  disabled={saveNoteMutation.isPending}
+                  disabled={saveNoteMutation.isPending || !dailyNote.trim()}
                   className="bg-[#D3B869] text-black hover:bg-[#D3B869]/90 mt-4"
                 >
                   {saveNoteMutation.isPending ? 'Guardando...' : 'Guardar Nota'}

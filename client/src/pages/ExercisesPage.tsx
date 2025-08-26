@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { Play, Filter, Clock, Target, Dumbbell, Heart, Zap } from 'lucide-react';
 import { useContentLibrary } from '@/hooks/api/use-content-library';
+import { getYouTubeThumbnail } from '@/utils/youtube';
 
 interface Exercise {
   id: number;
@@ -157,40 +158,70 @@ const ExercisesPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {categoryExercises.map((exercise) => (
-                    <Card key={exercise.id} className="hover:shadow-lg transition-all hover:scale-105 group">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-lg leading-tight pr-2">{exercise.title}</CardTitle>
-                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
-                            <Play className="w-5 h-5 text-red-600" />
+                  {categoryExercises.map((exercise) => {
+                    const thumbnail = getYouTubeThumbnail(exercise.video_url);
+                    
+                    return (
+                      <Card key={exercise.id} className="hover:shadow-lg transition-all hover:scale-105 group overflow-hidden">
+                        {/* Video Thumbnail */}
+                        {thumbnail ? (
+                          <div className="relative aspect-video">
+                            <img
+                              src={thumbnail}
+                              alt={exercise.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback to default thumbnail if maxres fails
+                                const target = e.target as HTMLImageElement;
+                                if (target.src.includes('maxresdefault')) {
+                                  target.src = target.src.replace('maxresdefault', 'mqdefault');
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Play className="w-12 h-12 text-white" />
+                            </div>
                           </div>
-                        </div>
-                        {exercise.description && (
-                          <CardDescription className="text-sm">
-                            {exercise.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {exercise.duration && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="w-4 h-4" />
-                            <span>{exercise.duration}</span>
+                        ) : (
+                          <div className="aspect-video bg-gray-200 flex items-center justify-center">
+                            <div className="text-center text-gray-500">
+                              <Play className="w-8 h-8 mx-auto mb-2" />
+                              <p className="text-sm">Video</p>
+                            </div>
                           </div>
                         )}
+
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <CardTitle className="text-lg leading-tight pr-2">{exercise.title}</CardTitle>
+                          </div>
+                          {exercise.description && (
+                            <CardDescription className="text-sm">
+                              {exercise.description}
+                            </CardDescription>
+                          )}
+                        </CardHeader>
                         
-                        <Button 
-                          onClick={() => openVideo(exercise.video_url, exercise.title)}
-                          className="w-full group-hover:bg-red-600 group-hover:text-white transition-colors bg-red-50 text-red-600 border border-red-200 hover:bg-red-600"
-                          size="sm"
-                        >
-                          <Play size={16} className="mr-2" />
-                          Ver Video en YouTube
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        <CardContent className="space-y-4">
+                          {exercise.duration && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="w-4 h-4" />
+                              <span>{exercise.duration}</span>
+                            </div>
+                          )}
+                          
+                          <Button 
+                            onClick={() => openVideo(exercise.video_url, exercise.title)}
+                            className="w-full group-hover:bg-red-600 group-hover:text-white transition-colors bg-red-50 text-red-600 border border-red-200 hover:bg-red-600"
+                            size="sm"
+                          >
+                            <Play size={16} className="mr-2" />
+                            Ver Video en YouTube
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

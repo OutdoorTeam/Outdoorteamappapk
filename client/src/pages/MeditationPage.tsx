@@ -8,6 +8,7 @@ import { useContentLibrary } from '@/hooks/api/use-content-library';
 import { useTodayHabits, useUpdateHabit } from '@/hooks/api/use-daily-habits';
 import { useSaveMeditationSession } from '@/hooks/api/use-meditation';
 import MeditationSession from '@/components/MeditationSession';
+import { getYouTubeThumbnail } from '@/utils/youtube';
 
 const MeditationPage: React.FC = () => {
   const { user } = useAuth();
@@ -224,31 +225,66 @@ const MeditationPage: React.FC = () => {
             </div>
           ) : meditationVideos && meditationVideos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {meditationVideos.map(video => (
-                <div key={video.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start gap-3 mb-3">
-                    <PlayCircle className="w-6 h-6 text-purple-600 mt-1 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-lg mb-1 line-clamp-2">{video.title}</h3>
-                      {video.description && (
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                          {video.description}
-                        </p>
+              {meditationVideos.map(video => {
+                const thumbnail = getYouTubeThumbnail(video.video_url);
+                
+                return (
+                  <Card key={video.id} className="overflow-hidden hover:shadow-md transition-shadow group">
+                    {/* Video Thumbnail */}
+                    {thumbnail ? (
+                      <div className="relative aspect-video">
+                        <img
+                          src={thumbnail}
+                          alt={video.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to default thumbnail if maxres fails
+                            const target = e.target as HTMLImageElement;
+                            if (target.src.includes('maxresdefault')) {
+                              target.src = target.src.replace('maxresdefault', 'mqdefault');
+                            }
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Play className="w-12 h-12 text-white" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-200 flex items-center justify-center">
+                        <div className="text-center text-gray-500">
+                          <PlayCircle className="w-8 h-8 mx-auto mb-2" />
+                          <p className="text-sm">Video</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Video Info */}
+                    <div className="p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <PlayCircle className="w-6 h-6 text-purple-600 mt-1 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-medium text-lg mb-1 line-clamp-2">{video.title}</h3>
+                          {video.description && (
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                              {video.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {video.video_url && (
+                        <Button 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => handleOpenVideo(video.video_url)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Ver Video
+                        </Button>
                       )}
                     </div>
-                  </div>
-                  {video.video_url && (
-                    <Button 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => handleOpenVideo(video.video_url)}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Ver Video
-                    </Button>
-                  )}
-                </div>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
