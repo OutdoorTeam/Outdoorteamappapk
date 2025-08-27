@@ -185,14 +185,17 @@ router.delete('/plans-management/:id', authenticateToken, requireAdmin, async (r
 
     console.log('Admin deleting plan:', id);
 
-    // Check if plan is in use
-    const usersWithPlan = await db
+    // Check if plan is in use by checking the 'plan_type' column on the 'users' table
+    const usersOnPlan = await db
       .selectFrom('users')
-      .select(['id', 'email'])
-      .where('plan_type', 'is not', null)
+      .select('id')
+      .where('plan_type', '=', (
+        db.selectFrom('plans').select('name').where('id', '=', parseInt(id))
+      ))
+      .limit(1)
       .execute();
 
-    if (usersWithPlan.length > 0) {
+    if (usersOnPlan.length > 0) {
       sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'No se puede eliminar un plan que está siendo usado por usuarios');
       return;
     }
@@ -201,3 +204,25 @@ router.delete('/plans-management/:id', authenticateToken, requireAdmin, async (r
       .deleteFrom('plans')
       .where('id', '=', parseInt(id))
       .returning(['id', 'name'])
+      .executeTakeFirst();
+
+    if (!deletedPlan) {
+      sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'Plan no encontrado');
+      return;
+    }
+
+    await SystemLogger.log('info', 'Plan deleted', {
+      userId: req.user.id,
+      metadata: { plan_id: deletedPlan.id, name: deletedPlan.name }
+    });
+
+    console.log('Plan deleted successfully:', deletedPlan.id);
+    res.status(200).json({ message: 'Plan eliminado correctamente' });
+  } catch (error) {
+    console.error('Error deleting plan:', error);
+    await SystemLogger.logCriticalError('Plan deletion error', error as Error, { userId: req.user?.id });
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al eliminar plan');
+  }
+});
+
+export default router;
