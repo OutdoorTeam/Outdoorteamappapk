@@ -8,7 +8,7 @@ const getAllowedOrigins = (): string[] => {
   const origins = [];
   
   // Production domains
-  origins.push('https://app.mioutdoorteam.com');
+  origins.push('https://app.moutdoorteam.com');
   origins.push('https://briskly-playful-sandwich.instance.app');
   
   // More permissive instance.app patterns for builds
