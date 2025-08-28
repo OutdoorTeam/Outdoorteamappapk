@@ -1,3 +1,4 @@
+
 import express from 'express';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -23,6 +24,7 @@ import dailyHabitsRoutes from './routes/daily-habits-routes.js';
 import dailyNotesRoutes from './routes/daily-notes-routes.js';
 import myGoalsRoutes from './routes/my-goals-routes.js';
 import apiRoutes from './routes/api-routes.js';
+import authRoutes from './routes/auth-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -326,6 +328,7 @@ app.use('/api', dailyHabitsRoutes);
 app.use('/api', dailyNotesRoutes);
 app.use('/api', myGoalsRoutes);
 app.use('/api', apiRoutes);
+app.use('/api/auth', authRoutes);
 
 // Admin Users Route (Critical for AdminPage)
 app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {

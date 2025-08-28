@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   CreditCard,
   User,
   Settings,
+  LogOut,
 } from "lucide-react";
 
 interface LayoutProps {
@@ -146,7 +148,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (user && user.role === "admin") {
       items.push({
         path: "/admin",
-        label: "Administración",
+        label: "Admin",
         icon: Settings,
         available: true,
       });
@@ -162,18 +164,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return (
       <div className="min-h-screen bg-background">
         {/* Top Navigation for Mobile */}
-        <div className="md:hidden fixed top-0 left-0 right-0 bg-[#D3B869] border-b shadow-lg px-1 py-2 z-50">
-          <div className="grid grid-cols-4 gap-0.5">
-            {navigationItems.slice(0, 8).map((item) => (
+        <div className="md:hidden fixed top-0 left-0 right-0 bg-card border-b shadow-lg px-1 py-2 z-50">
+          <div className="flex justify-around items-center">
+            {navigationItems.slice(0, 4).map((item) => (
               <Link
                 key={item.path}
                 to={item.available ? item.path : "#"}
                 className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
                   isActive(item.path)
-                    ? "text-black bg-black/10 font-bold"
+                    ? "text-primary"
                     : item.available
-                      ? "text-black hover:text-black hover:bg-black/5"
-                      : "text-gray-600 cursor-not-allowed"
+                      ? "text-foreground hover:text-primary"
+                      : "text-muted-foreground cursor-not-allowed"
                 }`}
                 onClick={(e) => {
                   if (!item.available) {
@@ -184,23 +186,35 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   }
                 }}
               >
-                <item.icon size={16} />
-                <span className="text-xs">{item.label}</span>
+                <item.icon size={20} />
                 {!item.available && (
-                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
+                  <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></div>
                 )}
               </Link>
             ))}
+             <Link
+                to="/profile"
+                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
+                  isActive("/profile")
+                    ? "text-primary"
+                    : "text-foreground hover:text-primary"
+                }`}
+              >
+                <User size={20} />
+              </Link>
+            <button onClick={handleLogout} className="text-foreground hover:text-primary">
+              <LogOut size={20} />
+            </button>
           </div>
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="border-b bg-[#D3B869] shadow-sm hidden md:block">
+        <nav className="border-b bg-card shadow-sm hidden md:block">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center">
                 <img 
-                  src="/assets/logo-black.png" 
+                  src="/assets/logo-with-text-black.png" 
                   alt="Outdoor Team Logo" 
                   className="h-10 w-auto"
                 />
@@ -212,12 +226,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link
                     key={item.path}
                     to={item.available ? item.path : "#"}
-                    className={`hover:text-black transition-colors font-medium ${
+                    className={`hover:text-primary transition-colors font-medium ${
                       isActive(item.path)
-                        ? "text-black font-bold"
+                        ? "text-primary font-bold"
                         : item.available
-                          ? "text-gray-800"
-                          : "text-gray-500 cursor-not-allowed"
+                          ? "text-foreground"
+                          : "text-muted-foreground cursor-not-allowed"
                     }`}
                     onClick={(e) => {
                       if (!item.available) {
@@ -236,14 +250,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
 
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-black font-medium">
+                  <span className="text-sm text-foreground font-medium">
                     Hola, {user.full_name.split(" ")[0]}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-black text-[#D3B869] bg-black hover:bg-gray-800 hover:text-[#D3B869]"
+                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                   >
                     Cerrar Sesión
                   </Button>
@@ -261,7 +275,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Default layout for non-logged in users and admins
   return (
     <div className="min-h-screen bg-background">
-      <nav className="border-b bg-white shadow-sm">
+      <nav className="border-b bg-card shadow-sm">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center">
@@ -276,21 +290,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="hidden md:flex items-center space-x-6">
               <Link
                 to="/"
-                className={`hover:text-[#D3B869] transition-colors ${
+                className={`hover:text-primary transition-colors ${
                   isActive("/")
-                    ? "text-[#D3B869] font-medium"
-                    : "text-brand-black"
+                    ? "text-primary font-medium"
+                    : "text-foreground"
                 }`}
               >
                 Inicio
               </Link>
 
               <Link
-                to="/planes"
-                className={`hover:text-[#D3B869] transition-colors ${
-                  isActive("/planes")
-                    ? "text-[#D3B869] font-medium"
-                    : "text-brand-black"
+                to="/plans"
+                className={`hover:text-primary transition-colors ${
+                  isActive("/plans")
+                    ? "text-primary font-medium"
+                    : "text-foreground"
                 }`}
               >
                 Planes
@@ -301,10 +315,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   {user.role === "admin" ? (
                     <Link
                       to="/admin"
-                      className={`hover:text-[#D3B869] transition-colors ${
+                      className={`hover:text-primary transition-colors ${
                         isActive("/admin")
-                          ? "text-[#D3B869] font-medium"
-                          : "text-brand-black"
+                          ? "text-primary font-medium"
+                          : "text-foreground"
                       }`}
                     >
                       Panel Admin
@@ -312,10 +326,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   ) : (
                     <Link
                       to="/dashboard"
-                      className={`hover:text-[#D3B869] transition-colors ${
+                      className={`hover:text-primary transition-colors ${
                         isActive("/dashboard")
-                          ? "text-[#D3B869] font-medium"
-                          : "text-brand-black"
+                          ? "text-primary font-medium"
+                          : "text-foreground"
                       }`}
                     >
                       Mi Panel
@@ -328,7 +342,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                   >
                     Cerrar Sesión
                   </Button>
@@ -339,7 +353,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                     >
                       Iniciar Sesión
                     </Button>
@@ -347,7 +361,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/register">
                     <Button
                       size="sm"
-                      className="bg-[#D3B869] hover:bg-[#D3B869]/90 text-black"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
                     >
                       Registrarse
                     </Button>
@@ -367,7 +381,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     variant="outline"
                     size="sm"
                     onClick={handleLogout}
-                    className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                   >
                     Salir
                   </Button>
@@ -378,7 +392,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      className="border-[#D3B869] text-[#D3B869] hover:bg-[#D3B869] hover:text-black"
+                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                     >
                       Login
                     </Button>
@@ -386,7 +400,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/register">
                     <Button
                       size="sm"
-                      className="bg-[#D3B869] text-black hover:bg-[#D3B869]/90"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       Sign Up
                     </Button>
