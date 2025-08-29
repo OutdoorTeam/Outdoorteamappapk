@@ -165,12 +165,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="min-h-screen bg-background">
         {/* Top Navigation for Mobile */}
         <div className="md:hidden fixed top-0 left-0 right-0 bg-card border-b shadow-lg px-1 py-2 z-50">
-          <div className="flex justify-around items-center">
-            {navigationItems.slice(0, 4).map((item) => (
+          <div className="flex items-center overflow-x-auto whitespace-nowrap">
+            {navigationItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.available ? item.path : "#"}
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
+                className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors relative ${
                   isActive(item.path)
                     ? "text-primary"
                     : item.available
@@ -192,17 +192,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 )}
               </Link>
             ))}
-             <Link
-                to="/profile"
-                className={`flex flex-col items-center space-y-1 px-1 py-2 rounded-lg transition-colors relative ${
-                  isActive("/profile")
-                    ? "text-primary"
-                    : "text-foreground hover:text-primary"
-                }`}
-              >
-                <User size={20} />
-              </Link>
-            <button onClick={handleLogout} className="text-foreground hover:text-primary">
+            <button onClick={handleLogout} className="text-foreground hover:text-primary px-3">
               <LogOut size={20} />
             </button>
           </div>
