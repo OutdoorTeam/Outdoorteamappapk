@@ -689,7 +689,6 @@ export const startServer = async (port = 3001) => {
       // Log deployment info
       if (process.env.NODE_ENV === 'production') {
         console.log(`🚀 Production deployment ready`);
-        console.log(`🌐 Expected URL: https://app.moutdoorteam.com`);
         
         // Check if built files exist
         const publicPath = path.join(process.cwd(), 'public');
