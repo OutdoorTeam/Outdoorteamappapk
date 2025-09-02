@@ -1,5 +1,4 @@
 
-      <![CDATA[
 import express from 'express';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -26,7 +25,6 @@ import dailyNotesRoutes from './routes/daily-notes-routes.js';
 import myGoalsRoutes from './routes/my-goals-routes.js';
 import apiRoutes from './routes/api-routes.js';
 import authRoutes from './routes/auth-routes.js';
-import reportRoutes from './routes/report-routes.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
@@ -326,7 +324,6 @@ app.use('/api', trainingScheduleRoutes);
 app.use('/api/admin', userManagementRoutes);
 app.use('/api/admin', userGoalsRoutes);
 app.use('/api/admin', plansManagementRoutes);
-app.use('/api/admin', reportRoutes);
 app.use('/api', dailyHabitsRoutes);
 app.use('/api', dailyNotesRoutes);
 app.use('/api', myGoalsRoutes);
@@ -777,5 +774,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
-]]>
-    
