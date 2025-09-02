@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -192,7 +191,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 )}
               </Link>
             ))}
-            <button onClick={handleLogout} className="text-foreground hover:text-primary px-3">
+            <button
+              onClick={handleLogout}
+              className="text-foreground hover:text-primary px-3"
+            >
               <LogOut size={20} />
             </button>
           </div>
@@ -203,9 +205,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center">
-                <img 
-                  src="/assets/logo-with-text-black.png" 
-                  alt="Outdoor Team Logo" 
+                <img
+                  src="/assets/logo-with-text-black.png"
+                  alt="Outdoor Team Logo"
                   className="h-10 w-auto"
                 />
               </Link>
@@ -269,9 +271,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center">
-              <img 
-                src="/assets/logo-with-text-black.png" 
-                alt="Outdoor Team Logo" 
+              <img
+                src="/assets/logo-with-text-black.png"
+                alt="Outdoor Team Logo"
                 className="h-12 w-auto"
               />
             </Link>
@@ -281,9 +283,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link
                 to="/"
                 className={`hover:text-primary transition-colors ${
-                  isActive("/")
-                    ? "text-primary font-medium"
-                    : "text-foreground"
+                  isActive("/") ? "text-primary font-medium" : "text-foreground"
                 }`}
               >
                 Inicio
@@ -301,42 +301,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
 
               {user ? (
-                <div className="flex items-center space-x-4">
-                  {user.role === "admin" ? (
-                    <Link
-                      to="/admin"
-                      className={`hover:text-primary transition-colors ${
-                        isActive("/admin")
-                          ? "text-primary font-medium"
-                          : "text-foreground"
-                      }`}
-                    >
-                      Panel Admin
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/dashboard"
-                      className={`hover:text-primary transition-colors ${
-                        isActive("/dashboard")
-                          ? "text-primary font-medium"
-                          : "text-foreground"
-                      }`}
-                    >
-                      Mi Panel
-                    </Link>
-                  )}
-                  <span className="text-sm text-muted-foreground">
-                    Hola, {user.full_name.split(" ")[0]}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                  >
-                    Cerrar Sesión
-                  </Button>
-                </div>
+                <div className="flex items-center space-x-4">Servicios</div>
               ) : (
                 <div className="flex items-center space-x-2">
                   <Link to="/login">
@@ -379,8 +344,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               ) : (
                 <div className="flex items-center space-x-1">
                   <Link to="/login">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                     >
