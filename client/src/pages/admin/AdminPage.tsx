@@ -27,7 +27,8 @@ import {
   Mail,
   Play,
   Eye,
-  Activity
+  Activity,
+  Package
 } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
@@ -99,7 +100,7 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
@@ -119,6 +120,10 @@ const AdminPage: React.FC = () => {
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Configuración
+          </TabsTrigger>
+          <TabsTrigger value="diagnostics" className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            Diagnósticos
           </TabsTrigger>
         </TabsList>
 
@@ -250,6 +255,10 @@ const AdminPage: React.FC = () => {
 
         <TabsContent value="settings" className="space-y-6">
           <PlansConfiguration />
+          <DiagnosticsPage />
+        </TabsContent>
+
+        <TabsContent value="diagnostics">
           <DiagnosticsPage />
         </TabsContent>
       </Tabs>
