@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +14,7 @@ import UserDetailPanel from '@/components/admin/UserDetailPanel';
 import ContentManagement from '@/components/admin/ContentManagement';
 import PlansManagementPage from '@/pages/admin/PlansManagementPage';
 import DiagnosticsPage from '@/pages/admin/DiagnosticsPage';
+import AdminEvaluations from '@/components/admin/AdminEvaluations';
 import { 
   Users, 
   Shield, 
@@ -25,7 +27,8 @@ import {
   Mail,
   Play,
   Eye,
-  Activity
+  Activity,
+  FileText
 } from 'lucide-react';
 
 const AdminPage: React.FC = () => {
@@ -97,10 +100,14 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="evaluations" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Evaluaciones
           </TabsTrigger>
           <TabsTrigger value="content" className="flex items-center gap-2">
             <Play className="w-4 h-4" />
@@ -235,6 +242,24 @@ const AdminPage: React.FC = () => {
                   </p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Evaluations Tab */}
+        <TabsContent value="evaluations">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Gestión de Evaluaciones
+              </CardTitle>
+              <CardDescription>
+                Revisa y exporta las evaluaciones de salud de los usuarios.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminEvaluations />
             </CardContent>
           </Card>
         </TabsContent>

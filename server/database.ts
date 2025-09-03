@@ -1,3 +1,4 @@
+
 import { Kysely, SqliteDialect } from 'kysely';
 import Database from 'better-sqlite3';
 import path from 'path';
@@ -256,6 +257,35 @@ export interface DatabaseSchema {
     weekly_points_goal: number;
     created_at: string;
     updated_at: string;
+  };
+  evaluaciones_parq: {
+    id: string;
+    user_id: number;
+    answers_json: string;
+    result_flag: number;
+    notes: string | null;
+    created_at: string;
+  };
+  evaluaciones_whoqol: {
+    id: string;
+    user_id: number;
+    score_physical: number;
+    score_psychological: number;
+    score_social: number;
+    score_environmental: number;
+    score_total: number;
+    answers_json: string;
+    notes: string | null;
+    created_at: string;
+  };
+  evaluaciones_pss10: {
+    id: string;
+    user_id: number;
+    score_total: number;
+    category: 'bajo' | 'moderado' | 'alto';
+    answers_json: string;
+    notes: string | null;
+    created_at: string;
   };
 }
 

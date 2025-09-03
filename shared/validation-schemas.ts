@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 // User registration schema
@@ -81,4 +82,32 @@ export const planAssignmentSchema = z.object({
 // Toggle user status schema
 export const toggleUserStatusSchema = z.object({
   is_active: z.boolean()
+});
+
+// PAR-Q Evaluation Schema
+export const parqSchema = z.object({
+  answers_json: z.record(z.boolean()),
+  result_flag: z.boolean(),
+  notes: z.string().optional(),
+});
+
+// WHOQOL-BREF Evaluation Schema
+export const whoqolSchema = z.object({
+  scores: z.object({
+    physical: z.number().min(0).max(100),
+    psychological: z.number().min(0).max(100),
+    social: z.number().min(0).max(100),
+    environmental: z.number().min(0).max(100),
+    total: z.number().min(0).max(100),
+  }),
+  answers_json: z.record(z.number()),
+  notes: z.string().optional(),
+});
+
+// PSS-10 Evaluation Schema
+export const pss10Schema = z.object({
+  score_total: z.number().min(0).max(40),
+  category: z.enum(['bajo', 'moderado', 'alto']),
+  answers_json: z.record(z.number()),
+  notes: z.string().optional(),
 });
