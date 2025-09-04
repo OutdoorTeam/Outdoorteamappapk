@@ -343,10 +343,10 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
   }
 });
 
-// Plans Route (Critical for AdminPage)
-app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
+// Plans Route (Public)
+app.get('/api/plans', async (req: any, res: express.Response) => {
   try {
-    console.log('Fetching plans for user:', req.user.email);
+    console.log('Fetching public plans');
 
     const plans = await db
       .selectFrom('plans')
@@ -355,11 +355,18 @@ app.get('/api/plans', authenticateToken, async (req: any, res: express.Response)
       .orderBy('created_at', 'desc')
       .execute();
 
-    console.log('Plans fetched:', plans.length);
-    res.json(plans);
+    const formattedPlans = plans.map(plan => ({
+      ...plan,
+      services_included: plan.services_included ? JSON.parse(plan.services_included) : [],
+      features_json: plan.features_json ? JSON.parse(plan.features_json) : {},
+      is_active: Boolean(plan.is_active)
+    }));
+
+    console.log('Public plans fetched:', formattedPlans.length);
+    res.json(formattedPlans);
   } catch (error) {
-    console.error('Error fetching plans:', error);
-    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id });
+    console.error('Error fetching public plans:', error);
+    await SystemLogger.logCriticalError('Public plans fetch error', error as Error);
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
   }
 });

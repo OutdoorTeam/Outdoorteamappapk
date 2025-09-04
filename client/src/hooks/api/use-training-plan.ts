@@ -53,19 +53,22 @@ export const TRAINING_PLAN_KEYS = {
 
 // Hook to get user's training plan (admin or own)
 export function useTrainingPlan(userId: number) {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: TRAINING_PLAN_KEYS.user(userId),
     queryFn: () => apiRequest<TrainingPlanData>(`/api/training-plan/${userId}`),
-    enabled: !!userId,
+    enabled: !!userId && !!token,
     staleTime: 60 * 1000, // 1 minute
   });
 }
 
 // Hook to get own training plan
 export function useOwnTrainingPlan() {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: TRAINING_PLAN_KEYS.own(),
     queryFn: () => apiRequest<TrainingPlanData>('/api/training-plan/own'),
+    enabled: !!token,
     staleTime: 60 * 1000, // 1 minute
   });
 }

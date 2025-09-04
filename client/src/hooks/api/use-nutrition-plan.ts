@@ -25,11 +25,12 @@ export const NUTRITION_PLAN_KEYS = {
 
 // Get nutrition plan for a user
 export function useNutritionPlan(userId: number) {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: NUTRITION_PLAN_KEYS.byUser(userId),
     queryFn: () => apiRequest<NutritionPlanResponse>(`/api/nutrition-plan/${userId}`),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    enabled: !!userId,
+    enabled: !!userId && !!token,
   });
 }
 

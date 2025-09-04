@@ -26,6 +26,7 @@ export const CONTENT_LIBRARY_KEYS = {
 
 // Hook to get content library items
 export function useContentLibrary(category?: string) {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: CONTENT_LIBRARY_KEYS.byCategory(category),
     queryFn: () => {
@@ -34,6 +35,7 @@ export function useContentLibrary(category?: string) {
         : '/api/content-library';
       return apiRequest<ContentLibraryItem[]>(url);
     },
+    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

@@ -3,309 +3,290 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  useAddOrUpdateDay,
-  TrainingPlanDay,
-  TrainingExercise
-} from '@/hooks/api/use-training-plan';
-import ExerciseEditor from './ExerciseEditor';
-import { ArrowLeft, Plus, Edit, Trash2, Save, Play, Dumbbell } from 'lucide-react';
+import { useContentLibrary } from '@/hooks/api/use-content-library';
+import { useAddOrUpdateExercise, useDeleteExercise } from '@/hooks/api/use-training-plan';
+import { ArrowLeft, Plus, Trash2, Play } from 'lucide-react';
+
+interface Exercise {
+  id?: number;
+  sort_order: number;
+  exercise_name: string;
+  content_library_id: number | null;
+  youtube_url: string | null;
+  sets: number | null;
+  reps: string | null;
+  intensity: string | null;
+  rest_seconds: number | null;
+  tempo: string | null;
+  notes: string | null;
+}
+
+interface TrainingDay {
+  id: number;
+  title: string | null;
+  exercises?: Exercise[];
+}
 
 interface TrainingDayEditorProps {
-  day: TrainingPlanDay;
+  day: TrainingDay;
   userId: number;
   onBack: () => void;
 }
 
 const TrainingDayEditor: React.FC<TrainingDayEditorProps> = ({ day, userId, onBack }) => {
   const { toast } = useToast();
-  const [dayTitle, setDayTitle] = React.useState(day.title || '');
-  const [dayNotes, setDayNotes] = React.useState(day.notes || '');
-  const [showExerciseEditor, setShowExerciseEditor] = React.useState(false);
-  const [editingExercise, setEditingExercise] = React.useState<TrainingExercise | undefined>(undefined);
+  const [exercises, setExercises] = React.useState<Exercise[]>(day.exercises || []);
   
-  const addOrUpdateDayMutation = useAddOrUpdateDay(userId);
+  const { data: contentLibrary } = useContentLibrary('exercise');
+  const addOrUpdateExerciseMutation = useAddOrUpdateExercise(userId);
+  const deleteExerciseMutation = useDeleteExercise(userId);
 
-  // Validate day object
-  React.useEffect(() => {
-    console.log('TrainingDayEditor received day:', day);
-    if (!day?.id) {
-      console.error('Invalid day object received in TrainingDayEditor:', day);
-      toast({
-        title: "Error",
-        description: "Día inválido. Regresando a la vista principal.",
-        variant: "destructive",
-      });
-      onBack();
+  const intensityOptions = ['baja', 'media', 'alta', 'RPE6', 'RPE7', 'RPE8', 'RPE9', 'RPE10'];
+
+  const handleAddExercise = () => {
+    const newExercise: Exercise = {
+      sort_order: exercises.length,
+      exercise_name: '',
+      content_library_id: null,
+      youtube_url: null,
+      sets: null,
+      reps: null,
+      intensity: null,
+      rest_seconds: null,
+      tempo: null,
+      notes: null
+    };
+    setExercises([...exercises, newExercise]);
+  };
+
+  const handleRemoveExercise = async (exerciseId: number | undefined, index: number) => {
+    if (exerciseId) {
+      try {
+        await deleteExerciseMutation.mutateAsync(exerciseId);
+        toast({ title: "Ejercicio eliminado" });
+      } catch (error) {
+        toast({ title: "Error", description: "No se pudo eliminar el ejercicio", variant: "destructive" });
+        return;
+      }
     }
-  }, [day, onBack, toast]);
+    setExercises(exercises.filter((_, i) => i !== index));
+  };
 
-  const handleSaveDay = async () => {
-    if (!day?.id) {
-      toast({
-        title: "Error",
-        description: "No se puede guardar un día inválido",
-        variant: "destructive",
-      });
+  const handleExerciseChange = (index: number, field: keyof Exercise, value: any) => {
+    const updatedExercises = [...exercises];
+    updatedExercises[index] = { ...updatedExercises[index], [field]: value };
+    setExercises(updatedExercises);
+  };
+
+  const handleContentLibrarySelect = (index: number, contentId: string) => {
+    const updatedExercises = [...exercises];
+    const exercise = updatedExercises[index];
+
+    if (contentId === 'custom') {
+      exercise.content_library_id = null;
+      exercise.youtube_url = null;
+    } else {
+      const contentItem = contentLibrary?.find(item => item.id === parseInt(contentId));
+      if (contentItem) {
+        exercise.content_library_id = contentItem.id;
+        exercise.exercise_name = contentItem.title;
+        exercise.youtube_url = contentItem.video_url;
+      }
+    }
+    setExercises(updatedExercises);
+  };
+
+  const handleSaveExercise = async (index: number) => {
+    const exercise = exercises[index];
+    if (!exercise.exercise_name.trim()) {
+      toast({ title: "Error", description: "El nombre del ejercicio es requerido", variant: "destructive" });
       return;
     }
 
     try {
-      await addOrUpdateDayMutation.mutateAsync({
-        planId: day.plan_id,
-        day_index: day.day_index,
-        title: dayTitle.trim() || `Día ${day.day_index}`,
-        notes: dayNotes.trim() || undefined,
-        sort_order: day.sort_order
+      await addOrUpdateExerciseMutation.mutateAsync({
+        dayId: day.id,
+        exerciseData: exercise
       });
-
-      toast({
-        title: "Día guardado",
-        description: "Los cambios del día se han guardado exitosamente",
-        variant: "default",
-      });
+      toast({ title: "Ejercicio guardado" });
     } catch (error) {
-      console.error('Error saving day:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar el día",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No se pudo guardar el ejercicio", variant: "destructive" });
     }
   };
-
-  const handleEditExercise = (exercise: TrainingExercise) => {
-    console.log('Editing exercise:', exercise, 'for day:', day.id);
-    setEditingExercise(exercise);
-    setShowExerciseEditor(true);
-  };
-
-  const handleAddExercise = () => {
-    console.log('Adding new exercise for day:', day.id);
-    setEditingExercise(undefined);
-    setShowExerciseEditor(true);
-  };
-
-  const handleCloseExerciseEditor = () => {
-    setShowExerciseEditor(false);
-    setEditingExercise(undefined);
-  };
-
-  const getIntensityColor = (intensity: string) => {
-    switch (intensity) {
-      case 'baja':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'media':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'alta':
-      case 'RPE9':
-      case 'RPE10':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'RPE7':
-      case 'RPE8':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      default:
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-  };
-
-  const exercises = day.exercises || [];
-
-  if (!day?.id) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-center">
-          <p className="text-red-600">Error: Día inválido</p>
-          <Button onClick={onBack} className="mt-4">Volver</Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (showExerciseEditor) {
-    return (
-      <ExerciseEditor
-        dayId={day.id}
-        userId={userId}
-        exercise={editingExercise}
-        onClose={handleCloseExerciseEditor}
-      />
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={onBack}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver al Plan
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="flex-1">
-              <CardTitle>
-                Editando: {dayTitle || `Día ${day.day_index}`}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Día ID: {day.id} | Plan ID: {day.plan_id} | Índice: {day.day_index}
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Day Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Detalles del Día</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="day-title">Título del Día</Label>
-            <Input
-              id="day-title"
-              value={dayTitle}
-              onChange={(e) => setDayTitle(e.target.value)}
-              placeholder={`Día ${day.day_index}`}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="day-notes">Notas del Día</Label>
-            <Textarea
-              id="day-notes"
-              value={dayNotes}
-              onChange={(e) => setDayNotes(e.target.value)}
-              placeholder="Notas o instrucciones especiales para este día"
-              rows={3}
-            />
-          </div>
-
-          <Button 
-            onClick={handleSaveDay}
-            disabled={addOrUpdateDayMutation.isPending}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {addOrUpdateDayMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
+            Editor del Día: {day.title || 'Día de Entrenamiento'}
+          </CardTitle>
+          <Button onClick={handleAddExercise}>
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar Ejercicio
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Exercises */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Dumbbell className="w-5 h-5" />
-              Ejercicios ({exercises.length})
-            </CardTitle>
-            <Button onClick={handleAddExercise}>
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar Ejercicio
-            </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {exercises.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>No hay ejercicios para este día. ¡Agrega el primero!</p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {exercises.length > 0 ? (
-            <div className="space-y-4">
-              {exercises
-                .sort((a, b) => a.sort_order - b.sort_order)
-                .map((exercise) => (
-                  <Card key={exercise.id} className="border-l-4 border-l-blue-500">
-                    <CardContent className="pt-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-lg mb-2">{exercise.exercise_name}</h4>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 text-sm">
-                            {exercise.sets && exercise.reps && (
-                              <div>
-                                <span className="text-muted-foreground">Series x Reps:</span>
-                                <div className="font-medium">{exercise.sets} × {exercise.reps}</div>
-                              </div>
-                            )}
-                            
-                            {exercise.intensity && (
-                              <div>
-                                <span className="text-muted-foreground">Intensidad:</span>
-                                <div>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={getIntensityColor(exercise.intensity)}
-                                  >
-                                    {exercise.intensity}
-                                  </Badge>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {exercise.rest_seconds && (
-                              <div>
-                                <span className="text-muted-foreground">Descanso:</span>
-                                <div className="font-medium">{exercise.rest_seconds}s</div>
-                              </div>
-                            )}
-                            
-                            {exercise.tempo && (
-                              <div>
-                                <span className="text-muted-foreground">Tempo:</span>
-                                <div className="font-medium">{exercise.tempo}</div>
-                              </div>
-                            )}
-                          </div>
+        ) : (
+          <div className="space-y-6">
+            {exercises.map((exercise, index) => (
+              <Card key={index} className="p-4 border-2">
+                <div className="flex items-start justify-between mb-4">
+                  <h4 className="font-medium text-lg">Ejercicio {index + 1}</h4>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleSaveExercise(index)}
+                      disabled={addOrUpdateExerciseMutation.isPending}
+                    >
+                      Guardar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleRemoveExercise(exercise.id, index)}
+                      disabled={deleteExerciseMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
 
-                          {exercise.notes && (
-                            <div className="mb-3">
-                              <span className="text-sm text-muted-foreground italic">
-                                💡 {exercise.notes}
-                              </span>
-                            </div>
-                          )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Exercise Selection */}
+                  <div className="space-y-2">
+                    <Label>Ejercicio</Label>
+                    <Select
+                      value={exercise.content_library_id?.toString() || 'custom'}
+                      onValueChange={(value) => handleContentLibrarySelect(index, value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar ejercicio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="custom">Ejercicio personalizado</SelectItem>
+                        {contentLibrary?.map(item => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                          {(exercise.content_library_id || exercise.youtube_url) && (
-                            <div className="mb-2">
-                              <Badge variant="secondary" className="text-xs">
-                                <Play className="w-3 h-3 mr-1" />
-                                Video disponible
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
+                  {/* Custom Exercise Name */}
+                  <div className="space-y-2">
+                    <Label>Nombre del Ejercicio</Label>
+                    <Input
+                      value={exercise.exercise_name}
+                      onChange={(e) => handleExerciseChange(index, 'exercise_name', e.target.value)}
+                      placeholder="Nombre del ejercicio"
+                    />
+                  </div>
 
-                        <div className="flex items-center gap-2 ml-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditExercise(exercise)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Dumbbell className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No hay ejercicios asignados para este día</p>
-              <Button 
-                onClick={handleAddExercise}
-                className="mt-4"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Primer Ejercicio
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                  {/* Video URL */}
+                  <div className="space-y-2">
+                    <Label>URL del Video</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={exercise.youtube_url || ''}
+                        onChange={(e) => handleExerciseChange(index, 'youtube_url', e.target.value)}
+                        placeholder="https://youtube.com/..."
+                      />
+                      {exercise.youtube_url && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(exercise.youtube_url!, '_blank')}
+                        >
+                          <Play className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sets, Reps, Rest */}
+                  <div className="space-y-2">
+                    <Label>Series</Label>
+                    <Input
+                      type="number"
+                      value={exercise.sets || ''}
+                      onChange={(e) => handleExerciseChange(index, 'sets', parseInt(e.target.value) || null)}
+                      placeholder="3"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Repeticiones</Label>
+                    <Input
+                      value={exercise.reps || ''}
+                      onChange={(e) => handleExerciseChange(index, 'reps', e.target.value)}
+                      placeholder="10-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descanso (seg)</Label>
+                    <Input
+                      type="number"
+                      value={exercise.rest_seconds || ''}
+                      onChange={(e) => handleExerciseChange(index, 'rest_seconds', parseInt(e.target.value) || null)}
+                      placeholder="60"
+                    />
+                  </div>
+
+                  {/* Intensity, Tempo, Notes */}
+                  <div className="space-y-2">
+                    <Label>Intensidad</Label>
+                    <Select
+                      value={exercise.intensity || ''}
+                      onValueChange={(value) => handleExerciseChange(index, 'intensity', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar intensidad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {intensityOptions.map(intensity => (
+                          <SelectItem key={intensity} value={intensity}>
+                            {intensity}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tempo</Label>
+                    <Input
+                      value={exercise.tempo || ''}
+                      onChange={(e) => handleExerciseChange(index, 'tempo', e.target.value)}
+                      placeholder="Ej: 2-0-1-0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notas</Label>
+                    <Textarea
+                      value={exercise.notes || ''}
+                      onChange={(e) => handleExerciseChange(index, 'notes', e.target.value)}
+                      placeholder="Notas adicionales..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

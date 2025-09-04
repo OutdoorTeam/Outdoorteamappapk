@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { registerSchema, RegisterFormData } from '../../../shared/validation-schemas';
+import { registerSchema, RegisterFormData } from '~shared/validation-schemas';
 import { Eye, EyeOff } from 'lucide-react';
 
 const RegisterPage: React.FC = () => {

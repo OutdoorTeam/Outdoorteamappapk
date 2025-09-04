@@ -25,12 +25,14 @@ export const USER_FILES_KEYS = {
 
 // Hook to get user files by type
 export function useUserFiles(fileType?: string) {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: fileType ? USER_FILES_KEYS.byType(fileType) : USER_FILES_KEYS.all,
     queryFn: () => {
       const url = fileType ? `/api/user-files?file_type=${fileType}` : '/api/user-files';
       return apiRequest<UserFile[]>(url);
     },
+    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });

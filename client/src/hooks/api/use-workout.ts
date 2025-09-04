@@ -20,9 +20,11 @@ export const WORKOUT_KEYS = {
 
 // Hook to get workout of the day
 export function useWorkoutOfDay() {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: WORKOUT_KEYS.today(),
     queryFn: () => apiRequest<WorkoutOfDay>('/api/workout-of-day'),
+    enabled: !!token,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
   });

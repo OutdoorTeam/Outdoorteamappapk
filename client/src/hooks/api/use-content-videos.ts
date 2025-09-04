@@ -19,9 +19,11 @@ export const CONTENT_VIDEOS_KEYS = {
 
 // Hook to get all content videos
 export function useContentVideos() {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: CONTENT_VIDEOS_KEYS.all,
     queryFn: () => apiRequest<ContentVideo[]>('/api/content-videos'),
+    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -29,10 +31,11 @@ export function useContentVideos() {
 
 // Hook to get content videos by category
 export function useContentVideosByCategory(category: string) {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: CONTENT_VIDEOS_KEYS.byCategory(category),
     queryFn: () => apiRequest<ContentVideo[]>(`/api/content-videos?category=${category}`),
-    enabled: !!category,
+    enabled: !!category && !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });

@@ -54,7 +54,7 @@ const PlansPage: React.FC = () => {
   };
 
   const renderPlanCard = (plan: Plan) => {
-    const services = JSON.parse(plan.services_included || '[]');
+    const services = plan.services_included || [];
     const isPopular = plan.name.toLowerCase().includes('totum');
 
     return (

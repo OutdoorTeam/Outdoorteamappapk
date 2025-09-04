@@ -18,10 +18,11 @@ export const ADMIN_USER_GOALS_KEYS = {
 
 // Hook to get user goals (admin only)
 export function useAdminUserGoals(userId: number) {
+  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: ADMIN_USER_GOALS_KEYS.byUser(userId),
     queryFn: () => apiRequest<AdminUserGoals>(`/api/admin/users/${userId}/goals`),
-    enabled: !!userId,
+    enabled: !!userId && !!token,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

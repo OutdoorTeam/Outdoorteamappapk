@@ -30,7 +30,6 @@ interface AuthContextType {
   register: (userData: any, setError: any) => Promise<void>;
   logout: () => void;
   loginWithGoogle: () => Promise<void>;
-  assignPlan: (planId: number) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -119,16 +118,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
   };
 
-  const assignPlan = async (planId: number) => {
-    // This logic should be moved to a dedicated hook if it becomes complex
-    console.log('Assigning plan', planId, 'to user', user?.id);
-    toast({
-      title: "Función no disponible",
-      description: "La asignación de planes se realiza desde el panel de administrador.",
-      variant: "warning",
-    });
-  };
-
   const value = React.useMemo(() => ({
     user: user || null,
     isLoading: isUserLoading,
@@ -136,7 +125,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     loginWithGoogle,
-    assignPlan,
     refreshUser,
   }), [user, isUserLoading]);
 
