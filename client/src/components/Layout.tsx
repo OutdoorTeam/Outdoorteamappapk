@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -206,7 +207,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center">
                 <img
-                  src="/assets/logo-with-text-black.png"
+                  src="/assets/logo.png"
                   alt="Outdoor Team Logo"
                   className="h-10 w-auto"
                 />
@@ -272,7 +273,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center">
               <img
-                src="/assets/logo-with-text-black.png"
+                src="/assets/logo.png"
                 alt="Outdoor Team Logo"
                 className="h-12 w-auto"
               />
