@@ -45,9 +45,9 @@ import {
 import {
   corsMiddleware,
   corsErrorHandler,
-  securityHeaders,
   logCorsConfig
 } from './config/cors.js';
+import { securityHeaders } from './middleware/security.js';
 import {
   registerSchema,
   loginSchema,
@@ -129,14 +129,14 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Security headers first (RELAXED for deployment)
+// Security headers first
 app.use(securityHeaders);
 
 // Body parsing middleware with larger limits for deployment
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Apply CORS to all routes (VERY PERMISSIVE for deployment)
+// Apply CORS to all routes
 app.use(corsMiddleware);
 app.use(corsErrorHandler);
 
@@ -612,40 +612,19 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(formatUserResponse(req.user));
 });
 
-// Setup static serving for production (ALWAYS in production)
+// Setup static serving for production
 if (process.env.NODE_ENV === 'production') {
   setupStaticServing(app);
   console.log('📁 Static file serving configured for production');
 }
 
-// More permissive error handling for deployment
-app.use((req, res, next) => {
-  console.warn(`404 - Route not found: ${req.method} ${req.path}`);
-  
-  if (req.path.startsWith('/api/')) {
-    sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
-    return;
-  }
-  
-  // In production, try to serve the SPA
-  if (process.env.NODE_ENV === 'production') {
-    const indexPath = path.join(process.cwd(), 'public', 'index.html');
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).json({ 
-        error: 'App not built',
-        message: 'Missing index.html - run npm run build',
-        cwd: process.cwd()
-      });
-    }
-    return;
-  }
-  
-  res.status(404).json({ error: 'Route not found' });
+// Fallback for API routes not found
+app.use('/api/*splat', (req, res) => {
+  console.warn(`404 - API Route not found: ${req.method} ${req.originalUrl}`);
+  sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
 });
 
-// Global error handler (very permissive for deployment)
+// Global error handler
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled error:', error);
   

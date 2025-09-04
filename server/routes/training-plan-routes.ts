@@ -287,7 +287,7 @@ router.post('/training-plan/:planId/days', authenticateToken, requireAdmin, asyn
     console.log('Adding/updating day for plan:', planId, 'day:', day_index);
 
     // Validate inputs
-    if (!day_index || day_index < 1) {
+    if (day_index === undefined || day_index < 0) {
       sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'Índice de día inválido');
       return;
     }
