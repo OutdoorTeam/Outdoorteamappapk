@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
 
@@ -31,6 +32,7 @@ export interface UserStats {
 export const USER_STATS_KEYS = {
   all: ['user-stats'] as const,
   byUser: (userId: number) => [...USER_STATS_KEYS.all, 'user', userId] as const,
+  my: () => [...USER_STATS_KEYS.all, 'my-stats'] as const,
 };
 
 // Hook to get user statistics (admin view)
@@ -46,7 +48,7 @@ export function useUserStats(userId: number) {
 // Hook to get current user's statistics
 export function useMyStats() {
   return useQuery({
-    queryKey: [...USER_STATS_KEYS.all, 'my-stats'],
+    queryKey: USER_STATS_KEYS.my(),
     queryFn: () => apiRequest<UserStats>('/api/stats/my-stats'),
     staleTime: 60 * 1000, // 1 minute
   });
