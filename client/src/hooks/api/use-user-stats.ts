@@ -40,7 +40,7 @@ export function useUserStats(userId: number) {
   return useQuery({
     queryKey: USER_STATS_KEYS.byUser(userId),
     queryFn: () => apiRequest<UserStats>(`/api/stats/user/${userId}`),
-    enabled: !!userId,
+    enabled: !!userId && !!localStorage.getItem('auth_token'),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -50,6 +50,7 @@ export function useMyStats() {
   return useQuery({
     queryKey: USER_STATS_KEYS.my(),
     queryFn: () => apiRequest<UserStats>('/api/stats/my-stats'),
+    enabled: !!localStorage.getItem('auth_token'),
     staleTime: 60 * 1000, // 1 minute
   });
 }
