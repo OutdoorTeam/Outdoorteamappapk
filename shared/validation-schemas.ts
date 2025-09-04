@@ -60,9 +60,10 @@ export const fileUploadSchema = z.object({
 export const contentLibrarySchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  video_url: z.string().url().optional(),
+  video_url: z.string().url().optional().or(z.literal('')),
   category: z.string().min(1),
   subcategory: z.string().optional(),
+  is_active: z.boolean().optional(),
 });
 
 // Broadcast message schema

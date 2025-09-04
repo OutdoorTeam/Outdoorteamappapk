@@ -29,7 +29,6 @@ import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
   validateFile,
-  sanitizeContent,
   ERROR_CODES,
   sendErrorResponse
 } from './utils/validation.js';
@@ -51,14 +50,6 @@ import { securityHeaders } from './middleware/security.js';
 import {
   registerSchema,
   loginSchema,
-  dailyHabitsUpdateSchema,
-  dailyNoteSchema,
-  meditationSessionSchema,
-  fileUploadSchema,
-  contentLibrarySchema,
-  broadcastMessageSchema,
-  planAssignmentSchema,
-  toggleUserStatusSchema
 } from '../shared/validation-schemas.js';
 
 dotenv.config();
@@ -453,7 +444,7 @@ app.post('/api/auth/register',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at'])
+        .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at', 'is_active'])
         .executeTakeFirst();
 
       if (!newUser) {
