@@ -2,12 +2,19 @@
 import path from 'path';
 import express from 'express';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Since this is an ES module, __dirname is not available. We construct it.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export function setupStaticServing(app: express.Application) {
-  const publicPath = path.join(process.cwd(), 'public');
+  // In production, server runs from dist/server, so we go up to dist/ and then to public/
+  const publicPath = path.resolve(__dirname, '../public');
   const indexPath = path.join(publicPath, 'index.html');
   
   console.log('Setting up static serving from:', publicPath);
+  console.log('Index file path:', indexPath);
   console.log('Index file exists:', fs.existsSync(indexPath));
   console.log('Current working directory:', process.cwd());
 
@@ -21,7 +28,10 @@ export function setupStaticServing(app: express.Application) {
       if (filePath.endsWith('.html')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       }
-    }
+    },
+    // This ensures that if a file is not found, it passes to the next middleware (our SPA handler)
+    // instead of sending a 404, which is the default. We will handle 404s for assets ourselves.
+    fallthrough: true 
   }));
 
   // Health check for static serving
@@ -38,29 +48,6 @@ export function setupStaticServing(app: express.Application) {
     });
   });
 
-  // Serve manifest.json explicitly for PWA
-  app.get('/site.webmanifest', (req, res) => {
-    const manifestPath = path.join(publicPath, 'site.webmanifest');
-    if (fs.existsSync(manifestPath)) {
-      res.setHeader('Content-Type', 'application/manifest+json');
-      res.sendFile(manifestPath);
-    } else {
-      res.status(404).send('Manifest not found');
-    }
-  });
-
-  // Handle service worker
-  app.get('/sw.js', (req, res) => {
-    const swPath = path.join(publicPath, 'sw.js');
-    if (fs.existsSync(swPath)) {
-      res.setHeader('Content-Type', 'application/javascript');
-      res.setHeader('Service-Worker-Allowed', '/');
-      res.sendFile(swPath);
-    } else {
-      res.status(404).send('Service worker not found');
-    }
-  });
-
   // Catch-all handler for SPA routing. This should be the LAST route.
   app.get('/*splat', (req, res, next) => {
     // Skip API routes
@@ -73,7 +60,15 @@ export function setupStaticServing(app: express.Application) {
       return next();
     }
 
-    // For any other non-API GET request, serve the main index.html file.
+    // Check if the request looks like a static asset. If so, and it wasn't found by express.static,
+    // it's a 404. This prevents serving index.html for missing assets.
+    const isAsset = /\.(js|css|png|jpg|jpeg|gif|svg|ico|json|webmanifest|map|txt|woff|woff2|ttf|eot)$/.test(req.path);
+    if (isAsset) {
+      console.warn(`404 - Static asset not found: ${req.path}`);
+      return res.status(404).send('Asset not found');
+    }
+
+    // For any other non-API GET request, serve the main index.html file for the SPA.
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath, (err) => {
         if (err) {
