@@ -12,8 +12,7 @@ import MonthlyHabitsChart from '@/components/profile/MonthlyHabitsChart';
 import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
 import StatsSummary from '@/components/profile/StatsSummary';
 import NotificationSettings from '@/components/profile/NotificationSettings';
-import EvaluationsTab from '@/components/profile/EvaluationsTab';
-import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, Bell, KeyRound, FileText } from 'lucide-react';
+import { User, Mail, Calendar, Crown, Star, Activity, BarChart3, Bell, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, parseApiError, getErrorMessage } from '@/utils/error-handling';
 
@@ -42,7 +41,7 @@ const ProfilePage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ password }),
       });
-      toast({ title: "Éxito", description: "Tu contraseña ha sido actualizada.", variant: "default" });
+      toast({ title: "Éxito", description: "Tu contraseña ha sido actualizada.", variant: "success" });
       setPassword('');
       setConfirmPassword('');
     } catch (error) {
@@ -88,14 +87,10 @@ const ProfilePage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Información Personal
-          </TabsTrigger>
-          <TabsTrigger value="evaluations" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Evaluaciones
           </TabsTrigger>
           <TabsTrigger value="statistics" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -209,10 +204,6 @@ const ProfilePage: React.FC = () => {
               </Card>
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="evaluations">
-          <EvaluationsTab />
         </TabsContent>
 
         <TabsContent value="statistics" className="space-y-6">
