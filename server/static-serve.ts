@@ -2,15 +2,10 @@
 import path from 'path';
 import express from 'express';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-// Since this is an ES module, __dirname is not available. We construct it.
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export function setupStaticServing(app: express.Application) {
   // In production, server runs from dist/server, so we go up to dist/ and then to public/
-  const publicPath = path.resolve(__dirname, '../public');
+  const publicPath = path.resolve(process.cwd(), 'public');
   const indexPath = path.join(publicPath, 'index.html');
   
   console.log('Setting up static serving from:', publicPath);

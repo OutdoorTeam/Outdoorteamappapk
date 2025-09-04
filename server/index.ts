@@ -653,7 +653,7 @@ export const startServer = async (port = 3001) => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
-      console.log(`📂 Current working directory: ${process.cwd()}`);
+      console.log(`📁 Current working directory: ${process.cwd()}`);
       console.log(`📁 Data directory: ${DATA_DIRECTORY}`);
       
       // Log deployment info
@@ -667,7 +667,7 @@ export const startServer = async (port = 3001) => {
         console.log(`📄 Index.html exists: ${indexExists}`);
         
         if (!indexExists) {
-          console.log('⚠️  WARNING: index.html not found - run npm run build');
+          console.log('⚠️  WARNING: index.html not found in `dist/public`. Make sure `npm run build` was successful.');
         }
       } else {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
@@ -738,7 +738,7 @@ export const startServer = async (port = 3001) => {
   }
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url.startsWith('file:') && process.argv[1] === new URL(import.meta.url).pathname) {
   const port = parseInt(process.env.PORT || '3001', 10);
   startServer(port);
 }
