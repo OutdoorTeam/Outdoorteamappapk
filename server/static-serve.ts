@@ -42,7 +42,7 @@ export function setupStaticServing(app: express.Application) {
   })
 
   // SPA Fallback: Serve index.html for any non-API, non-asset request
-  app.get('/*splat', (req, res, next) => {
+  app.get('/*', (req, res, next) => {
     // Skip API routes and health checks
     if (req.path.startsWith('/api/')) return next()
     if (['/health', '/static-health', '/deployment-info'].includes(req.path)) return next()

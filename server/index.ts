@@ -617,7 +617,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Fallback for API routes not found
-app.use('/api/*splat', (req, res) => {
+app.use('/api/*', (req, res) => {
   console.warn(`404 - API Route not found: ${req.method} ${req.originalUrl}`);
   sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
 });
@@ -668,13 +668,15 @@ export const startServer = async (port = 3001) => {
         console.log(`🚀 Production deployment ready`);
         
         // Check if built files exist
-        const publicPath = path.join(process.cwd(), 'public');
+        const distPath = path.resolve(process.cwd());
+        const publicPath = path.join(distPath, 'public');
         const indexExists = fs.existsSync(path.join(publicPath, 'index.html'));
+        console.log(`📁 Dist directory: ${distPath}`);
         console.log(`📁 Public directory: ${publicPath}`);
         console.log(`📄 Index.html exists: ${indexExists}`);
         
         if (!indexExists) {
-          console.log('⚠️  WARNING: index.html not found in `public`. Make sure `npm run build` was successful.');
+          console.log('⚠️  WARNING: index.html not found in `dist/public`. Make sure `npm run build` was successful.');
         }
       } else {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
