@@ -302,7 +302,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
 
               {user ? (
-                <div className="flex items-center space-x-4">Servicios</div>
+                <div className="flex items-center space-x-4">
+                  {user.role === 'admin' && (
+                    <Link
+                      to="/admin"
+                      className={`hover:text-primary transition-colors ${
+                        isActive("/admin") ? "text-primary font-medium" : "text-foreground"
+                      }`}
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  <span className="text-sm text-foreground font-medium">
+                    Hola, {user.full_name.split(" ")[0]}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                  >
+                    Cerrar Sesión
+                  </Button>
+                </div>
               ) : (
                 <div className="flex items-center space-x-2">
                   <Link to="/login">
