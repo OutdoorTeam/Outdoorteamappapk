@@ -1,14 +1,16 @@
+
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "target": "es2020",
-    "module": "NodeNext",
+    "outDir": "dist/server-build",
+    "rootDir": "server",
+    "module": "ES2022",
+    "target": "ES2022",
     "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
     "esModuleInterop": true,
-    "outDir": "dist/server",
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "allowSyntheticDefaultImports": true,
+    "strict": false
   },
-  "include": ["server/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["server/**/*.ts"]
 }

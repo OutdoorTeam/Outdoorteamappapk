@@ -674,7 +674,7 @@ export const startServer = async (port = 3001) => {
         console.log(`📄 Index.html exists: ${indexExists}`);
         
         if (!indexExists) {
-          console.log('⚠️  WARNING: index.html not found in `dist/public`. Make sure `npm run build` was successful.');
+          console.log('⚠️  WARNING: index.html not found in `public`. Make sure `npm run build` was successful.');
         }
       } else {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
