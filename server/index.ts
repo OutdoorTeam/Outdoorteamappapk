@@ -189,20 +189,20 @@ app.get('/deployment-info', (req, res) => {
 });
 
 // System logs endpoint for debugging (admin only)
-app.get('/api/system-logs', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+app.get('/api/system-logs', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('Admin fetching system logs');
 
     const { level, limit = 100 } = req.query;
-    
+
     let query = db
       .selectFrom('system_logs')
       .selectAll()
       .orderBy('created_at', 'desc')
-      .limit(parseInt(limit as string));
+      .limit(parseInt(String(limit)));
 
     if (level) {
-      query = query.where('level', '=', level as string);
+      query = query.where('level', '=', String(level));
     }
 
     const logs = await query.execute();
@@ -211,7 +211,8 @@ app.get('/api/system-logs', authenticateToken, requireAdmin, async (req: any, re
     res.json(logs);
   } catch (error) {
     console.error('Error fetching system logs:', error);
-    await SystemLogger.logCriticalError('System logs fetch error', error as Error, { userId: req.user?.id });
+    const userId = req.user?.id ?? null;
+    await SystemLogger.logCriticalError('System logs fetch error', error as Error, { userId: Number(userId) });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener logs del sistema');
   }
 });
@@ -683,7 +684,7 @@ export const startServer = async (port = 3001) => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
-      console.log(`📂 Current working directory: ${process.cwd()}`);
+      console.log(`📁 Current working directory: ${process.cwd()}`);
       console.log(`📁 Data directory: ${DATA_DIRECTORY}`);
       
       // Log deployment info
