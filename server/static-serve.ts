@@ -1,95 +1,67 @@
-
-import path from 'path';
-import express from 'express';
-import fs from 'fs';
+import path from 'path'
+import express from 'express'
+import fs from 'fs'
 
 export function setupStaticServing(app: express.Application) {
-  // In production, server runs from dist/server, so we go up to dist/ and then to public/
-  const publicPath = path.resolve(process.cwd(), 'public');
-  const indexPath = path.join(publicPath, 'index.html');
-  
-  console.log('Setting up static serving from:', publicPath);
-  console.log('Index file path:', indexPath);
-  console.log('Index file exists:', fs.existsSync(indexPath));
-  console.log('Current working directory:', process.cwd());
+  const distPath = path.resolve(process.cwd(), 'dist')
+  const indexPath = path.join(distPath, 'index.html')
 
-  // Serve static files from the 'public' directory
-  app.use(express.static(publicPath, {
-    maxAge: '1d', // Cache static assets for 1 day
+  console.log('Setting up static serving from:', distPath)
+  console.log('Index file path:', indexPath)
+  console.log('Index file exists:', fs.existsSync(indexPath))
+  console.log('Current working directory:', process.cwd())
+
+  // Archivos estáticos
+  app.use(express.static(distPath, {
+    maxAge: '1d',
     etag: true,
     lastModified: true,
-    index: false, // We will handle the index.html manually
+    index: false,
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
       }
     },
-    // This ensures that if a file is not found, it passes to the next middleware (our SPA handler)
-    // instead of sending a 404, which is the default. We will handle 404s for assets ourselves.
-    fallthrough: true 
-  }));
+    fallthrough: true
+  }))
 
-  // Health check for static serving
-  app.get('/static-health', (req, res) => {
-    const files = fs.existsSync(publicPath) ? fs.readdirSync(publicPath) : [];
-    res.json({ 
+  // Health estático (opcional)
+  app.get('/static-health', (_req, res) => {
+    const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : []
+    res.json({
       status: 'ok',
-      publicPath,
+      distPath,
       indexExists: fs.existsSync(indexPath),
-      files: files.slice(0, 10), // Show first 10 files
+      files: files.slice(0, 10),
       totalFiles: files.length,
       cwd: process.cwd(),
       timestamp: new Date().toISOString()
-    });
-  });
+    })
+  })
 
-  // Catch-all handler for SPA routing. This should be the LAST route.
-  app.get('/*splat', (req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api/')) {
-      return next();
-    }
+  // Fallback SPA (último handler)
+  app.get('*', (req, res, next) => {
+    // saltar API/health
+    if (req.path.startsWith('/api/')) return next()
+    if (['/health', '/static-health', '/deployment-info'].includes(req.path)) return next()
 
-    // Skip health checks and other specific server routes
-    if (req.path === '/health' || req.path === '/static-health' || req.path === '/deployment-info') {
-      return next();
-    }
-
-    // Check if the request looks like a static asset. If so, and it wasn't found by express.static,
-    // it's a 404. This prevents serving index.html for missing assets.
-    const isAsset = /\.(js|css|png|jpg|jpeg|gif|svg|ico|json|webmanifest|map|txt|woff|woff2|ttf|eot)$/.test(req.path);
+    // si parece asset y no existe, 404 (no devolver index.html)
+    const isAsset = /\.(js|css|png|jpe?g|gif|svg|ico|json|webmanifest|map|txt|woff2?|ttf|eot)$/.test(req.path)
     if (isAsset) {
-      console.warn(`404 - Static asset not found: ${req.path}`);
-      return res.status(404).send('Asset not found');
+      console.warn(`404 - Static asset not found: ${req.path}`)
+      return res.status(404).send('Asset not found')
     }
 
-    // For any other non-API GET request, serve the main index.html file for the SPA.
     if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath, (err) => {
+      return res.sendFile(indexPath, (err) => {
         if (err) {
-          console.error('Error serving index.html:', err);
-          res.status(500).json({ 
-            error: 'Error loading application',
-            message: err.message,
-            path: indexPath,
-            exists: fs.existsSync(indexPath)
-          });
+          console.error('Error serving index.html:', err)
+          res.status(500).json({ error: 'Error loading application' })
         }
-      });
+      })
     } else {
-      console.error('index.html not found at:', indexPath);
-      console.error('Files in public directory:', fs.existsSync(publicPath) ? fs.readdirSync(publicPath) : 'Directory does not exist');
-      
-      res.status(404).json({ 
-        error: 'Application not built',
-        message: 'Missing index.html - run npm run build',
-        path: indexPath,
-        publicPath,
-        cwd: process.cwd(),
-        exists: fs.existsSync(indexPath),
-        publicExists: fs.existsSync(publicPath),
-        files: fs.existsSync(publicPath) ? fs.readdirSync(publicPath) : []
-      });
+      console.error('index.html not found at:', indexPath)
+      return res.status(404).json({ error: 'Application not built - run npm run build' })
     }
-  });
+  })
 }
