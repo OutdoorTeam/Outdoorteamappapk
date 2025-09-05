@@ -72,7 +72,7 @@ router.post('/daily-notes', authenticateToken, async (req: any, res) => {
     console.log('Saving note for user:', userId, 'date:', noteDate, 'content length:', content?.length || 0);
 
     // Validate inputs
-    if (content === undefined || content === null) {
+    if (!content || content.trim().length === 0) {
       sendErrorResponse(res, ERROR_CODES.VALIDATION_ERROR, 'Contenido de la nota requerido');
       return;
     }

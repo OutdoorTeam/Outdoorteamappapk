@@ -18,11 +18,9 @@ export const DAILY_NOTES_KEYS = {
 
 // Hook to get today's note
 export function useTodayNote() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: DAILY_NOTES_KEYS.today(),
     queryFn: () => apiRequest<DailyNote>('/api/daily-notes/today'),
-    enabled: !!token,
     staleTime: 30 * 1000, // 30 seconds
     refetchOnWindowFocus: true,
   });
@@ -30,11 +28,10 @@ export function useTodayNote() {
 
 // Hook to get note by specific date
 export function useDailyNote(date: string) {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: DAILY_NOTES_KEYS.byDate(date),
     queryFn: () => apiRequest<DailyNote>(`/api/daily-notes/${date}`),
-    enabled: !!date && !!token,
+    enabled: !!date,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

@@ -18,7 +18,7 @@ class NotificationScheduler {
   private checkVapidConfiguration(): void {
     const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
     const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-    const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@outdoorteam.com';
+    const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@moutdoorteam.com';
 
     // Check if keys are properly configured
     this.isConfigured = !!(
@@ -113,7 +113,7 @@ class NotificationScheduler {
     return {
       configured: this.isConfigured,
       publicKey: this.isConfigured ? process.env.VAPID_PUBLIC_KEY : undefined,
-      email: process.env.VAPID_EMAIL || 'admin@outdoorteam.com'
+      email: process.env.VAPID_EMAIL || 'admin@moutdoorteam.com'
     };
   }
 }

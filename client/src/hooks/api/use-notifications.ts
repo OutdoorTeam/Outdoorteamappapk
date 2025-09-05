@@ -23,13 +23,11 @@ export interface BroadcastNotificationResult {
 
 // Get user notification preferences (always disabled)
 export const useNotificationPreferences = () => {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: ['notification-preferences'],
     queryFn: async () => {
       return apiRequest<NotificationPreferences>('/api/notifications/preferences');
     },
-    enabled: !!token,
     retry: 1,
     staleTime: 30000, // 30 seconds
   });
@@ -116,14 +114,12 @@ export const useSendBroadcastNotification = () => {
 
 // Get VAPID public key (disabled)
 export const useVapidPublicKey = () => {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: ['vapid-public-key'],
     queryFn: async () => {
       const response = await apiRequest<{ publicKey: string }>('/api/notifications/vapid-public-key');
       return response.publicKey;
     },
-    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   });

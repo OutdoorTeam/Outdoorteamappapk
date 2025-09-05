@@ -1,10 +1,9 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Apple, Dumbbell, Package } from 'lucide-react';
+import { Apple, Dumbbell } from 'lucide-react';
 import NutritionPlanAdmin from './nutrition/NutritionPlanAdmin';
 import TrainingPlanAdmin from './training/TrainingPlanAdmin';
-import PlansConfiguration from '@/components/admin/PlansConfiguration';
 
 const PlansManagementPage: React.FC = () => {
   return (
@@ -12,16 +11,12 @@ const PlansManagementPage: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Gestión de Planes</h1>
         <p className="text-muted-foreground">
-          Administra los planes de servicio, nutrición y entrenamiento para los usuarios
+          Administra los planes de nutrición y entrenamiento para los usuarios
         </p>
       </div>
 
-      <Tabs defaultValue="plans" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="plans" className="flex items-center gap-2">
-            <Package className="w-4 h-4" />
-            Planes de Servicio
-          </TabsTrigger>
+      <Tabs defaultValue="nutrition" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="nutrition" className="flex items-center gap-2">
             <Apple className="w-4 h-4" />
             Nutrición
@@ -31,10 +26,6 @@ const PlansManagementPage: React.FC = () => {
             Entrenamiento
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="plans">
-          <PlansConfiguration />
-        </TabsContent>
 
         <TabsContent value="nutrition">
           <Card>

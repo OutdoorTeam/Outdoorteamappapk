@@ -24,9 +24,8 @@ router.get('/stats/user/:userId', authenticateToken, async (req: any, res: expre
 
     // Get current week data
     const today = new Date();
-    const dayOfWeek = today.getDay(); // Sunday = 0, Monday = 1, etc.
     const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // Monday as start of week
+    weekStart.setDate(today.getDate() - today.getDay()); // Sunday
     const weekStartStr = weekStart.toISOString().split('T')[0];
 
     // Get last 30 days data
@@ -104,9 +103,8 @@ router.get('/stats/my-stats', authenticateToken, async (req: any, res: express.R
 
     // Reuse the same logic as above but for current user
     const today = new Date();
-    const dayOfWeek = today.getDay(); // Sunday = 0, Monday = 1, etc.
     const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // Monday as start of week
+    weekStart.setDate(today.getDate() - today.getDay()); // Sunday
     const weekStartStr = weekStart.toISOString().split('T')[0];
 
     const thirtyDaysAgo = new Date(today);

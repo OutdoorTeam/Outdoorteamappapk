@@ -1,11 +1,10 @@
-
 import { Request, Response, NextFunction } from 'express';
 import { ERROR_CODES, sendErrorResponse } from '../utils/validation.js';
 
 // IP allowlist middleware for internal routes
 export function ipAllowlist(allowedIPs: string[] = []) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const clientIP = req.ip || 'unknown';
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     
     // Default allowed IPs if none provided
     const defaultAllowed = ['127.0.0.1', '::1', 'localhost'];
@@ -44,7 +43,7 @@ export function requireInternalApiKey(req: Request, res: Response, next: NextFun
 export function securityHeaders(req: Request, res: Response, next: NextFunction) {
   // Basic security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   

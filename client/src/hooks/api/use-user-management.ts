@@ -52,11 +52,10 @@ export const USER_MANAGEMENT_KEYS = {
 
 // Hook to get user permissions (admin only)
 export function useUserPermissions(userId: number) {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: USER_MANAGEMENT_KEYS.permissions(userId),
     queryFn: () => apiRequest<UserPermissions>(`/api/admin/users/${userId}/permissions`),
-    enabled: !!userId && !!token,
+    enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -85,11 +84,10 @@ export function useUpdateUserPermissions() {
 
 // Hook to get user goals (admin only)
 export function useUserGoals(userId: number) {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: USER_MANAGEMENT_KEYS.goals(userId),
     queryFn: () => apiRequest<UserGoals>(`/api/admin/users/${userId}/goals`),
-    enabled: !!userId && !!token,
+    enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -118,11 +116,10 @@ export function useUpdateUserGoals() {
 
 // Hook to get user's today habits (admin only)
 export function useUserTodayHabits(userId: number) {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: USER_MANAGEMENT_KEYS.todayHabits(userId),
     queryFn: () => apiRequest<UserTodayHabits>(`/api/admin/users/${userId}/today-habits`),
-    enabled: !!userId && !!token,
+    enabled: !!userId,
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refresh every minute
   });
@@ -130,11 +127,10 @@ export function useUserTodayHabits(userId: number) {
 
 // Hook to get user's step history (admin only)
 export function useUserStepHistory(userId: number, days: number = 30) {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: USER_MANAGEMENT_KEYS.stepHistory(userId, days),
     queryFn: () => apiRequest<UserStepHistory[]>(`/api/admin/users/${userId}/step-history?days=${days}`),
-    enabled: !!userId && !!token,
+    enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

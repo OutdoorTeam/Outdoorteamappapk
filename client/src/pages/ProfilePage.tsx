@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyStats } from '@/hooks/api/use-user-stats';
+import { useUserStats } from '@/hooks/api/use-user-stats';
 import WeeklyPointsChart from '@/components/profile/WeeklyPointsChart';
 import MonthlyHabitsChart from '@/components/profile/MonthlyHabitsChart';
 import HabitCompletionDonut from '@/components/profile/HabitCompletionDonut';
@@ -18,7 +18,7 @@ import { apiRequest, parseApiError, getErrorMessage } from '@/utils/error-handli
 
 const ProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth();
-  const { data: userStats, isLoading: statsLoading, error: statsError } = useMyStats();
+  const { data: userStats, isLoading: statsLoading, error: statsError } = useUserStats(user?.id || 0);
   const { toast } = useToast();
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');

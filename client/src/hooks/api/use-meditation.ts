@@ -19,11 +19,9 @@ export const MEDITATION_KEYS = {
 
 // Hook for meditation sessions
 export function useMeditationSessions() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: MEDITATION_KEYS.sessions(),
     queryFn: () => apiRequest<MeditationSession[]>('/api/meditation-sessions'),
-    enabled: !!token,
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
   });

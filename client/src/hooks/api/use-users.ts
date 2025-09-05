@@ -21,29 +21,54 @@ export interface User {
 // Query keys
 export const USERS_KEYS = {
   all: ['users'] as const,
-  detail: (id: number) => [...USERS_KEYS.all, id] as const,
+  detail: (id: number) => [...USERS_KEYS.all, 'detail', id] as const,
 };
 
 // Hook to get all users (admin only)
 export function useUsers() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: USERS_KEYS.all,
     queryFn: () => apiRequest<User[]>('/api/users'),
-    enabled: !!token,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// Hook to get user by ID
+export function useUser(userId: number) {
+  return useQuery({
+    queryKey: USERS_KEYS.detail(userId),
+    queryFn: () => apiRequest<User>(`/api/users/${userId}`),
+    enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
-// Hook to toggle user status (admin only)
+// Mutation to toggle user status
 export function useToggleUserStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ userId, is_active }: { userId: number; is_active: boolean }) =>
-      apiRequest(`/api/admin/users/${userId}/status`, {
+      apiRequest(`/api/users/${userId}/toggle-status`, {
         method: 'PUT',
         body: JSON.stringify({ is_active }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: USERS_KEYS.all });
+    },
+  });
+}
+
+// Mutation to assign plan to user
+export function useAssignPlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, planId }: { userId: number; planId: number }) =>
+      apiRequest(`/api/users/${userId}/assign-plan`, {
+        method: 'POST',
+        body: JSON.stringify({ planId }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: USERS_KEYS.all });

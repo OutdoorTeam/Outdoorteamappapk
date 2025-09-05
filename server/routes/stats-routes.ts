@@ -93,9 +93,9 @@ function processWeeklyStats(weeklyHabits: any[], weeklyMeditation: any[], weekSt
   // Create array of last 7 days
   const days = [];
   for (let i = 0; i < 7; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    days.unshift(date.toISOString().split('T')[0]);
+    const date = new Date(weekStartStr);
+    date.setDate(date.getDate() + i);
+    days.push(date.toISOString().split('T')[0]);
   }
 
   // Create daily data structure

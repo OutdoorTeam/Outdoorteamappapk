@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -8,14 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { loginSchema, LoginFormData } from '~shared/validation-schemas';
+import { useToast } from '@/hooks/use-toast';
+import { loginSchema, LoginFormData } from '../../../shared/validation-schemas';
+import { apiRequest, parseApiError, getErrorMessage, isAuthError, focusFirstInvalidField } from '@/utils/error-handling';
 import { Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
-  const { user, login } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   
   const from = (location.state as any)?.from?.pathname || '/';
 
@@ -32,19 +34,54 @@ const LoginPage: React.FC = () => {
   React.useEffect(() => {
     if (user) {
       if (user.role === 'admin') {
-        navigate('/admin', { replace: true });
+        navigate('/admin');
       } else {
-        navigate(from === '/login' ? '/dashboard' : from, { replace: true });
+        navigate(from === '/login' ? '/dashboard' : from);
       }
     }
   }, [user, navigate, from]);
 
   const onSubmit = async (data: LoginFormData) => {
-    await login(data, setError);
+    try {
+      const response = await apiRequest<{ user: any; token: string }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      localStorage.setItem('auth_token', response.token);
+      
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: `Bienvenido ${response.user.full_name}`,
+        variant: "success",
+      });
+
+      // The useEffect will handle navigation based on user role
+      window.location.reload(); // Force reload to update auth context
+    } catch (error) {
+      const apiError = parseApiError(error);
+      
+      if (isAuthError(apiError)) {
+        setError('email', { message: 'Credenciales inválidas' });
+        setError('password', { message: 'Credenciales inválidas' });
+      } else {
+        toast({
+          title: "Error al iniciar sesión",
+          description: getErrorMessage(apiError),
+          variant: "destructive",
+        });
+      }
+
+      focusFirstInvalidField();
+    }
   };
 
   const handleGoogleLogin = async () => {
-    // Placeholder for Google login
+    toast({
+      title: "Función no disponible",
+      description: "El login con Google aún no está implementado. Por favor usa email y contraseña.",
+      variant: "warning",
+    });
   };
 
   if (user) {

@@ -11,11 +11,9 @@ export const DAILY_HABITS_KEYS = {
 
 // Hook for today's habits
 export function useTodayHabits() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: DAILY_HABITS_KEYS.today(),
     queryFn: () => apiRequest('/api/daily-habits/today'),
-    enabled: !!token,
     staleTime: 30 * 1000, // 30 seconds for real-time data
     refetchInterval: 60 * 1000, // Refresh every minute when tab is active
     refetchOnWindowFocus: true,
@@ -24,11 +22,9 @@ export function useTodayHabits() {
 
 // Hook for weekly points
 export function useWeeklyPoints() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: DAILY_HABITS_KEYS.weeklyPoints(),
     queryFn: () => apiRequest('/api/daily-habits/weekly-points'),
-    enabled: !!token,
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: true,
   });
@@ -36,11 +32,9 @@ export function useWeeklyPoints() {
 
 // Hook for calendar data
 export function useCalendarData() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: DAILY_HABITS_KEYS.calendar(),
     queryFn: () => apiRequest('/api/daily-habits/calendar'),
-    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });

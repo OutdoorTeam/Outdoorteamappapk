@@ -40,22 +40,19 @@ export const TRAINING_SCHEDULE_KEYS = {
 
 // Hook to get user's training schedule
 export function useUserTrainingSchedule(userId: number) {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: TRAINING_SCHEDULE_KEYS.byUser(userId),
     queryFn: () => apiRequest<TrainingScheduleData>(`/api/users/${userId}/training-schedule`),
-    enabled: !!userId && !!token,
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
 // Hook to get current user's training schedule
 export function useMyTrainingSchedule() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: TRAINING_SCHEDULE_KEYS.my(),
     queryFn: () => apiRequest<TrainingScheduleData>('/api/users/me/training-schedule'),
-    enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

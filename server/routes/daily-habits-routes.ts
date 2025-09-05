@@ -58,9 +58,8 @@ router.get('/daily-habits/weekly-points', authenticateToken, async (req: any, re
   try {
     const userId = req.user.id;
     const today = new Date();
-    const dayOfWeek = today.getDay(); // Sunday = 0, Monday = 1, etc.
     const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // Monday as start of week
+    weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
     const weekStartStr = weekStart.toISOString().split('T')[0];
     
     console.log('Fetching weekly points for user:', userId, 'from:', weekStartStr);

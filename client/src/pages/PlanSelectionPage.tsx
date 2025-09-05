@@ -4,43 +4,62 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Check, Star } from 'lucide-react';
-import { usePlans, Plan } from '@/hooks/api/use-plans';
-import { apiRequest, parseApiError, getErrorMessage } from '@/utils/error-handling';
-import { useToast } from '@/hooks/use-toast';
+
+interface Plan {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  services_included: string[];
+  features: {
+    habits: boolean;
+    training: boolean;
+    nutrition: boolean;
+    meditation: boolean;
+    active_breaks: boolean;
+  };
+  is_active: boolean;
+}
 
 const PlanSelectionPage: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const { user, assignPlan } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { data: plans, isLoading, error } = usePlans();
+  const [plans, setPlans] = React.useState<Plan[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [assigningPlan, setAssigningPlan] = React.useState<number | null>(null);
 
-  const handleSelectPlan = async (plan: Plan) => {
-    if (!user) return;
-    setAssigningPlan(plan.id);
-    
+  React.useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  const fetchPlans = async () => {
     try {
-      await apiRequest(`/api/admin/users/${user.id}/assign-plan`, {
-        method: 'POST',
-        body: JSON.stringify({ planId: plan.id }),
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch('/api/plans', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
-      
-      await refreshUser();
-      
-      toast({
-        title: "Plan seleccionado",
-        description: `Has seleccionado el plan "${plan.name}".`,
-        variant: "success",
-      });
-      
+
+      if (response.ok) {
+        const plansData = await response.json();
+        setPlans(plansData.filter((plan: Plan) => plan.is_active));
+      }
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectPlan = async (planId: number) => {
+    setAssigningPlan(planId);
+    try {
+      await assignPlan(planId);
       navigate('/dashboard');
-    } catch (err) {
-      const apiError = parseApiError(err);
-      toast({
-        title: "Error al seleccionar el plan",
-        description: getErrorMessage(apiError),
-        variant: "destructive",
-      });
+    } catch (error) {
+      console.error('Error assigning plan:', error);
+      alert('Error al seleccionar el plan. Por favor intenta de nuevo.');
     } finally {
       setAssigningPlan(null);
     }
@@ -50,14 +69,6 @@ const PlanSelectionPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">Cargando planes...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-red-600">Error al cargar los planes.</div>
       </div>
     );
   }
@@ -72,7 +83,7 @@ const PlanSelectionPage: React.FC = () => {
       </div>
 
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-        {plans?.filter(p => p.is_active).map((plan, index) => (
+        {plans.map((plan, index) => (
           <Card key={plan.id} className={`relative ${index === 1 ? 'border-primary shadow-lg scale-105' : ''}`}>
             {index === 1 && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -101,31 +112,31 @@ const PlanSelectionPage: React.FC = () => {
               <div className="mb-6">
                 <h4 className="font-semibold mb-3">Características incluidas:</h4>
                 <div className="grid grid-cols-1 gap-2 text-sm">
-                  {plan.features_json.habits && (
+                  {plan.features.habits && (
                     <div className="flex items-center gap-2">
                       <Check size={16} className="text-green-500" />
                       <span>Seguimiento de hábitos diarios</span>
                     </div>
                   )}
-                  {plan.features_json.training && (
+                  {plan.features.training && (
                     <div className="flex items-center gap-2">
                       <Check size={16} className="text-green-500" />
                       <span>Entrenamientos personalizados</span>
                     </div>
                   )}
-                  {plan.features_json.active_breaks && (
+                  {plan.features.active_breaks && (
                     <div className="flex items-center gap-2">
                       <Check size={16} className="text-green-500" />
                       <span>Pausas activas</span>
                     </div>
                   )}
-                  {plan.features_json.meditation && (
+                  {plan.features.meditation && (
                     <div className="flex items-center gap-2">
                       <Check size={16} className="text-green-500" />
                       <span>Ejercicios de respiración</span>
                     </div>
                   )}
-                  {plan.features_json.nutrition && (
+                  {plan.features.nutrition && (
                     <div className="flex items-center gap-2">
                       <Check size={16} className="text-green-500" />
                       <span>Plan de nutrición personalizado</span>
@@ -147,18 +158,13 @@ const PlanSelectionPage: React.FC = () => {
               </div>
 
               <Button 
-                onClick={() => handleSelectPlan(plan)}
+                onClick={() => handleSelectPlan(plan.id)}
                 className="w-full" 
                 variant={index === 1 ? "default" : "outline"}
-                disabled={assigningPlan === plan.id || user?.plan_type === plan.name}
+                disabled={assigningPlan === plan.id}
               >
-                {user?.plan_type === plan.name 
-                  ? 'Plan Actual' 
-                  : assigningPlan === plan.id 
-                    ? 'Seleccionando...' 
-                    : plan.price > 0 
-                      ? 'Seleccionar Plan' 
-                      : 'Comenzar Gratis'}
+                {assigningPlan === plan.id ? 'Seleccionando...' : 
+                 plan.price > 0 ? 'Seleccionar Plan' : 'Comenzar Gratis'}
               </Button>
 
               {plan.price > 0 && (

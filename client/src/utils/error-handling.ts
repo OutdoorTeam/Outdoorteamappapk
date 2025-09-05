@@ -1,28 +1,13 @@
-
 // Error handling utilities for API calls and form validation
 
-export interface ApiErrorData {
+export interface ApiError {
   code: string;
   message: string;
   fieldErrors?: Record<string, string>;
 }
 
 export interface ApiErrorResponse {
-  error: ApiErrorData;
-}
-
-// Custom ApiError class
-export class ApiError extends Error {
-  public status?: number;
-
-  constructor(
-    public code: string,
-    message: string,
-    public fieldErrors?: Record<string, string>
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
+  error: ApiError;
 }
 
 // Generic API request function with error handling
@@ -51,34 +36,23 @@ export async function apiRequest<T>(
     const contentType = response.headers.get('content-type');
     
     if (!response.ok) {
-      let errorData: ApiErrorResponse | null = null;
+      // Try to parse error as JSON
       if (contentType?.includes('application/json')) {
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          // Ignore if parsing fails
-        }
+        const errorData: ApiErrorResponse = await response.json();
+        throw new ApiError(errorData.error?.code || 'UNKNOWN_ERROR', errorData.error?.message || 'An error occurred', errorData.error?.fieldErrors);
+      } else {
+        // Fallback for non-JSON errors
+        const textError = await response.text();
+        throw new ApiError('HTTP_ERROR', textError || `HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      const apiError = new ApiError(
-        errorData?.error?.code || 'HTTP_ERROR',
-        errorData?.error?.message || `HTTP ${response.status}: ${response.statusText}`,
-        errorData?.error?.fieldErrors
-      );
-      apiError.status = response.status;
-      throw apiError;
     }
     
     // Handle successful responses
-    if (response.status === 204) { // No Content
-      return undefined as T;
-    }
-
     if (contentType?.includes('application/json')) {
       return await response.json();
     } else {
-      // For non-JSON responses, return the response itself or text
-      return response.text() as unknown as T;
+      // For non-JSON responses, return the response itself
+      return response as unknown as T;
     }
   } catch (error) {
     // Re-throw ApiError instances
@@ -93,6 +67,18 @@ export async function apiRequest<T>(
     
     // Handle other errors
     throw new ApiError('UNKNOWN_ERROR', error instanceof Error ? error.message : 'Error desconocido');
+  }
+}
+
+// Custom ApiError class
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public fieldErrors?: Record<string, string>
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
 }
 
@@ -134,7 +120,7 @@ export function getFieldErrors(error: ApiError): Record<string, string> {
 
 // Check if error is authentication related
 export function isAuthError(error: ApiError): boolean {
-  return error.code === 'AUTHENTICATION_ERROR' || error.code === 'AUTHORIZATION_ERROR' || error.status === 401 || error.status === 403;
+  return error.code === 'AUTHENTICATION_ERROR' || error.code === 'AUTHORIZATION_ERROR';
 }
 
 // Check if error is validation related

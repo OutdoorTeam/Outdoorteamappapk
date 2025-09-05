@@ -29,6 +29,7 @@ import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import {
   validateRequest,
   validateFile,
+  sanitizeContent,
   ERROR_CODES,
   sendErrorResponse
 } from './utils/validation.js';
@@ -44,12 +45,20 @@ import {
 import {
   corsMiddleware,
   corsErrorHandler,
+  securityHeaders,
   logCorsConfig
 } from './config/cors.js';
-import { securityHeaders } from './middleware/security.js';
 import {
   registerSchema,
   loginSchema,
+  dailyHabitsUpdateSchema,
+  dailyNoteSchema,
+  meditationSessionSchema,
+  fileUploadSchema,
+  contentLibrarySchema,
+  broadcastMessageSchema,
+  planAssignmentSchema,
+  toggleUserStatusSchema
 } from '../shared/validation-schemas.js';
 
 dotenv.config();
@@ -120,14 +129,14 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Security headers first
+// Security headers first (RELAXED for deployment)
 app.use(securityHeaders);
 
 // Body parsing middleware with larger limits for deployment
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Apply CORS to all routes
+// Apply CORS to all routes (VERY PERMISSIVE for deployment)
 app.use(corsMiddleware);
 app.use(corsErrorHandler);
 
@@ -343,10 +352,10 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
   }
 });
 
-// Plans Route (Public)
-app.get('/api/plans', async (req: any, res: express.Response) => {
+// Plans Route (Critical for AdminPage)
+app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
   try {
-    console.log('Fetching public plans');
+    console.log('Fetching plans for user:', req.user.email);
 
     const plans = await db
       .selectFrom('plans')
@@ -355,18 +364,11 @@ app.get('/api/plans', async (req: any, res: express.Response) => {
       .orderBy('created_at', 'desc')
       .execute();
 
-    const formattedPlans = plans.map(plan => ({
-      ...plan,
-      services_included: plan.services_included ? JSON.parse(plan.services_included) : [],
-      features_json: plan.features_json ? JSON.parse(plan.features_json) : {},
-      is_active: Boolean(plan.is_active)
-    }));
-
-    console.log('Public plans fetched:', formattedPlans.length);
-    res.json(formattedPlans);
+    console.log('Plans fetched:', plans.length);
+    res.json(plans);
   } catch (error) {
-    console.error('Error fetching public plans:', error);
-    await SystemLogger.logCriticalError('Public plans fetch error', error as Error);
+    console.error('Error fetching plans:', error);
+    await SystemLogger.logCriticalError('Plans fetch error', error as Error, { userId: req.user?.id });
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener planes');
   }
 });
@@ -451,7 +453,7 @@ app.post('/api/auth/register',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at', 'is_active'])
+        .returning(['id', 'email', 'full_name', 'role', 'plan_type', 'features_json', 'created_at'])
         .executeTakeFirst();
 
       if (!newUser) {
@@ -610,19 +612,40 @@ app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => 
   res.json(formatUserResponse(req.user));
 });
 
-// Setup static serving for production
+// Setup static serving for production (ALWAYS in production)
 if (process.env.NODE_ENV === 'production') {
   setupStaticServing(app);
   console.log('📁 Static file serving configured for production');
 }
 
-// Fallback for API routes not found
-app.use('/api/*', (req, res) => {
-  console.warn(`404 - API Route not found: ${req.method} ${req.originalUrl}`);
-  sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
+// More permissive error handling for deployment
+app.use((req, res, next) => {
+  console.warn(`404 - Route not found: ${req.method} ${req.path}`);
+  
+  if (req.path.startsWith('/api/')) {
+    sendErrorResponse(res, ERROR_CODES.NOT_FOUND_ERROR, 'API endpoint not found');
+    return;
+  }
+  
+  // In production, try to serve the SPA
+  if (process.env.NODE_ENV === 'production') {
+    const indexPath = path.join(process.cwd(), 'public', 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({ 
+        error: 'App not built',
+        message: 'Missing index.html - run npm run build',
+        cwd: process.cwd()
+      });
+    }
+    return;
+  }
+  
+  res.status(404).json({ error: 'Route not found' });
 });
 
-// Global error handler
+// Global error handler (very permissive for deployment)
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled error:', error);
   
@@ -660,23 +683,22 @@ export const startServer = async (port = 3001) => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Listening on: 0.0.0.0:${port}`);
-      console.log(`📁 Current working directory: ${process.cwd()}`);
+      console.log(`📂 Current working directory: ${process.cwd()}`);
       console.log(`📁 Data directory: ${DATA_DIRECTORY}`);
       
       // Log deployment info
       if (process.env.NODE_ENV === 'production') {
         console.log(`🚀 Production deployment ready`);
+        console.log(`🌐 Expected URL: https://app.moutdoorteam.com`);
         
         // Check if built files exist
-        const distPath = path.resolve(process.cwd());
-        const publicPath = path.join(distPath, 'public');
+        const publicPath = path.join(process.cwd(), 'public');
         const indexExists = fs.existsSync(path.join(publicPath, 'index.html'));
-        console.log(`📁 Dist directory: ${distPath}`);
         console.log(`📁 Public directory: ${publicPath}`);
         console.log(`📄 Index.html exists: ${indexExists}`);
         
         if (!indexExists) {
-          console.log('⚠️  WARNING: index.html not found in `dist/public`. Make sure `npm run build` was successful.');
+          console.log('⚠️  WARNING: index.html not found - run npm run build');
         }
       } else {
         console.log(`🌐 Frontend dev server: http://localhost:3000`);
@@ -747,7 +769,7 @@ export const startServer = async (port = 3001) => {
   }
 };
 
-if (import.meta.url.startsWith('file:') && process.argv[1] === new URL(import.meta.url).pathname) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const port = parseInt(process.env.PORT || '3001', 10);
   startServer(port);
 }

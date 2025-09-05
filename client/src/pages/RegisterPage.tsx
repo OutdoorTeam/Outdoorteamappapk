@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -9,14 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { registerSchema, RegisterFormData } from '~shared/validation-schemas';
+import { useToast } from '@/hooks/use-toast';
+import { registerSchema, RegisterFormData } from '../../../shared/validation-schemas';
+import { apiRequest, parseApiError, getErrorMessage, getFieldErrors, focusFirstInvalidField, setFormErrors } from '@/utils/error-handling';
 import { Eye, EyeOff } from 'lucide-react';
 
 const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const { user, register: performRegister } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const {
     register,
@@ -35,20 +37,55 @@ const RegisterPage: React.FC = () => {
   React.useEffect(() => {
     if (user) {
       if (user.role === 'admin') {
-        navigate('/admin', { replace: true });
+        navigate('/admin');
       } else {
-        navigate('/dashboard', { replace: true });
+        navigate('/dashboard');
       }
     }
   }, [user, navigate]);
 
   const onSubmit = async (data: RegisterFormData) => {
-    const { confirmPassword, acceptTos, ...registrationData } = data;
-    await performRegister(registrationData, setError);
+    try {
+      const { acceptTos, confirmPassword, ...registrationData } = data;
+      
+      const response = await apiRequest<{ user: any; token: string }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(registrationData),
+      });
+
+      localStorage.setItem('auth_token', response.token);
+      
+      toast({
+        title: "Registro exitoso",
+        description: `¡Bienvenido ${response.user.full_name}! Tu cuenta ha sido creada.`,
+        variant: "success",
+      });
+
+      // Force reload to update auth context
+      window.location.reload();
+    } catch (error) {
+      const apiError = parseApiError(error);
+      const fieldErrors = getFieldErrors(apiError);
+      
+      if (Object.keys(fieldErrors).length > 0) {
+        setFormErrors(setError, fieldErrors);
+        focusFirstInvalidField();
+      } else {
+        toast({
+          title: "Error en el registro",
+          description: getErrorMessage(apiError),
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const handleGoogleRegister = async () => {
-    // Placeholder for Google registration
+    toast({
+      title: "Función no disponible",
+      description: "El registro con Google aún no está implementado. Por favor usa el formulario.",
+      variant: "warning",
+    });
   };
 
   if (user) {

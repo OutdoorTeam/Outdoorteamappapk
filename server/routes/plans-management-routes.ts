@@ -19,8 +19,8 @@ router.get('/plans-management', authenticateToken, requireAdmin, async (req: any
 
     const formattedPlans = plans.map(plan => ({
       ...plan,
-      services_included: plan.services_included ? JSON.parse(plan.services_included) : [],
-      features_json: plan.features_json ? JSON.parse(plan.features_json) : {},
+      services_included: JSON.parse(plan.services_included || '[]'),
+      features_json: JSON.parse(plan.features_json || '{}'),
       is_active: Boolean(plan.is_active)
     }));
 
@@ -89,8 +89,8 @@ router.put('/plans-management/:id', authenticateToken, requireAdmin, async (req:
 
     const formattedPlan = {
       ...updatedPlan,
-      services_included: updatedPlan.services_included ? JSON.parse(updatedPlan.services_included) : [],
-      features_json: updatedPlan.features_json ? JSON.parse(updatedPlan.features_json) : {},
+      services_included: JSON.parse(updatedPlan.services_included || '[]'),
+      features_json: JSON.parse(updatedPlan.features_json || '{}'),
       is_active: Boolean(updatedPlan.is_active)
     };
 
@@ -164,8 +164,8 @@ router.post('/plans-management', authenticateToken, requireAdmin, async (req: an
 
     const formattedPlan = {
       ...newPlan,
-      services_included: newPlan.services_included ? JSON.parse(newPlan.services_included) : [],
-      features_json: newPlan.features_json ? JSON.parse(newPlan.features_json) : {},
+      services_included: JSON.parse(newPlan.services_included || '[]'),
+      features_json: JSON.parse(newPlan.features_json || '{}'),
       is_active: Boolean(newPlan.is_active)
     };
 

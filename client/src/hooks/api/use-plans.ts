@@ -6,15 +6,9 @@ export interface Plan {
   name: string;
   description: string;
   price: number;
-  services_included: string[];
-  features_json: {
-    habits: boolean;
-    training: boolean;
-    nutrition: boolean;
-    meditation: boolean;
-    active_breaks: boolean;
-  };
-  is_active: boolean;
+  services_included: string;
+  features_json: string;
+  is_active: number;
   created_at: string;
   updated_at: string;
 }
@@ -24,7 +18,7 @@ export const PLANS_KEYS = {
   all: ['plans'] as const,
 };
 
-// Hook to get all active plans (public)
+// Hook to get all active plans
 export function usePlans() {
   return useQuery({
     queryKey: PLANS_KEYS.all,

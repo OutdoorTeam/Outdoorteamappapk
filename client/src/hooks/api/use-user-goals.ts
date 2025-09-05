@@ -19,11 +19,9 @@ export const USER_GOALS_KEYS = {
 
 // Hook to get current user's goals
 export function useMyGoals() {
-  const token = localStorage.getItem('auth_token');
   return useQuery({
     queryKey: USER_GOALS_KEYS.my(),
     queryFn: () => apiRequest<UserGoals>('/api/my-goals'),
-    enabled: !!token,
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: true,
   });

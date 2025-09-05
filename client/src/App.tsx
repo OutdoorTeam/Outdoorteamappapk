@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -19,7 +18,7 @@ import MeditationPage from '@/pages/MeditationPage';
 import ActiveBreaksPage from '@/pages/ActiveBreaksPage';
 import ExercisesPage from '@/pages/ExercisesPage';
 import PlansPage from '@/pages/PlansPage';
-import PlansManagePage from '@/pages/admin/PlansManagementPage';
+import PlansManagePage from '@/pages/PlansManagePage';
 import ProfilePage from '@/pages/ProfilePage';
 import PlanSelectionPage from '@/pages/PlanSelectionPage';
 

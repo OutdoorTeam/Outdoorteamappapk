@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
 
@@ -15,13 +14,7 @@ export function useCurrentUser() {
     queryFn: () => apiRequest('/api/auth/me'),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true,
-    retry: (failureCount, error: any) => {
-      // Do not retry on auth errors
-      if (error?.status === 401 || error?.status === 403) {
-        return false;
-      }
-      return failureCount < 2;
-    },
+    retry: false, // Don't retry auth requests
     enabled: !!localStorage.getItem('auth_token'), // Only run if token exists
   });
 }
@@ -74,7 +67,7 @@ export function useLogout() {
 
   return () => {
     localStorage.removeItem('auth_token');
-    queryClient.setQueryData(AUTH_KEYS.user(), null);
     queryClient.clear(); // Clear all cached data
+    queryClient.setQueryData(AUTH_KEYS.user(), null);
   };
 }
