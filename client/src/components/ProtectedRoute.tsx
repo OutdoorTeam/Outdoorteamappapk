@@ -2,13 +2,23 @@ import * as React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
+type Role = 'admin' | 'user' | string;
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: string;
   adminOnly?: boolean;
+  requiredRole?: Role;       // mantiene compat
+  allowedRoles?: Role[];     // nuevo: varios roles aceptados
+  fallbackPath?: string;     // nuevo: adónde mandar si no alcanza
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole, adminOnly }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  adminOnly,
+  requiredRole,
+  allowedRoles,
+  fallbackPath = '/',
+}) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -24,12 +34,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole,
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (adminOnly && user.role !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
+  const mustBeAdmin = adminOnly === true;
+  const passesAdmin = !mustBeAdmin || user.role === 'admin';
 
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/" replace />;
+  const passesRequired =
+    !requiredRole || user.role === requiredRole;
+
+  const passesAllowed =
+    !allowedRoles || allowedRoles.includes(user.role);
+
+  if (!passesAdmin || !passesRequired || !passesAllowed) {
+    return <Navigate to={fallbackPath} replace />;
   }
 
   return <>{children}</>;
