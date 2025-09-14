@@ -87,7 +87,7 @@
   </head>
   <body>
     <!-- Loading screen -->
-    <div class="loading-screen">
+    <div id="__splash" class="loading-screen" data-app-splash>
       <div class="loading-spinner"></div>
       <div class="loading-text">Cargando Outdoor Team...</div>
     </div>
@@ -157,6 +157,18 @@
             deferredPrompt = null;
           });
         }
+      };
+    </script>
+    <div id="__splash" data-app-splash
+         style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;z-index:9999;color:#d4b35b;font-family:system-ui, -apple-system, Segoe UI, Roboto;">
+      Cargando…
+    </div>
+    <script>
+      window.hideLoadingScreen = function () {
+        try {
+          var el = document.getElementById('__splash');
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        } catch (e) {}
       };
     </script>
   </body>

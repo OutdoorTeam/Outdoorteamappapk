@@ -9,17 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { loginSchema, LoginFormData } from '../../../shared/validation-schemas';
-import { apiRequest, parseApiError, getErrorMessage, isAuthError, focusFirstInvalidField } from '@/utils/error-handling';
 import { Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
-  const { user } = useAuth();
+  const { user, login, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
-  const from = (location.state as any)?.from?.pathname || '/';
+
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const {
     register,
@@ -28,60 +27,34 @@ const LoginPage: React.FC = () => {
     setError,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: 'onBlur'
+    mode: 'onBlur',
   });
 
   React.useEffect(() => {
     if (user) {
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate(from === '/login' ? '/dashboard' : from);
-      }
+      if (user.role === 'admin') navigate('/admin', { replace: true });
+      else navigate(from === '/login' ? '/dashboard' : from, { replace: true });
     }
   }, [user, navigate, from]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      const response = await apiRequest<{ user: any; token: string }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-
-      localStorage.setItem('auth_token', response.token);
-      
+      await login(data.email, data.password);
       toast({
-        title: "Inicio de sesión exitoso",
-        description: `Bienvenido ${response.user.full_name}`,
-        variant: "success",
+        title: 'Inicio de sesión exitoso',
+        description: `Bienvenido`,
+        variant: 'success',
       });
-
-      // The useEffect will handle navigation based on user role
-      window.location.reload(); // Force reload to update auth context
-    } catch (error) {
-      const apiError = parseApiError(error);
-      
-      if (isAuthError(apiError)) {
-        setError('email', { message: 'Credenciales inválidas' });
-        setError('password', { message: 'Credenciales inválidas' });
-      } else {
-        toast({
-          title: "Error al iniciar sesión",
-          description: getErrorMessage(apiError),
-          variant: "destructive",
-        });
-      }
-
-      focusFirstInvalidField();
+      // El useEffect redirige cuando user cambia
+    } catch (err: any) {
+      setError('email', { message: err?.message || 'Credenciales inválidas' });
+      setError('password', { message: err?.message || 'Credenciales inválidas' });
+      toast({
+        title: 'Error al iniciar sesión',
+        description: err?.message || 'No se pudo iniciar sesión',
+        variant: 'destructive',
+      });
     }
-  };
-
-  const handleGoogleLogin = async () => {
-    toast({
-      title: "Función no disponible",
-      description: "El login con Google aún no está implementado. Por favor usa email y contraseña.",
-      variant: "warning",
-    });
   };
 
   if (user) {
@@ -111,7 +84,7 @@ const LoginPage: React.FC = () => {
                   type="email"
                   placeholder="Ingresa tu correo electrónico"
                   {...register('email')}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isLoading}
                   aria-invalid={!!errors.email}
                   className={errors.email ? 'border-red-500' : ''}
                 />
@@ -121,7 +94,7 @@ const LoginPage: React.FC = () => {
                   </p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
@@ -130,7 +103,7 @@ const LoginPage: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Ingresa tu contraseña"
                     {...register('password')}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoading}
                     aria-invalid={!!errors.password}
                     className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
                   />
@@ -140,13 +113,9 @@ const LoginPage: React.FC = () => {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     <span className="sr-only">
                       {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                     </span>
@@ -159,7 +128,7 @@ const LoginPage: React.FC = () => {
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <Button type="submit" className="w-full" disabled={isSubmitting || isLoading}>
                 {isSubmitting ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>
@@ -170,19 +139,11 @@ const LoginPage: React.FC = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    O continúa con
-                  </span>
+                  <span className="bg-background px-2 text-muted-foreground">O continúa con</span>
                 </div>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-4"
-                onClick={handleGoogleLogin}
-                disabled={isSubmitting}
-              >
-                Continuar con Google
+              <Button type="button" variant="outline" className="w-full mt-4" disabled>
+                Continuar con Google (pronto)
               </Button>
             </div>
 

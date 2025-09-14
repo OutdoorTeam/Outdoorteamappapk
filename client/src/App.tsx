@@ -21,6 +21,7 @@ import PlansPage from '@/pages/PlansPage';
 import PlansManagePage from '@/pages/PlansManagePage';
 import ProfilePage from '@/pages/ProfilePage';
 import PlanSelectionPage from '@/pages/PlanSelectionPage';
+import AccountDebug from '@/pages/AccountDebug';
 
 // Error fallback component
 const PageErrorFallback: React.FC<{ error?: Error, pageName?: string }> = ({ error, pageName }) => (
@@ -237,6 +238,19 @@ const App: React.FC = () => {
                     </PageWrapper>
                   </ProtectedRoute>
                 } />
+
+                {/* Debug (sin auth) */}
+                <Route path="/debug/account/raw" element={<AccountDebug />} />
+
+                {/* Debug (protegida) */}
+                <Route
+                  path="/debug/account"
+                  element={
+                    <ProtectedRoute>
+                      <AccountDebug />
+                    </ProtectedRoute>
+                  }
+                />
 
                 {/* Catch all route - redirect to home */}
                 <Route path="*" element={

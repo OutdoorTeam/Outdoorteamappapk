@@ -3,10 +3,37 @@ import * as ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Hide loading screen when React is ready
-if (typeof window !== 'undefined' && window.hideLoadingScreen) {
-  window.hideLoadingScreen();
+// --- Quitar overlay/splash si quedó montado ---
+if (typeof window !== 'undefined') {
+  const w = window as any;
+  if (typeof w.hideLoadingScreen === 'function') {
+    try { w.hideLoadingScreen(); } catch {}
+  } else {
+    const el =
+      document.getElementById('__splash') ||
+      document.getElementById('splash') ||
+      document.getElementById('loading') ||
+      document.querySelector('[data-app-splash]');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
 }
+
+// -------- Preloader: llamada segura + fallback --------
+// --- Quitar overlay/splash de forma agresiva y segura ---
+function forceHideOverlays() {
+  const selectors = ['#__splash','#splash','#loading','#loading-screen','.loading-screen','[data-app-splash]'];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+  document.body.classList.add('loaded');
+}
+if (typeof window !== 'undefined') {
+  const w = window as any;
+  try { if (typeof w.hideLoadingScreen === 'function') w.hideLoadingScreen(); } catch {}
+  try { forceHideOverlays(); } catch {}
+}
+// ------------------------------------------------------
 
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -25,10 +52,10 @@ if (!root) {
 
 // Add error boundary for better error handling
 const ErrorFallback = ({ error }: { error: Error }) => (
-  <div style={{ 
-    padding: '20px', 
-    textAlign: 'center', 
-    backgroundColor: '#000', 
+  <div style={{
+    padding: '20px',
+    textAlign: 'center',
+    backgroundColor: '#000',
     color: '#D3B869',
     minHeight: '100vh',
     display: 'flex',
@@ -38,16 +65,16 @@ const ErrorFallback = ({ error }: { error: Error }) => (
   }}>
     <h1>Error en la aplicación</h1>
     <p>Ha ocurrido un error inesperado:</p>
-    <pre style={{ 
-      backgroundColor: '#333', 
-      padding: '10px', 
+    <pre style={{
+      backgroundColor: '#333',
+      padding: '10px',
       borderRadius: '4px',
       maxWidth: '80%',
       overflow: 'auto'
     }}>
       {error.message}
     </pre>
-    <button 
+    <button
       onClick={() => window.location.reload()}
       style={{
         marginTop: '20px',
@@ -65,7 +92,7 @@ const ErrorFallback = ({ error }: { error: Error }) => (
 );
 
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode }, 
+  { children: React.ReactNode },
   { hasError: boolean; error?: Error }
 > {
   constructor(props: { children: React.ReactNode }) {
@@ -85,7 +112,6 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError && this.state.error) {
       return <ErrorFallback error={this.state.error} />;
     }
-
     return this.props.children;
   }
 }
@@ -100,7 +126,7 @@ try {
   );
 } catch (error) {
   console.error('Failed to render React app:', error);
-  root.innerHTML = `
+  (root as HTMLElement).innerHTML = `
     <div style="padding: 20px; text-align: center; background: #000; color: #D3B869; min-height: 100vh; display: flex; flex-direction: column; justify-content: center;">
       <h1>Error al cargar la aplicación</h1>
       <p>No se pudo inicializar React. Revisa la consola para más detalles.</p>

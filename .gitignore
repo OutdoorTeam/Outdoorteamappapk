@@ -1,0 +1,16 @@
+# node / vite / builds
+node_modules
+dist
+build
+.vite
+*.log
+
+# env files
+.env
+.env.*
+!.env.example
+
+# editor junk
+.vscode
+.DS_Store
+Thumbs.db
