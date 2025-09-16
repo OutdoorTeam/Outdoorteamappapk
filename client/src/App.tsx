@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { Toaster } from '@/components/ui/toaster';
@@ -22,6 +22,20 @@ import PlansManagePage from '@/pages/PlansManagePage';
 import ProfilePage from '@/pages/ProfilePage';
 import PlanSelectionPage from '@/pages/PlanSelectionPage';
 import AccountDebug from '@/pages/AccountDebug';
+
+// API disable flag
+const DISABLE_API = import.meta.env.VITE_DISABLE_API === 'true';
+
+// Wrap app-level providers (Auth/Supabase don't hit /api)
+function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryProvider>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </QueryProvider>
+  );
+}
 
 // Error fallback component
 const PageErrorFallback: React.FC<{ error?: Error, pageName?: string }> = ({ error, pageName }) => (
@@ -125,17 +139,15 @@ const App: React.FC = () => {
 
   try {
     return (
-      <QueryProvider>
-        <AuthProvider>
-          <Router>
-            <Layout>
-              <Routes>
+      <Providers>
+        <Router>
+          <Layout>
+            <Routes>
                 {/* Public routes */}
-                <Route path="/" element={
-                  <PageWrapper pageName="Home">
-                    <HomePage />
-                  </PageWrapper>
-                } />
+                <Route
+                  path="/"
+                  element={<Navigate to={DISABLE_API ? '/account-debug' : '/dashboard'} replace />}
+                />
                 <Route path="/login" element={
                   <PageWrapper pageName="Login">
                     <LoginPage />
@@ -159,11 +171,15 @@ const App: React.FC = () => {
 
                 {/* Protected user routes */}
                 <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <PageWrapper pageName="Dashboard">
-                      <DashboardPage />
-                    </PageWrapper>
-                  </ProtectedRoute>
+                  DISABLE_API ? (
+                    <Navigate to="/account-debug" replace />
+                  ) : (
+                    <ProtectedRoute>
+                      <PageWrapper pageName="Dashboard">
+                        <DashboardPage />
+                      </PageWrapper>
+                    </ProtectedRoute>
+                  )
                 } />
                 
                 <Route path="/plan-selection" element={
@@ -241,6 +257,7 @@ const App: React.FC = () => {
 
                 {/* Debug (sin auth) */}
                 <Route path="/debug/account/raw" element={<AccountDebug />} />
+                <Route path="/account-debug" element={<AccountDebug />} />
 
                 {/* Debug (protegida) */}
                 <Route
@@ -252,18 +269,13 @@ const App: React.FC = () => {
                   }
                 />
 
-                {/* Catch all route - redirect to home */}
-                <Route path="*" element={
-                  <PageWrapper pageName="Home">
-                    <HomePage />
-                  </PageWrapper>
-                } />
+                {/* Catch all route - redirect based on API flag */}
+                <Route path="*" element={<Navigate to={DISABLE_API ? '/account-debug' : '/dashboard'} replace />} />
               </Routes>
             </Layout>
             <Toaster />
           </Router>
-        </AuthProvider>
-      </QueryProvider>
+        </Providers>
     );
   } catch (error) {
     console.error('Error rendering App component:', error);

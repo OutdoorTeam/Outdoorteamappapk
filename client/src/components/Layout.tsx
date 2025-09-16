@@ -16,6 +16,8 @@ import {
   LogOut,
 } from "lucide-react";
 
+const DISABLE_API = import.meta.env.VITE_DISABLE_API === 'true';
+
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -68,12 +70,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     // Dashboard - always available for logged-in users
     if (user) {
-      items.push({
-        path: "/dashboard",
-        label: "Dashboard",
-        icon: Home,
-        available: true,
-      });
+      if (DISABLE_API) {
+        items.push({
+          path: "/account-debug",
+          label: "Perfil",
+          icon: User,
+          available: true,
+        });
+      } else {
+        items.push({
+          path: "/dashboard",
+          label: "Dashboard",
+          icon: Home,
+          available: true,
+        });
+      }
     }
 
     // Training - show if user has training features or is admin
@@ -315,14 +326,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </Link>
                   ) : (
                     <Link
-                      to="/dashboard"
+                      to={DISABLE_API ? "/account-debug" : "/dashboard"}
                       className={`hover:text-primary transition-colors ${
-                        isActive("/dashboard")
+                        isActive(DISABLE_API ? "/account-debug" : "/dashboard")
                           ? "text-primary font-medium"
                           : "text-foreground"
                       }`}
                     >
-                      Mi Panel
+                      {DISABLE_API ? "Perfil" : "Mi Panel"}
                     </Link>
                   )}
                   <span className="text-sm text-muted-foreground">

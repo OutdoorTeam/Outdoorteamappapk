@@ -15,6 +15,11 @@ const AccountDebug: React.FC = () => {
   const [newName, setNewName] = React.useState<string>('');
   const [updateMsg, setUpdateMsg] = React.useState<string>('');
 
+  // Objetivo para UPDATE: tabla y campo existentes en profiles
+  const targetTable: 'profiles' = 'profiles';
+  const fieldName: 'nombre' | 'full_name' =
+    row && 'nombre' in (row as any) ? 'nombre' : 'full_name';
+
   React.useEffect(() => {
     (async () => {
       setLoading(true);
@@ -41,6 +46,7 @@ const AccountDebug: React.FC = () => {
           setRow(data as Row);
           // nombre por defecto para el input
           const guess =
+            (data as any)?.nombre ??
             (data as any)?.full_name ??
             (data as any)?.name ??
             (data as any)?.display_name ??
@@ -66,6 +72,23 @@ const AccountDebug: React.FC = () => {
       }
     })();
   }, []);
+
+  const doUpdateProfileField = async () => {
+    setUpdateMsg('');
+    try {
+      const { error } = await supabase
+        .from(targetTable)
+        .update({ [fieldName]: newName })
+        .eq('id', uid);
+      if (error) {
+        setUpdateMsg(`ERROR: ${error.message}`);
+      } else {
+        setUpdateMsg(`OK: actualizado ${fieldName}`);
+      }
+    } catch (e: any) {
+      setUpdateMsg(`ERROR: ${e?.message || e}`);
+    }
+  };
 
   const doUpdateUsersFullName = async () => {
     setUpdateMsg('');
@@ -108,7 +131,7 @@ const AccountDebug: React.FC = () => {
           </pre>
 
           <div className="space-y-2">
-            <label className="text-sm">Probar UPDATE users.full_name</label>
+            <label className="text-sm">{`Probar UPDATE ${targetTable}.${fieldName}`}</label>
             <div className="flex gap-2">
               <input
                 value={newName}
@@ -117,7 +140,7 @@ const AccountDebug: React.FC = () => {
                 placeholder="Nuevo nombre"
               />
               <button
-                onClick={doUpdateUsersFullName}
+                onClick={doUpdateProfileField}
                 className="rounded bg-yellow-600 px-3 py-1 text-sm font-medium"
               >
                 Actualizar

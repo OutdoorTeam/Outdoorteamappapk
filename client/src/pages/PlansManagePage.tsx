@@ -17,6 +17,8 @@ interface Plan {
   is_active: boolean;
 }
 
+const DISABLE_API = import.meta.env.VITE_DISABLE_API === 'true';
+
 const PlansManagePage: React.FC = () => {
   const { user } = useAuth();
   const [plans, setPlans] = React.useState<Plan[]>([]);
@@ -25,8 +27,9 @@ const PlansManagePage: React.FC = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
 
   React.useEffect(() => {
+    if (DISABLE_API) return; // no llames al backend en dev
     fetchPlans();
-  }, []);
+  }, [DISABLE_API]);
 
   const fetchPlans = async () => {
     try {

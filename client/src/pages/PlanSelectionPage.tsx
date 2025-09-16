@@ -21,6 +21,8 @@ interface Plan {
   is_active: boolean;
 }
 
+const DISABLE_API = import.meta.env.VITE_DISABLE_API === 'true';
+
 const PlanSelectionPage: React.FC = () => {
   const { user, assignPlan } = useAuth();
   const navigate = useNavigate();
@@ -29,8 +31,9 @@ const PlanSelectionPage: React.FC = () => {
   const [assigningPlan, setAssigningPlan] = React.useState<number | null>(null);
 
   React.useEffect(() => {
+    if (DISABLE_API) return; // no llames al backend en dev
     fetchPlans();
-  }, []);
+  }, [DISABLE_API]);
 
   const fetchPlans = async () => {
     try {

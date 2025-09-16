@@ -39,6 +39,8 @@ interface SystemLog {
   created_at: string;
 }
 
+const DISABLE_API = import.meta.env.VITE_DISABLE_API === 'true';
+
 const DiagnosticsPage: React.FC = () => {
   const { toast } = useToast();
   const [diagnostics, setDiagnostics] = React.useState<DiagnosticsData | null>(null);
@@ -106,13 +108,15 @@ const DiagnosticsPage: React.FC = () => {
   };
 
   React.useEffect(() => {
+    if (DISABLE_API) return; // no llames al backend en dev
     fetchDiagnostics();
     fetchLogs();
-  }, []);
+  }, [DISABLE_API]);
 
   React.useEffect(() => {
+    if (DISABLE_API) return; // no llames al backend en dev
     fetchLogs(selectedLevel);
-  }, [selectedLevel]);
+  }, [selectedLevel, DISABLE_API]);
 
   const getStatusIcon = (status: boolean) => {
     return status ? (

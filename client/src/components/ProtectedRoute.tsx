@@ -19,10 +19,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   allowedRoles,
   fallbackPath = '/',
 }) => {
-  const { user, isLoading } = useAuth();
+  const { user, initialized } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  if (!initialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">Cargando...</div>

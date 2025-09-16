@@ -20,6 +20,11 @@ export const requestNotificationPermission = async (): Promise<NotificationPermi
 
 // Register service worker
 export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
+  // Only register service worker in production builds
+  if (!import.meta.env.PROD) {
+    throw new Error('El Service Worker solo se registra en producción');
+  }
+
   if (!('serviceWorker' in navigator)) {
     throw new Error('Service Workers no son compatibles con este navegador');
   }

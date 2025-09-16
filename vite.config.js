@@ -1,10 +1,13 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export const vitePort = 3000;
 
 export default defineConfig(({ mode }) => {
+  // Cargar envs desde el root del cliente y definir flag
+  const env = loadEnv(mode, path.join(process.cwd(), 'client'), '');
+  const disableApi = env.VITE_DISABLE_API === 'true';
   return {
     plugins: [
       react(),
@@ -74,7 +77,7 @@ export default defineConfig(({ mode }) => {
       port: vitePort,
       allowedHosts: true,
       cors: true, // Enable CORS in the dev server
-      proxy: {
+      proxy: disableApi ? {} : {
         '/api/': {
           target: 'http://localhost:3001',
           changeOrigin: true,

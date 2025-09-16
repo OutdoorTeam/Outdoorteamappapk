@@ -18,6 +18,22 @@ if (typeof window !== 'undefined') {
   }
 }
 
+// Stub global fetch to short-circuit /api calls in dev when disabled
+if (import.meta.env.DEV && import.meta.env.VITE_DISABLE_API === 'true') {
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : (input as Request).url;
+    if (url?.toString().startsWith('/api/')) {
+      console.warn('[stubbed /api]', url);
+      return new Response(
+        JSON.stringify({ ok: true, stub: true, data: null }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    return origFetch(input, init);
+  };
+}
+
 // -------- Preloader: llamada segura + fallback --------
 // --- Quitar overlay/splash de forma agresiva y segura ---
 function forceHideOverlays() {

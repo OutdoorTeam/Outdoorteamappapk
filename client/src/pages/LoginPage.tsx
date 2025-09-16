@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { loginSchema, LoginFormData } from '../../../shared/validation-schemas';
+import { loginSchema, type LoginFormData } from '../../../shared/validation-schemas';
 import { Eye, EyeOff } from 'lucide-react';
+
+const DISABLE_API = import.meta.env.VITE_DISABLE_API === 'true';
 
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
-  const { user, login, isLoading } = useAuth();
+  const [loading, setLoading] = React.useState(false);
+  const { user, initialized, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -23,39 +26,68 @@ const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     setError,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
+    reValidateMode: 'onChange',
   });
 
   React.useEffect(() => {
-    if (user) {
-      if (user.role === 'admin') navigate('/admin', { replace: true });
-      else navigate(from === '/login' ? '/dashboard' : from, { replace: true });
+    if (!initialized || !user) return;
+
+    const fallback = DISABLE_API ? '/account-debug' : '/dashboard';
+    if (user.role === 'admin') {
+      navigate('/admin', { replace: true });
+      return;
     }
-  }, [user, navigate, from]);
+
+    navigate(from === '/login' ? fallback : from, { replace: true });
+  }, [initialized, user, navigate, from]);
 
   const onSubmit = async (data: LoginFormData) => {
+    setLoading(true);
     try {
-      await login(data.email, data.password);
+      const { error } = await login(data.email, data.password);
+      if (error) {
+        const message = error.message || 'Credenciales invalidas';
+        setError('email', { message });
+        setError('password', { message });
+        toast({
+          title: 'Error al iniciar sesion',
+          description: message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
-        title: 'Inicio de sesión exitoso',
-        description: `Bienvenido`,
+        title: 'Inicio de sesion exitoso',
+        description: 'Bienvenido',
         variant: 'success',
       });
-      // El useEffect redirige cuando user cambia
     } catch (err: any) {
-      setError('email', { message: err?.message || 'Credenciales inválidas' });
-      setError('password', { message: err?.message || 'Credenciales inválidas' });
+      const message = err?.message || 'Credenciales invalidas';
+      setError('email', { message });
+      setError('password', { message });
       toast({
-        title: 'Error al iniciar sesión',
-        description: err?.message || 'No se pudo iniciar sesión',
+        title: 'Error al iniciar sesion',
+        description: message,
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (!initialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Cargando...</div>
+      </div>
+    );
+  }
 
   if (user) {
     return (
@@ -70,21 +102,21 @@ const LoginPage: React.FC = () => {
       <div className="max-w-md mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-center">Bienvenido de Vuelta</CardTitle>
+            <CardTitle className="text-2xl text-center">Bienvenido de vuelta</CardTitle>
             <CardDescription className="text-center">
-              Inicia sesión en tu cuenta de Outdoor Team
+              Inicia sesion en tu cuenta de Outdoor Team
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
+                <Label htmlFor="email">Correo electronico</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Ingresa tu correo electrónico"
+                  placeholder="Ingresa tu correo electronico"
                   {...register('email')}
-                  disabled={isSubmitting || isLoading}
+                  disabled={loading}
                   aria-invalid={!!errors.email}
                   className={errors.email ? 'border-red-500' : ''}
                 />
@@ -96,14 +128,14 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password">Contrasena</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Ingresa tu contraseña"
+                    placeholder="Ingresa tu contrasena"
                     {...register('password')}
-                    disabled={isSubmitting || isLoading}
+                    disabled={loading}
                     aria-invalid={!!errors.password}
                     className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
                   />
@@ -113,11 +145,11 @@ const LoginPage: React.FC = () => {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={isSubmitting || isLoading}
+                    disabled={loading}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     <span className="sr-only">
-                      {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      {showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
                     </span>
                   </Button>
                 </div>
@@ -128,8 +160,8 @@ const LoginPage: React.FC = () => {
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={isSubmitting || isLoading}>
-                {isSubmitting ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Iniciando sesion...' : 'Iniciar sesion'}
               </Button>
             </form>
 
@@ -139,7 +171,7 @@ const LoginPage: React.FC = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">O continúa con</span>
+                  <span className="bg-background px-2 text-muted-foreground">O continua con</span>
                 </div>
               </div>
               <Button type="button" variant="outline" className="w-full mt-4" disabled>
@@ -149,14 +181,14 @@ const LoginPage: React.FC = () => {
 
             <div className="mt-4 text-center text-sm">
               <Link to="#" className="text-primary hover:underline">
-                ¿Olvidaste tu contraseña?
+                Olvidaste tu contrasena?
               </Link>
             </div>
 
             <div className="mt-6 text-center text-sm">
-              ¿No tienes una cuenta?{' '}
+              No tienes una cuenta?{' '}
               <Link to="/register" className="text-primary hover:underline">
-                Regístrate
+                Registrate
               </Link>
             </div>
           </CardContent>
