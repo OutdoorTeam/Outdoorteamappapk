@@ -3,8 +3,7 @@ import { db } from '../database.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
 import type { Request, Response, NextFunction } from 'express';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+import { getJwtConfig } from '../config/security.js';
 
 // Extend Request interface to include user
 declare global {
@@ -26,7 +25,8 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const { secret, algorithm } = getJwtConfig();
+    const decoded = jwt.verify(token, secret, { algorithms: [algorithm] }) as any;
     const user = await db
       .selectFrom('users')
       .selectAll()

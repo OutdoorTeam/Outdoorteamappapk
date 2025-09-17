@@ -2,6 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import { SystemLogger } from '../utils/logging.js';
 import { ERROR_CODES, createErrorResponse } from '../utils/validation.js';
 
+const parseBooleanFlag = (value?: string | null): boolean =>
+  value === 'true' || value === '1';
+
+export const isRateLimitDisabled = (): boolean =>
+  parseBooleanFlag(process.env.DISABLE_RATE_LIMIT) ||
+  parseBooleanFlag(process.env.DISABLE_RATE_LIMITING);
+
 interface RateLimitStore {
   get(key: string): Promise<number | null>;
   getInfo(key: string): Promise<{ count: number; resetTime: number } | null>;
@@ -60,7 +67,7 @@ class MemoryStore implements RateLimitStore {
   async reset(key: string): Promise<void> {
     this.store.delete(key);
   }
-  
+
   cleanup(): void {
     const now = Date.now();
     for (const [key, item] of this.store.entries()) {
@@ -68,6 +75,10 @@ class MemoryStore implements RateLimitStore {
         this.store.delete(key);
       }
     }
+  }
+
+  clear(): void {
+    this.store.clear();
   }
 }
 
@@ -105,10 +116,8 @@ class RateLimiter {
   createMiddleware(config: RateLimitConfig) {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
-        // MUCH MORE PERMISSIVE: Skip rate limiting in many cases
-        if (process.env.DISABLE_RATE_LIMITING === 'true' || 
-            process.env.NODE_ENV !== 'production' ||
-            this.shouldSkipRateLimit(req)) {
+        // Skip rate limiting only when explicitly disabled or whitelisted
+        if (isRateLimitDisabled() || this.shouldSkipRateLimit(req)) {
           return next();
         }
         
@@ -250,8 +259,8 @@ class RateLimiter {
   }
   
   private async logRateLimitViolation(
-    req: Request, 
-    key: string, 
+    req: Request,
+    key: string,
     rateLimitInfo: RateLimitInfo
   ): Promise<void> {
     try {
@@ -274,6 +283,12 @@ class RateLimiter {
     }
   }
 
+  public resetAll(): void {
+    if (this.store instanceof MemoryStore) {
+      (this.store as MemoryStore).clear();
+    }
+  }
+
   public async resetLoginBlocks(email: string, ip: string): Promise<void> {
     await this.store.reset(`login:block:ip:${ip}`);
     await this.store.reset(`login:block:email:${email.toLowerCase()}`);
@@ -282,22 +297,21 @@ class RateLimiter {
 
 export const rateLimiter = new RateLimiter();
 
-// MUCH MORE PERMISSIVE rate limits
 export const globalApiLimit = rateLimiter.createMiddleware({
   windowMs: 60 * 1000,
-  maxRequests: 500, // Increased from 100
+  maxRequests: 100,
   customMessage: 'Too many API requests. Please slow down.'
 });
 
 export const burstLimit = rateLimiter.createMiddleware({
   windowMs: 1000,
-  maxRequests: 50, // Increased from 10
+  maxRequests: 20,
   customMessage: 'Too many requests in a short time. Please wait a moment.'
 });
 
 export const loginLimit = rateLimiter.createMiddleware({
   windowMs: 15 * 60 * 1000,
-  maxRequests: 10, // Increased from 5
+  maxRequests: 5,
   keyGenerator: (req) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const email = req.body?.email?.toLowerCase() || 'no-email';
@@ -318,13 +332,13 @@ export const loginLimit = rateLimiter.createMiddleware({
 
 export const registerLimit = rateLimiter.createMiddleware({
   windowMs: 60 * 1000,
-  maxRequests: 10, // Increased from 3
+  maxRequests: 3,
   customMessage: 'Too many registration attempts. Please try again later.'
 });
 
 export const passwordResetLimit = rateLimiter.createMiddleware({
   windowMs: 60 * 60 * 1000,
-  maxRequests: 5, // Increased from 3
+  maxRequests: 3,
   customMessage: 'Too many password reset requests. Please try again in an hour.'
 });
 

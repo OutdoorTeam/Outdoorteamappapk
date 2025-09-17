@@ -2,21 +2,9 @@ import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
+import { getVapidConfig, isVapidConfigured } from '../config/security.js';
 
 const router = Router();
-
-// Check if VAPID is configured
-const isVapidConfigured = (): boolean => {
-  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-  
-  return !!(VAPID_PUBLIC_KEY && 
-           VAPID_PRIVATE_KEY && 
-           VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && 
-           VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE' &&
-           VAPID_PRIVATE_KEY.length >= 32 &&
-           VAPID_PUBLIC_KEY.length >= 32);
-};
 
 // Get user notification preferences
 router.get('/preferences', authenticateToken, async (req: any, res) => {
@@ -107,8 +95,8 @@ router.post('/test', authenticateToken, async (req: any, res) => {
 router.post('/broadcast', authenticateToken, requireAdmin, async (req: any, res) => {
   try {
     const vapidConfigured = isVapidConfigured();
-    const message = vapidConfigured ? 
-      'Las notificaciones están desactivadas temporalmente' : 
+    const message = vapidConfigured ?
+      'Las notificaciones están desactivadas temporalmente' :
       'VAPID no configurado. Ejecuta: npm run generate-vapid';
     
     res.json({ 
@@ -137,11 +125,11 @@ router.post('/mark-complete', async (req, res) => {
 
 // Get VAPID public key
 router.get('/vapid-public-key', (req, res) => {
-  const vapidConfigured = isVapidConfigured();
-  
-  if (vapidConfigured) {
-    res.json({ 
-      publicKey: process.env.VAPID_PUBLIC_KEY,
+  const vapid = getVapidConfig();
+
+  if (vapid) {
+    res.json({
+      publicKey: vapid.publicKey,
       configured: true
     });
   } else {
