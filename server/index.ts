@@ -40,8 +40,15 @@ import {
   loginLimit,
   registerLimit,
   passwordResetLimit,
-  checkLoginBlock
+  checkLoginBlock,
+  isRateLimitDisabled
 } from './middleware/rate-limiter.js';
+import {
+  ensureJwtSecret,
+  getJwtConfig,
+  getVapidConfig,
+  isVapidConfigured
+} from './config/security.js';
 import {
   corsMiddleware,
   corsErrorHandler,
@@ -64,7 +71,6 @@ import {
 dotenv.config();
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 
 // Enable trust proxy for deployment platforms
@@ -74,22 +80,17 @@ app.set('trust proxy', true);
 let resetScheduler: DailyResetScheduler;
 let notificationScheduler: NotificationScheduler;
 
-const checkVapidConfiguration = () => {
-  const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-  const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const logVapidConfigurationStatus = () => {
+  const vapid = getVapidConfig();
 
-  const isConfigured = !!(VAPID_PUBLIC_KEY && 
-                         VAPID_PRIVATE_KEY && 
-                         VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && 
-                         VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE' &&
-                         VAPID_PRIVATE_KEY.length >= 32 &&
-                         VAPID_PUBLIC_KEY.length >= 32);
-
-  if (!isConfigured) {
+  if (!vapid) {
+    console.warn('⚠️  VAPID keys are missing or invalid. Push notifications remain disabled.');
     return false;
   }
 
   console.log('✅ VAPID keys are configured correctly');
+  console.log(`📧 VAPID email: ${vapid.email}`);
+  console.log(`🔑 VAPID public key prefix: ${vapid.publicKey.substring(0, 20)}...`);
   return true;
 };
 
@@ -140,17 +141,15 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(corsMiddleware);
 app.use(corsErrorHandler);
 
-// CONDITIONAL rate limiting - disabled for builds and deployment
-const isDeploymentMode = process.env.BUILD_MODE === 'true' || 
-                        process.env.INSTANCE_APP_BUILD === 'true' ||
-                        process.env.NODE_ENV === 'production';
+// Global rate limiting (can be disabled via environment flag for emergencies)
+const rateLimitDisabled = isRateLimitDisabled();
 
-if (!isDeploymentMode) {
+if (!rateLimitDisabled) {
   app.use('/api/', globalApiLimit);
   app.use('/api/', burstLimit);
-  console.log('📊 Rate limiting enabled for development');
+  console.log('📊 Rate limiting enabled');
 } else {
-  console.log('🚀 Rate limiting disabled for deployment/production');
+  console.warn('⚠️ Rate limiting disabled via DISABLE_RATE_LIMIT flag');
 }
 
 // Health check endpoint (FIRST - no auth needed)
@@ -237,7 +236,7 @@ app.get('/api/diagnostics', authenticateToken, requireAdmin, async (req: any, re
       BUILD_MODE: process.env.BUILD_MODE,
       INSTANCE_APP_BUILD: process.env.INSTANCE_APP_BUILD,
       DATA_DIRECTORY: DATA_DIRECTORY,
-      VAPID_CONFIGURED: checkVapidConfiguration(),
+      VAPID_CONFIGURED: isVapidConfigured(),
       CWD: process.cwd()
     };
 
@@ -400,18 +399,16 @@ app.get('/api/content-library', authenticateToken, async (req: any, res: express
   }
 });
 
-// Auth Routes with CONDITIONAL Rate Limiting (disabled for deployment)
-const authRateLimit = isDeploymentMode ? 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
-  registerLimit;
+// Auth Routes with rate limiting (can be bypassed with DISABLE_RATE_LIMIT=true)
+const passThroughMiddleware = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => next();
 
-const loginRateLimit = isDeploymentMode ? 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
-  loginLimit;
-
-const loginBlockCheck = isDeploymentMode ? 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
-  checkLoginBlock;
+const authRateLimit = rateLimitDisabled ? passThroughMiddleware : registerLimit;
+const loginRateLimit = rateLimitDisabled ? passThroughMiddleware : loginLimit;
+const loginBlockCheck = rateLimitDisabled ? passThroughMiddleware : checkLoginBlock;
 
 app.post('/api/auth/register',
   authRateLimit,
@@ -488,14 +485,15 @@ app.post('/api/auth/register',
         })
         .execute();
 
+      const { secret, expiresIn, algorithm } = getJwtConfig();
       const token = jwt.sign(
         {
           id: newUser.id,
           email: newUser.email,
           role: newUser.role
         },
-        JWT_SECRET,
-        { expiresIn: '7d' }
+        secret,
+        { expiresIn, algorithm }
       );
 
       console.log('User registered successfully:', newUser.email, 'Role:', newUser.role);
@@ -564,14 +562,15 @@ app.post('/api/auth/login',
         return;
       }
 
+      const { secret, expiresIn, algorithm } = getJwtConfig();
       const token = jwt.sign(
         {
           id: user.id,
           email: user.email,
           role: user.role
         },
-        JWT_SECRET,
-        { expiresIn: '7d' }
+        secret,
+        { expiresIn, algorithm }
       );
 
       await db
@@ -671,7 +670,9 @@ export const startServer = async (port = 3001) => {
     await db.selectFrom('users').select('id').limit(1).execute();
     console.log('✅ Database connection established');
 
-    const vapidConfigured = checkVapidConfiguration();
+    ensureJwtSecret();
+
+    const vapidConfigured = logVapidConfigurationStatus();
 
     console.log('🔄 Initializing daily reset scheduler...');
     resetScheduler = new DailyResetScheduler(db);

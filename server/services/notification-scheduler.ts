@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { SystemLogger } from '../utils/logging.js';
+import { getVapidConfig } from '../config/security.js';
 
 class NotificationScheduler {
   private isRunning = false;
@@ -16,30 +17,20 @@ class NotificationScheduler {
   }
 
   private checkVapidConfiguration(): void {
-    const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
-    const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-    const VAPID_EMAIL = process.env.VAPID_EMAIL || 'admin@moutdoorteam.com';
+    const vapid = getVapidConfig();
 
-    // Check if keys are properly configured
-    this.isConfigured = !!(
-      VAPID_PUBLIC_KEY && 
-      VAPID_PRIVATE_KEY && 
-      VAPID_PRIVATE_KEY !== 'YOUR_PRIVATE_KEY_HERE' && 
-      VAPID_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY_HERE' &&
-      VAPID_PRIVATE_KEY.length >= 32 &&
-      VAPID_PUBLIC_KEY.length >= 32
-    );
+    this.isConfigured = !!vapid;
 
-    if (this.isConfigured) {
+    if (this.isConfigured && vapid) {
       try {
         webpush.setVapidDetails(
-          `mailto:${VAPID_EMAIL}`,
-          VAPID_PUBLIC_KEY,
-          VAPID_PRIVATE_KEY
+          `mailto:${vapid.email}`,
+          vapid.publicKey,
+          vapid.privateKey
         );
         console.log('✅ VAPID keys configured successfully for push notifications');
-        console.log(`📧 VAPID email: ${VAPID_EMAIL}`);
-        console.log(`🔑 VAPID public key: ${VAPID_PUBLIC_KEY.substring(0, 20)}...`);
+        console.log(`📧 VAPID email: ${vapid.email}`);
+        console.log(`🔑 VAPID public key: ${vapid.publicKey.substring(0, 20)}...`);
       } catch (error) {
         console.error('❌ Error configuring VAPID keys:', error);
         this.isConfigured = false;
@@ -56,11 +47,18 @@ class NotificationScheduler {
       console.log('2. Restart the server');
       console.log('');
       console.log('Current VAPID status:');
-      console.log(`- Public key: ${VAPID_PUBLIC_KEY ? '✓ Set' : '✗ Missing'}`);
-      console.log(`- Private key: ${VAPID_PRIVATE_KEY ? '✓ Set' : '✗ Missing'}`);
-      console.log(`- Email: ${VAPID_EMAIL || '✗ Missing'}`);
+      console.log(`- Public key: ${vapid?.publicKey ? '✓ Set' : '✗ Missing'}`);
+      console.log(`- Private key: ${vapid?.privateKey ? '✓ Set' : '✗ Missing'}`);
+      console.log(`- Email: ${vapid?.email || '✗ Missing'}`);
       console.log('═══════════════════════════════════════');
       console.log('');
+
+      void SystemLogger.log('warn', 'Push notifications disabled: invalid VAPID configuration', {
+        metadata: {
+          hasPublicKey: Boolean(vapid?.publicKey),
+          hasPrivateKey: Boolean(vapid?.privateKey)
+        }
+      });
     }
   }
 
@@ -110,10 +108,12 @@ class NotificationScheduler {
   }
 
   public getVapidStatus(): { configured: boolean; publicKey?: string; email?: string } {
+    const vapid = getVapidConfig();
+
     return {
-      configured: this.isConfigured,
-      publicKey: this.isConfigured ? process.env.VAPID_PUBLIC_KEY : undefined,
-      email: process.env.VAPID_EMAIL || 'admin@moutdoorteam.com'
+      configured: !!vapid,
+      publicKey: vapid?.publicKey,
+      email: vapid?.email || 'admin@moutdoorteam.com'
     };
   }
 }
