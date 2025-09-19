@@ -1,6 +1,4 @@
-﻿import { Kysely, SqliteDialect, type ColumnType, type Generated } from 'kysely';
-import Database from 'better-sqlite3';
-import path from 'path';
+﻿import { Kysely, PostgresDialect, SqliteDialect, type ColumnType, type Generated } from 'kysely';
 
 export interface DatabaseSchema {
   users: {
@@ -259,15 +257,31 @@ export interface DatabaseSchema {
   };
 }
 
-const dataDirectory = process.env.DATA_DIRECTORY || './data';
-const sqliteDb = new Database(path.join(dataDirectory, 'database.sqlite'));
+const usePg = Boolean(process.env.DATABASE_URL);
 
-export const db = new Kysely<DatabaseSchema>({
-  dialect: new SqliteDialect({
-    database: sqliteDb,
-  }),
-  log: ['query', 'error']
-});
+async function createDb(): Promise<Kysely<DatabaseSchema>> {
+  if (usePg) {
+    const { Pool } = await import('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
 
+    return new Kysely<DatabaseSchema>({
+      dialect: new PostgresDialect({ pool }),
+      log: ['query', 'error']
+    });
+  }
 
+  const { default: BetterSqlite3 } = await import('better-sqlite3');
+  const sqlitePath = process.env.SQLITE_PATH ?? 'data/app.db';
+  const sqlite = new BetterSqlite3(sqlitePath);
+
+  return new Kysely<DatabaseSchema>({
+    dialect: new SqliteDialect({ database: sqlite }),
+    log: ['query', 'error']
+  });
+}
+
+export const db = await createDb();
 
