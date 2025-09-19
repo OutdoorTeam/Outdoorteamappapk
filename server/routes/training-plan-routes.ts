@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get training plan for a user with days and exercises
-router.get('/training-plan/:userId', authenticateToken, async (req: any, res) => {
+router.get('/training-plan/:userId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
@@ -116,7 +117,7 @@ router.get('/training-plan/:userId', authenticateToken, async (req: any, res) =>
 });
 
 // Create or get draft training plan (admin only)
-router.post('/training-plan/:userId/draft', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/:userId/draft', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const adminId = req.user.id;
@@ -175,7 +176,7 @@ router.post('/training-plan/:userId/draft', authenticateToken, requireAdmin, asy
 });
 
 // Ensure draft training plan exists (admin only) - NEW ROUTE
-router.post('/training-plan/user/:userId/ensure-draft', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/user/:userId/ensure-draft', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const adminId = req.user.id;
@@ -234,7 +235,7 @@ router.post('/training-plan/user/:userId/ensure-draft', authenticateToken, requi
 });
 
 // Update training plan metadata (admin only)
-router.put('/training-plan/:planId', authenticateToken, requireAdmin, async (req: any, res) => {
+router.put('/training-plan/:planId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { planId } = req.params;
     const { title, status } = req.body;
@@ -279,7 +280,7 @@ router.put('/training-plan/:planId', authenticateToken, requireAdmin, async (req
 });
 
 // Add or update training plan day (admin only)
-router.post('/training-plan/:planId/days', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/:planId/days', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { planId } = req.params;
     const { day_index, title, notes, sort_order = 0 } = req.body;
@@ -337,7 +338,7 @@ router.post('/training-plan/:planId/days', authenticateToken, requireAdmin, asyn
 });
 
 // Add or update exercise (admin only)
-router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { dayId } = req.params;
     const {
@@ -447,7 +448,7 @@ router.post('/training-plan/days/:dayId/exercises', authenticateToken, requireAd
 });
 
 // Publish training plan (admin only)
-router.post('/training-plan/:planId/publish', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/training-plan/:planId/publish', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { planId } = req.params;
 
@@ -494,7 +495,7 @@ router.post('/training-plan/:planId/publish', authenticateToken, requireAdmin, a
 });
 
 // Delete exercise (admin only)
-router.delete('/training-plan/exercises/:exerciseId', authenticateToken, requireAdmin, async (req: any, res) => {
+router.delete('/training-plan/exercises/:exerciseId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { exerciseId } = req.params;
 

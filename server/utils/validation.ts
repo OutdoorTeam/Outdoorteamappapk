@@ -31,8 +31,8 @@ export const ERROR_CODES = {
 } as const;
 
 // Validation middleware factory
-export function validateRequest<T>(
-  schema: z.ZodSchema<T>,
+export function validateRequest<T extends z.ZodTypeAny>(
+  schema: T,
   target: 'body' | 'query' | 'params' = 'body'
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -66,7 +66,7 @@ export function validateRequest<T>(
       }
 
       // Replace the original data with validated and transformed data
-      req[target] = result.data;
+      req[target] = result.data as z.infer<T>;
       next();
     } catch (error) {
       console.error('Validation middleware error:', error);

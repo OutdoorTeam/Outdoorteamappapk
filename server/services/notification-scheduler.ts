@@ -1,4 +1,4 @@
-import webpush from 'web-push';
+﻿import webpush from 'web-push';
 import { SystemLogger } from '../utils/logging.js';
 
 class NotificationScheduler {
@@ -9,9 +9,9 @@ class NotificationScheduler {
   constructor() {
     this.checkVapidConfiguration();
     if (this.isConfigured) {
-      console.log('✅ NotificationScheduler initialized and configured');
+      console.log('âœ… NotificationScheduler initialized and configured');
     } else {
-      console.log('⚠️  NotificationScheduler initialized but VAPID keys not configured');
+      console.log('âš ï¸  NotificationScheduler initialized but VAPID keys not configured');
     }
   }
 
@@ -31,24 +31,26 @@ class NotificationScheduler {
     );
 
     if (this.isConfigured) {
+      const publicKey = VAPID_PUBLIC_KEY!;
+      const privateKey = VAPID_PRIVATE_KEY!;
       try {
         webpush.setVapidDetails(
           `mailto:${VAPID_EMAIL}`,
-          VAPID_PUBLIC_KEY,
-          VAPID_PRIVATE_KEY
+          publicKey,
+          privateKey
         );
-        console.log('✅ VAPID keys configured successfully for push notifications');
-        console.log(`📧 VAPID email: ${VAPID_EMAIL}`);
-        console.log(`🔑 VAPID public key: ${VAPID_PUBLIC_KEY.substring(0, 20)}...`);
+        console.log('âœ… VAPID keys configured successfully for push notifications');
+        console.log(`ðŸ“§ VAPID email: ${VAPID_EMAIL}`);
+        console.log(`ðŸ”‘ VAPID public key: ${publicKey.substring(0, 20)}...`);
       } catch (error) {
-        console.error('❌ Error configuring VAPID keys:', error);
+        console.error('âŒ Error configuring VAPID keys:', error);
         this.isConfigured = false;
       }
     } else {
       console.log('');
-      console.log('═══════════════════════════════════════');
-      console.log('⚠️   VAPID KEYS NOT CONFIGURED   ⚠️');
-      console.log('═══════════════════════════════════════');
+      console.log('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+      console.log('âš ï¸   VAPID KEYS NOT CONFIGURED   âš ï¸');
+      console.log('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
       console.log('Push notifications are disabled.');
       console.log('');
       console.log('To enable push notifications:');
@@ -56,10 +58,10 @@ class NotificationScheduler {
       console.log('2. Restart the server');
       console.log('');
       console.log('Current VAPID status:');
-      console.log(`- Public key: ${VAPID_PUBLIC_KEY ? '✓ Set' : '✗ Missing'}`);
-      console.log(`- Private key: ${VAPID_PRIVATE_KEY ? '✓ Set' : '✗ Missing'}`);
-      console.log(`- Email: ${VAPID_EMAIL || '✗ Missing'}`);
-      console.log('═══════════════════════════════════════');
+      console.log(`- Public key: ${VAPID_PUBLIC_KEY ? 'âœ“ Set' : 'âœ— Missing'}`);
+      console.log(`- Private key: ${VAPID_PRIVATE_KEY ? 'âœ“ Set' : 'âœ— Missing'}`);
+      console.log(`- Email: ${VAPID_EMAIL || 'âœ— Missing'}`);
+      console.log('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
       console.log('');
     }
   }
@@ -119,3 +121,5 @@ class NotificationScheduler {
 }
 
 export default NotificationScheduler;
+
+

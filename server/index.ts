@@ -1,5 +1,6 @@
 ﻿
 import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -59,7 +60,7 @@ import {
   broadcastMessageSchema,
   planAssignmentSchema,
   toggleUserStatusSchema
-} from '../shared/validation-schemas.js';
+} from './shared-schemas.js';
 
 dotenv.config();
 
@@ -156,7 +157,7 @@ if (!isDeploymentMode) {
 // Health check endpoint (FIRST - no auth needed)
 app.get('/healthz', (_req, res) => res.send('ok'));
 
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
@@ -170,7 +171,7 @@ app.get('/health', (req, res) => {
 });
 
 // Deployment info endpoint
-app.get('/deployment-info', (req, res) => {
+app.get('/deployment-info', (req: Request, res: Response) => {
   const publicPath = path.join(process.cwd(), 'public');
   const indexExists = fs.existsSync(path.join(publicPath, 'index.html'));
   
@@ -191,7 +192,7 @@ app.get('/deployment-info', (req, res) => {
 });
 
 // System logs endpoint for debugging (admin only)
-app.get('/api/system-logs', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/system-logs', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     console.log('Admin fetching system logs');
 
@@ -220,7 +221,7 @@ app.get('/api/system-logs', authenticateToken, requireAdmin, async (req, res) =>
 });
 
 // Diagnostic endpoint (admin only)
-app.get('/api/diagnostics', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+app.get('/api/diagnostics', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     console.log('Admin requesting diagnostics');
 
@@ -274,7 +275,7 @@ app.get('/api/diagnostics', authenticateToken, requireAdmin, async (req: any, re
 });
 
 // Simple root endpoint (before static serving)
-app.get('/api/status', (req, res) => {
+app.get('/api/status', (req: Request, res: Response) => {
   res.json({ 
     message: 'Outdoor Team API Server', 
     status: 'running',
@@ -334,7 +335,7 @@ app.use('/api', apiRoutes);
 app.use('/api/auth', authRoutes);
 
 // Admin Users Route (Critical for AdminPage)
-app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+app.get('/api/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     console.log('Admin fetching all users');
 
@@ -356,7 +357,7 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req: any, res: exp
 });
 
 // Plans Route (Critical for AdminPage)
-app.get('/api/plans', authenticateToken, async (req: any, res: express.Response) => {
+app.get('/api/plans', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('Fetching plans for user:', req.user.email);
 
@@ -377,7 +378,7 @@ app.get('/api/plans', authenticateToken, async (req: any, res: express.Response)
 });
 
 // Content Library Route (Critical for AdminPage)
-app.get('/api/content-library', authenticateToken, async (req: any, res: express.Response) => {
+app.get('/api/content-library', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
     console.log('Fetching content library for user:', req.user.email, 'category:', category);
@@ -404,21 +405,21 @@ app.get('/api/content-library', authenticateToken, async (req: any, res: express
 
 // Auth Routes with CONDITIONAL Rate Limiting (disabled for deployment)
 const authRateLimit = isDeploymentMode ? 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
+  (req: Request, res: Response, next: NextFunction) => next() : 
   registerLimit;
 
 const loginRateLimit = isDeploymentMode ? 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
+  (req: Request, res: Response, next: NextFunction) => next() : 
   loginLimit;
 
 const loginBlockCheck = isDeploymentMode ? 
-  (req: express.Request, res: express.Response, next: express.NextFunction) => next() : 
+  (req: Request, res: Response, next: NextFunction) => next() : 
   checkLoginBlock;
 
 app.post('/api/auth/register',
   authRateLimit,
   validateRequest(registerSchema),
-  async (req: express.Request, res: express.Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { full_name, email, password } = req.body;
 
@@ -521,7 +522,7 @@ app.post('/api/auth/login',
   loginBlockCheck,
   loginRateLimit,
   validateRequest(loginSchema),
-  async (req: express.Request, res: express.Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
 
@@ -601,7 +602,7 @@ app.post('/api/auth/login',
 
 app.post('/api/auth/reset-password',
   passwordResetLimit,
-  async (req: express.Request, res: express.Response) => {
+  async (req: Request, res: Response) => {
     try {
       await SystemLogger.log('info', 'Password reset requested');
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Funcionalidad de reset de contraseña aún no implementada');
@@ -611,7 +612,7 @@ app.post('/api/auth/reset-password',
     }
   });
 
-app.get('/api/auth/me', authenticateToken, (req: any, res: express.Response) => {
+app.get('/api/auth/me', authenticateToken, (req: Request, res: Response) => {
   res.json(formatUserResponse(req.user));
 });
 
@@ -622,7 +623,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // More permissive error handling for deployment
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   console.warn(`404 - Route not found: ${req.method} ${req.path}`);
   
   if (req.path.startsWith('/api/')) {
@@ -649,7 +650,7 @@ app.use((req, res, next) => {
 });
 
 // Global error handler (very permissive for deployment)
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled error:', error);
   
   if (res.headersSent) {
@@ -778,6 +779,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
+
+
+
 
 
 

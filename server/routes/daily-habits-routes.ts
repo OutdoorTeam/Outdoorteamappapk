@@ -1,4 +1,5 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get today's habits for the authenticated user
-router.get('/daily-habits/today', authenticateToken, async (req: any, res) => {
+router.get('/daily-habits/today', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const today = new Date().toISOString().split('T')[0];
@@ -37,10 +38,7 @@ router.get('/daily-habits/today', authenticateToken, async (req: any, res) => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .returning([
-          'id', 'user_id', 'date', 'training_completed', 'nutrition_completed', 
-          'movement_completed', 'meditation_completed', 'daily_points', 'steps'
-        ])
+        .returningAll()
         .executeTakeFirst();
     }
 
@@ -49,12 +47,12 @@ router.get('/daily-habits/today', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Error fetching today habits:', error);
     await SystemLogger.logCriticalError('Today habits fetch error', error as Error, { userId: req.user?.id });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener hábitos de hoy');
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener hÃ¡bitos de hoy');
   }
 });
 
 // Get weekly points for the authenticated user
-router.get('/daily-habits/weekly-points', authenticateToken, async (req: any, res) => {
+router.get('/daily-habits/weekly-points', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const today = new Date();
@@ -90,7 +88,7 @@ router.get('/daily-habits/weekly-points', authenticateToken, async (req: any, re
 });
 
 // Get calendar data for the authenticated user
-router.get('/daily-habits/calendar', authenticateToken, async (req: any, res) => {
+router.get('/daily-habits/calendar', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const today = new Date();
@@ -119,7 +117,7 @@ router.get('/daily-habits/calendar', authenticateToken, async (req: any, res) =>
 });
 
 // Update daily habits
-router.put('/daily-habits/update', authenticateToken, async (req: any, res) => {
+router.put('/daily-habits/update', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const { 
@@ -209,8 +207,9 @@ router.put('/daily-habits/update', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Error updating daily habits:', error);
     await SystemLogger.logCriticalError('Daily habits update error', error as Error, { userId: req.user?.id });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar hábitos diarios');
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al actualizar hÃ¡bitos diarios');
   }
 });
 
 export default router;
+

@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { SystemLogger } from '../utils/logging.js';
@@ -7,7 +8,7 @@ import { ERROR_CODES, sendErrorResponse } from '../utils/validation.js';
 const router = express.Router();
 
 // Get user statistics (admin view or own stats)
-router.get('/stats/user/:userId', authenticateToken, async (req: any, res: express.Response) => {
+router.get('/stats/user/:userId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
@@ -95,7 +96,7 @@ router.get('/stats/user/:userId', authenticateToken, async (req: any, res: expre
 });
 
 // Get current user's own statistics
-router.get('/stats/my-stats', authenticateToken, async (req: any, res: express.Response) => {
+router.get('/stats/my-stats', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     

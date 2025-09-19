@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get user goals (admin only)
-router.get('/users/:userId/goals', authenticateToken, requireAdmin, async (req: any, res) => {
+router.get('/users/:userId/goals', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
@@ -43,7 +44,7 @@ router.get('/users/:userId/goals', authenticateToken, requireAdmin, async (req: 
 });
 
 // Update user goals (admin only)
-router.put('/users/:userId/goals', authenticateToken, requireAdmin, async (req: any, res) => {
+router.put('/users/:userId/goals', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { daily_steps_goal, weekly_points_goal } = req.body;

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get nutrition plan for a user
-router.get('/nutrition-plan/:userId', authenticateToken, async (req: any, res) => {
+router.get('/nutrition-plan/:userId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
@@ -58,7 +59,7 @@ router.get('/nutrition-plan/:userId', authenticateToken, async (req: any, res) =
 });
 
 // Upsert nutrition plan (admin only)
-router.put('/nutrition-plan/:userId', authenticateToken, requireAdmin, async (req: any, res) => {
+router.put('/nutrition-plan/:userId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { content_md, status = 'draft' } = req.body;

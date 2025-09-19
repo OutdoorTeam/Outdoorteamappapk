@@ -1,4 +1,5 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get user statistics endpoint
-router.get('/users/:id/stats', authenticateToken, async (req: any, res) => {
+router.get('/users/:id/stats', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const requestingUserId = req.user.id;
@@ -85,13 +86,13 @@ router.get('/users/:id/stats', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Error fetching user stats:', error);
     await SystemLogger.logCriticalError('User stats fetch error', error as Error, { userId: req.user?.id, req });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener estadísticas');
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener estadÃ­sticas');
   }
 });
 
 function processWeeklyStats(weeklyHabits: any[], weeklyMeditation: any[], weekStartStr: string) {
   // Create array of last 7 days
-  const days = [];
+  const days: string[] = [];
   for (let i = 0; i < 7; i++) {
     const date = new Date(weekStartStr);
     date.setDate(date.getDate() + i);
@@ -161,9 +162,9 @@ function processMonthlyStats(monthlyHabits: any[], monthlyMeditation: any[]) {
   // Habit completion data for chart
   const habitCompletionData = [
     { name: 'Entrenamiento', completed: trainingDays, total: totalDays, percentage: habitCompletionRates.training },
-    { name: 'Nutrición', completed: nutritionDays, total: totalDays, percentage: habitCompletionRates.nutrition },
+    { name: 'NutriciÃ³n', completed: nutritionDays, total: totalDays, percentage: habitCompletionRates.nutrition },
     { name: 'Movimiento', completed: movementDays, total: totalDays, percentage: habitCompletionRates.movement },
-    { name: 'Meditación', completed: meditationDays, total: totalDays, percentage: habitCompletionRates.meditation }
+    { name: 'MeditaciÃ³n', completed: meditationDays, total: totalDays, percentage: habitCompletionRates.meditation }
   ];
 
   return {
@@ -183,3 +184,4 @@ function processMonthlyStats(monthlyHabits: any[], monthlyMeditation: any[]) {
 }
 
 export default router;
+

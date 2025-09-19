@@ -1,10 +1,10 @@
-import { Kysely, SqliteDialect } from 'kysely';
+﻿import { Kysely, SqliteDialect, type ColumnType, type Generated } from 'kysely';
 import Database from 'better-sqlite3';
 import path from 'path';
 
 export interface DatabaseSchema {
   users: {
-    id: number;
+    id: Generated<number>;
     email: string;
     password_hash: string | null;
     full_name: string;
@@ -12,19 +12,19 @@ export interface DatabaseSchema {
     plan_type: string | null;
     is_active: number;
     features_json: string;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   habits: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     name: string;
     is_completed: number;
     date: string;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   daily_habits: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     date: string;
     training_completed: number;
@@ -33,11 +33,11 @@ export interface DatabaseSchema {
     meditation_completed: number;
     daily_points: number;
     steps: number;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   daily_history: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     date: string;
     daily_points: number;
@@ -50,76 +50,76 @@ export interface DatabaseSchema {
     archived_at: string;
   };
   user_notes: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     content: string;
     date: string;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   step_counts: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     steps: number;
     date: string;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   user_files: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     filename: string;
     file_type: string;
     file_path: string;
     uploaded_by: number;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   broadcast_messages: {
-    id: number;
+    id: Generated<number>;
     sender_id: number;
     message: string;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   plans: {
-    id: number;
+    id: Generated<number>;
     name: string;
     description: string;
     price: number;
     services_included: string;
     features_json: string;
     is_active: number;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   content_library: {
-    id: number;
+    id: Generated<number>;
     title: string;
     description: string | null;
     video_url: string | null;
     category: string;
     subcategory: string | null;
     is_active: number;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   content_videos: {
-    id: number;
+    id: Generated<number>;
     title: string;
     description: string | null;
     category: string;
     video_url: string;
     is_active: number;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   workout_of_day: {
-    id: number;
+    id: Generated<number>;
     title: string;
     description: string | null;
     exercises_json: string;
     date: string;
     is_active: number;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   meditation_sessions: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     duration_minutes: number;
     meditation_type: string;
@@ -128,7 +128,7 @@ export interface DatabaseSchema {
     completed_at: string;
   };
   daily_reset_log: {
-    id: number;
+    id: Generated<number>;
     reset_date: string;
     executed_at: string;
     users_processed: number;
@@ -138,10 +138,10 @@ export interface DatabaseSchema {
     status: string;
     error_message: string | null;
     execution_time_ms: number;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   system_logs: {
-    id: number;
+    id: Generated<number>;
     level: string;
     event: string;
     user_id: number | null;
@@ -149,10 +149,10 @@ export interface DatabaseSchema {
     ip_address: string | null;
     user_agent: string | null;
     metadata: string | null;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   user_notifications: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     enabled: number;
     habits: string;
@@ -160,39 +160,39 @@ export interface DatabaseSchema {
     push_token: string | null;
     push_endpoint: string | null;
     push_keys: string | null;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   notification_jobs: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     habit_key: string;
     reminder_time: string;
     next_send_at: string;
-    created_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
   };
   nutrition_plans: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     content_md: string | null;
     version: number;
     status: string;
     created_by: number | null;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   training_plans: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     title: string | null;
     version: number;
     status: string;
     created_by: number | null;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   training_plan_days: {
-    id: number;
+    id: Generated<number>;
     plan_id: number;
     day_index: number;
     title: string | null;
@@ -200,7 +200,7 @@ export interface DatabaseSchema {
     sort_order: number;
   };
   training_exercises: {
-    id: number;
+    id: Generated<number>;
     day_id: number;
     sort_order: number;
     exercise_name: string;
@@ -214,17 +214,17 @@ export interface DatabaseSchema {
     notes: string | null;
   };
   training_plan_schedules: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     plan_title: string | null;
     week_number: number;
     status: string;
     created_by: number | null;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   training_plan_exercises: {
-    id: number;
+    id: Generated<number>;
     schedule_id: number;
     day_name: string;
     exercise_name: string;
@@ -238,7 +238,7 @@ export interface DatabaseSchema {
     sort_order: number;
   };
   user_permissions: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     dashboard_enabled: number;
     training_enabled: number;
@@ -246,16 +246,16 @@ export interface DatabaseSchema {
     meditation_enabled: number;
     active_breaks_enabled: number;
     exercises_enabled: number;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
   user_goals: {
-    id: number;
+    id: Generated<number>;
     user_id: number;
     daily_steps_goal: number;
     weekly_points_goal: number;
-    created_at: string;
-    updated_at: string;
+    created_at: ColumnType<string, string | undefined, never>;
+    updated_at: ColumnType<string, string | undefined, string>;
   };
 }
 
@@ -268,3 +268,6 @@ export const db = new Kysely<DatabaseSchema>({
   }),
   log: ['query', 'error']
 });
+
+
+

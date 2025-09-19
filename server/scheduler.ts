@@ -1,5 +1,5 @@
-import { db } from './database.js';
-import cron from 'node-cron';
+﻿import { db } from './database.js';
+import cron, { type ScheduledTask } from 'node-cron';
 
 interface DailyResetStats {
   usersProcessed: number;
@@ -10,7 +10,7 @@ interface DailyResetStats {
 
 class DailyResetScheduler {
   private isRunning = false;
-  private cronJob: cron.ScheduledTask | null = null;
+  private cronJob: ScheduledTask | null = null;
   private database: any;
 
   constructor(database: any) {
@@ -20,7 +20,7 @@ class DailyResetScheduler {
   async initialize() {
     this.initializeScheduler();
     await this.checkMissedReset();
-    console.log('✅ Daily reset scheduler initialized');
+    console.log('âœ… Daily reset scheduler initialized');
   }
 
   private initializeScheduler() {
@@ -312,3 +312,4 @@ class DailyResetScheduler {
 }
 
 export default DailyResetScheduler;
+

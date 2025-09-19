@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { SystemLogger } from '../utils/logging.js';
@@ -7,7 +8,7 @@ import { ERROR_CODES, sendErrorResponse } from '../utils/validation.js';
 const router = express.Router();
 
 // Get user permissions
-router.get('/users/:id/permissions', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.get('/users/:id/permissions', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id);
@@ -51,7 +52,7 @@ router.get('/users/:id/permissions', authenticateToken, requireAdmin, async (req
 });
 
 // Update user permissions
-router.put('/users/:id/permissions', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.put('/users/:id/permissions', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id);
@@ -117,7 +118,7 @@ router.put('/users/:id/permissions', authenticateToken, requireAdmin, async (req
 });
 
 // Get user goals
-router.get('/users/:id/goals', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.get('/users/:id/goals', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id);
@@ -157,7 +158,7 @@ router.get('/users/:id/goals', authenticateToken, requireAdmin, async (req: any,
 });
 
 // Update user goals
-router.put('/users/:id/goals', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.put('/users/:id/goals', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id);
@@ -219,7 +220,7 @@ router.put('/users/:id/goals', authenticateToken, requireAdmin, async (req: any,
 });
 
 // Get user's today habits (admin view)
-router.get('/users/:id/today-habits', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.get('/users/:id/today-habits', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id);
@@ -257,7 +258,7 @@ router.get('/users/:id/today-habits', authenticateToken, requireAdmin, async (re
 });
 
 // Get user's step history
-router.get('/users/:id/step-history', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.get('/users/:id/step-history', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id);

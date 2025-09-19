@@ -1,4 +1,5 @@
-import express from 'express';
+﻿import express from 'express';
+import type { Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { validateRequest, ERROR_CODES, sendErrorResponse } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
@@ -6,12 +7,12 @@ import { db } from '../database.js';
 import {
   contentLibrarySchema,
   broadcastMessageSchema
-} from '../../shared/validation-schemas.js';
+} from '../shared-schemas.js';
 
 const router = express.Router();
 
 // Content Library Routes
-router.get('/content-library', authenticateToken, async (req: any, res: express.Response) => {
+router.get('/content-library', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { category } = req.query;
     console.log('Fetching content library for user:', req.user.email, 'category:', category);
@@ -41,7 +42,7 @@ router.post('/content-library',
   authenticateToken, 
   requireAdmin, 
   validateRequest(contentLibrarySchema),
-  async (req: any, res: express.Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { title, description, video_url, category, subcategory } = req.body;
       console.log('Admin creating content:', title, 'category:', category);
@@ -78,7 +79,7 @@ router.put('/content-library/:id',
   authenticateToken, 
   requireAdmin, 
   validateRequest(contentLibrarySchema),
-  async (req: any, res: express.Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { title, description, video_url, category, subcategory, is_active } = req.body;
@@ -117,7 +118,7 @@ router.put('/content-library/:id',
     }
   });
 
-router.delete('/content-library/:id', authenticateToken, requireAdmin, async (req: any, res: express.Response) => {
+router.delete('/content-library/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     console.log('Admin deleting content:', id);
@@ -142,7 +143,7 @@ router.delete('/content-library/:id', authenticateToken, requireAdmin, async (re
 });
 
 // Workout of Day Routes
-router.get('/workout-of-day', authenticateToken, async (req: any, res: express.Response) => {
+router.get('/workout-of-day', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('Fetching workout of day for user:', req.user.email);
     const workout = await db
@@ -157,7 +158,7 @@ router.get('/workout-of-day', authenticateToken, async (req: any, res: express.R
   } catch (error) {
     console.error('Error fetching workout of day:', error);
     await SystemLogger.logCriticalError('Workout of day fetch error', error as Error, { userId: req.user?.id, req });
-    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener entrenamiento del día');
+    sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Error al obtener entrenamiento del dÃ­a');
   }
 });
 
@@ -166,7 +167,7 @@ router.post('/broadcast',
   authenticateToken, 
   requireAdmin, 
   validateRequest(broadcastMessageSchema),
-  async (req: any, res: express.Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { message } = req.body;
       const senderId = req.user.id;
@@ -198,3 +199,4 @@ router.post('/broadcast',
   });
 
 export default router;
+

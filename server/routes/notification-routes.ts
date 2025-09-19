@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
 import { SystemLogger } from '../utils/logging.js';
@@ -19,7 +20,7 @@ const isVapidConfigured = (): boolean => {
 };
 
 // Get user notification preferences
-router.get('/preferences', authenticateToken, async (req: any, res) => {
+router.get('/preferences', authenticateToken, async (req: Request, res: Response) => {
   try {
     // Return disabled preferences when VAPID is not configured
     const defaultPreferences = {
@@ -39,7 +40,7 @@ router.get('/preferences', authenticateToken, async (req: any, res) => {
 });
 
 // Update user notification preferences
-router.put('/preferences', authenticateToken, async (req: any, res) => {
+router.put('/preferences', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!isVapidConfigured()) {
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Las notificaciones no están disponibles. VAPID no configurado.');
@@ -62,7 +63,7 @@ router.put('/preferences', authenticateToken, async (req: any, res) => {
 });
 
 // Subscribe to push notifications (disabled when VAPID not configured)
-router.post('/subscribe', authenticateToken, async (req: any, res) => {
+router.post('/subscribe', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!isVapidConfigured()) {
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Las notificaciones push están desactivadas. VAPID no configurado.');
@@ -78,7 +79,7 @@ router.post('/subscribe', authenticateToken, async (req: any, res) => {
 });
 
 // Unsubscribe from push notifications
-router.post('/unsubscribe', authenticateToken, async (req: any, res) => {
+router.post('/unsubscribe', authenticateToken, async (req: Request, res: Response) => {
   try {
     res.json({ success: true, vapid_configured: isVapidConfigured() });
   } catch (error) {
@@ -88,7 +89,7 @@ router.post('/unsubscribe', authenticateToken, async (req: any, res) => {
 });
 
 // Send test notification (disabled when VAPID not configured)
-router.post('/test', authenticateToken, async (req: any, res) => {
+router.post('/test', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!isVapidConfigured()) {
       sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Las notificaciones de prueba están desactivadas. VAPID no configurado.');
@@ -104,7 +105,7 @@ router.post('/test', authenticateToken, async (req: any, res) => {
 });
 
 // Send broadcast notification (disabled when VAPID not configured)
-router.post('/broadcast', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/broadcast', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const vapidConfigured = isVapidConfigured();
     const message = vapidConfigured ? 
@@ -125,7 +126,7 @@ router.post('/broadcast', authenticateToken, requireAdmin, async (req: any, res)
 });
 
 // Mark habit as complete from notification (disabled)
-router.post('/mark-complete', async (req, res) => {
+router.post('/mark-complete', async (req: Request, res: Response) => {
   try {
     sendErrorResponse(res, ERROR_CODES.SERVER_ERROR, 'Funcionalidad desactivada');
     return;
@@ -136,7 +137,7 @@ router.post('/mark-complete', async (req, res) => {
 });
 
 // Get VAPID public key
-router.get('/vapid-public-key', (req, res) => {
+router.get('/vapid-public-key', (req: Request, res: Response) => {
   const vapidConfigured = isVapidConfigured();
   
   if (vapidConfigured) {

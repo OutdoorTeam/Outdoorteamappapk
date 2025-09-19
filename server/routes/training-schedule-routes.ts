@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get user's active training schedule - fixed route path for user access
-router.get('/users/:userId/training-schedule', authenticateToken, async (req: any, res) => {
+router.get('/users/:userId/training-schedule', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
@@ -95,7 +96,7 @@ router.get('/users/:userId/training-schedule', authenticateToken, async (req: an
 });
 
 // Create or update training schedule (admin only)
-router.post('/users/:userId/training-schedule', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/users/:userId/training-schedule', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { plan_title, exercises_by_day } = req.body;
@@ -199,7 +200,7 @@ router.post('/users/:userId/training-schedule', authenticateToken, requireAdmin,
 });
 
 // Update specific exercise
-router.put('/training-exercises/:exerciseId', authenticateToken, requireAdmin, async (req: any, res) => {
+router.put('/training-exercises/:exerciseId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { exerciseId } = req.params;
     const updateData = req.body;
@@ -252,7 +253,7 @@ router.put('/training-exercises/:exerciseId', authenticateToken, requireAdmin, a
 });
 
 // Delete exercise
-router.delete('/training-exercises/:exerciseId', authenticateToken, requireAdmin, async (req: any, res) => {
+router.delete('/training-exercises/:exerciseId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { exerciseId } = req.params;
 

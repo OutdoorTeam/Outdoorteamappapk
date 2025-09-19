@@ -1,4 +1,4 @@
-﻿{
+{
   "compilerOptions": {
     "target": "ES2021",
     "module": "ES2020",
@@ -6,9 +6,11 @@
     "outDir": "dist",
     "rootDir": ".",
     "strict": true,
+    "skipLibCheck": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "types": ["node"],
+    "noImplicitAny": false
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "types/**/*.d.ts"],
   "exclude": ["dist", "node_modules"]
 }

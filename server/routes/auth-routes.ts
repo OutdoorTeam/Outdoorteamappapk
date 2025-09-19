@@ -1,5 +1,6 @@
 
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -9,7 +10,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Change password for authenticated user
-router.post('/change-password', authenticateToken, async (req: any, res) => {
+router.post('/change-password', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const { password } = req.body;

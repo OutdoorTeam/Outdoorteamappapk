@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get all plans (admin only)
-router.get('/plans-management', authenticateToken, requireAdmin, async (req: any, res) => {
+router.get('/plans-management', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     console.log('Admin fetching all plans for management');
 
@@ -34,7 +35,7 @@ router.get('/plans-management', authenticateToken, requireAdmin, async (req: any
 });
 
 // Update plan (admin only)
-router.put('/plans-management/:id', authenticateToken, requireAdmin, async (req: any, res) => {
+router.put('/plans-management/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, description, price, services_included, features_json, is_active } = req.body;
@@ -104,7 +105,7 @@ router.put('/plans-management/:id', authenticateToken, requireAdmin, async (req:
 });
 
 // Create new plan (admin only)
-router.post('/plans-management', authenticateToken, requireAdmin, async (req: any, res) => {
+router.post('/plans-management', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { name, description, price, services_included, features_json } = req.body;
 
@@ -179,7 +180,7 @@ router.post('/plans-management', authenticateToken, requireAdmin, async (req: an
 });
 
 // Delete plan (admin only)
-router.delete('/plans-management/:id', authenticateToken, requireAdmin, async (req: any, res) => {
+router.delete('/plans-management/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

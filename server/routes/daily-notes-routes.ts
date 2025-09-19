@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { db } from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { sendErrorResponse, ERROR_CODES } from '../utils/validation.js';
@@ -7,7 +8,7 @@ import { SystemLogger } from '../utils/logging.js';
 const router = Router();
 
 // Get today's note for the authenticated user
-router.get('/daily-notes/today', authenticateToken, async (req: any, res) => {
+router.get('/daily-notes/today', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const today = new Date().toISOString().split('T')[0];
@@ -32,7 +33,7 @@ router.get('/daily-notes/today', authenticateToken, async (req: any, res) => {
 });
 
 // Get note by date for the authenticated user
-router.get('/daily-notes/:date', authenticateToken, async (req: any, res) => {
+router.get('/daily-notes/:date', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const { date } = req.params;
@@ -63,7 +64,7 @@ router.get('/daily-notes/:date', authenticateToken, async (req: any, res) => {
 });
 
 // Save/update note
-router.post('/daily-notes', authenticateToken, async (req: any, res) => {
+router.post('/daily-notes', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user.id;
     const { content, date } = req.body;
