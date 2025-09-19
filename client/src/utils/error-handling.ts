@@ -11,7 +11,7 @@ export interface ApiErrorResponse {
 }
 
 // Generic API request function with error handling
-export async function apiRequest<T>(
+export async function apiRequest<T = any>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {

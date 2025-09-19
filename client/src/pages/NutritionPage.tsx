@@ -19,7 +19,7 @@ const NutritionPage: React.FC = () => {
   const hasNutritionAccess = user?.features?.nutrition || false;
   
   // Fetch user's nutrition plan
-  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(user?.id || 0);
+  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(user?.id ?? null);
   
   // Daily habits for completion tracking
   const { data: todayHabits } = useTodayHabits();

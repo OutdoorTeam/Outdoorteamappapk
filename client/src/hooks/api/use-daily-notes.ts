@@ -1,63 +1,73 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/utils/error-handling';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface DailyNote {
-  id?: number;
-  user_id?: number;
   content: string;
   date: string;
-  created_at?: string;
 }
 
-// Query keys
+const buildStorageKey = (userId: string, date: string) => `daily-note:${userId}:${date}`;
+
 export const DAILY_NOTES_KEYS = {
   all: ['daily-notes'] as const,
-  today: () => [...DAILY_NOTES_KEYS.all, 'today'] as const,
-  byDate: (date: string) => [...DAILY_NOTES_KEYS.all, 'date', date] as const,
+  today: (userId?: string) => ['daily-notes', 'today', userId ?? 'anonymous'] as const,
+  byDate: (userId: string | undefined, date: string) => ['daily-notes', 'date', userId ?? 'anonymous', date] as const,
 };
 
-// Hook to get today's note
 export function useTodayNote() {
+  const { user } = useAuth();
+  const today = new Date().toISOString().split('T')[0];
+
   return useQuery({
-    queryKey: DAILY_NOTES_KEYS.today(),
-    queryFn: () => apiRequest<DailyNote>('/api/daily-notes/today'),
-    staleTime: 30 * 1000, // 30 seconds
-    refetchOnWindowFocus: true,
+    queryKey: DAILY_NOTES_KEYS.today(user?.id),
+    enabled: Boolean(user?.id),
+    queryFn: async (): Promise<DailyNote> => {
+      if (!user) throw new Error('Usuario no autenticado');
+
+      if (typeof window === 'undefined') {
+        return { content: '', date: today };
+      }
+
+      const stored = window.localStorage.getItem(buildStorageKey(user.id, today));
+      return { content: stored ?? '', date: today };
+    },
   });
 }
 
-// Hook to get note by specific date
 export function useDailyNote(date: string) {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: DAILY_NOTES_KEYS.byDate(date),
-    queryFn: () => apiRequest<DailyNote>(`/api/daily-notes/${date}`),
-    enabled: !!date,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryKey: DAILY_NOTES_KEYS.byDate(user?.id, date),
+    enabled: Boolean(user?.id && date),
+    queryFn: async (): Promise<DailyNote> => {
+      if (!user) throw new Error('Usuario no autenticado');
+      if (typeof window === 'undefined') {
+        return { content: '', date };
+      }
+      const stored = window.localStorage.getItem(buildStorageKey(user.id, date));
+      return { content: stored ?? '', date };
+    },
   });
 }
 
-// Mutation to save/update note
 export function useSaveNote() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: (data: { content: string; date: string }) =>
-      apiRequest<DailyNote>('/api/daily-notes', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    onSuccess: (data, variables) => {
-      // Update today's note if it's for today
-      const today = new Date().toISOString().split('T')[0];
-      if (variables.date === today) {
-        queryClient.setQueryData(DAILY_NOTES_KEYS.today(), data);
+    mutationFn: async ({ content, date }: { content: string; date: string }) => {
+      if (!user) throw new Error('Usuario no autenticado');
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(buildStorageKey(user.id, date), content);
       }
-      
-      // Update specific date query
-      queryClient.setQueryData(DAILY_NOTES_KEYS.byDate(variables.date), data);
-      
-      // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: DAILY_NOTES_KEYS.all });
+      return { content, date } as DailyNote;
+    },
+    onSuccess: (note) => {
+      queryClient.setQueryData(DAILY_NOTES_KEYS.today(user?.id), note);
+      if (user) {
+        queryClient.setQueryData(DAILY_NOTES_KEYS.byDate(user.id, note.date), note);
+      }
     },
   });
 }

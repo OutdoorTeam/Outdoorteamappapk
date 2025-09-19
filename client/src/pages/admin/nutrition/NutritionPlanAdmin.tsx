@@ -19,8 +19,8 @@ const NutritionPlanAdmin: React.FC = () => {
 
   // Fetch users and nutrition plan data
   const { data: users } = useUsers();
-  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(selectedUserId || 0);
-  const upsertPlanMutation = useUpsertNutritionPlan(selectedUserId || 0);
+  const { data: nutritionData, isLoading: planLoading } = useNutritionPlan(selectedUserId ? selectedUserId.toString() : null);
+  const upsertPlanMutation = useUpsertNutritionPlan(selectedUserId?.toString() ?? '');
 
   // Update content when plan data changes - fixed dependency array
   React.useEffect(() => {

@@ -1,22 +1,19 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
+import { buildAccessModel, type AccessFeatures, type AccessModel } from '@/lib/userAccess';
 
-interface UserFeatures {
-  habits: boolean;
-  training: boolean;
-  nutrition: boolean;
-  meditation: boolean;
-  active_breaks: boolean;
-}
+export type UserFeatures = AccessFeatures;
 
 export interface AppUser {
   id: string;
   email: string;
   full_name: string;
-  role: string;
-  plan_type?: string | null;
+  role: 'admin' | 'user';
+  plan_type: string | null;
   features: UserFeatures;
+  avatar_url: string | null;
+  access: AccessModel;
 }
 
 type AuthContextShape = {
@@ -26,7 +23,7 @@ type AuthContextShape = {
   login: (email: string, password: string) => Promise<{ error: any | null }>;
   logout: () => Promise<void>;
   register: (fullName: string, email: string, password: string) => Promise<void>;
-  assignPlan: (planId: number) => Promise<void>;
+  assignPlan: (planId: string | null) => Promise<void>;
   refreshUser: () => Promise<void>;
 };
 
@@ -36,34 +33,6 @@ export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
   return ctx;
-};
-
-const parseFeatures = (raw: unknown): UserFeatures => {
-  try {
-    const data = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? {});
-    return {
-      habits: !!(data as any).habits,
-      training: !!(data as any).training,
-      nutrition: !!(data as any).nutrition,
-      meditation: !!(data as any).meditation,
-      active_breaks: !!(data as any).active_breaks,
-    };
-  } catch {
-    return { habits: true, training: true, nutrition: true, meditation: true, active_breaks: true };
-  }
-};
-
-const coalesceName = (u: SupabaseAuthUser | null, row?: any): string =>
-  row?.full_name ?? u?.user_metadata?.full_name ?? u?.user_metadata?.name ?? '';
-
-const fetchProfile = async (uid: string) => {
-  const fromUsers = await supabase.from('users').select('*').eq('id', uid).single();
-  if (!fromUsers.error && fromUsers.data) return { row: fromUsers.data };
-
-  const fromProfiles = await supabase.from('profiles').select('*').eq('id', uid).single();
-  if (!fromProfiles.error && fromProfiles.data) return { row: fromProfiles.data };
-
-  return { row: null };
 };
 
 const tryRehydrateFromLocalStorage = async (): Promise<boolean> => {
@@ -95,19 +64,65 @@ const tryRehydrateFromLocalStorage = async (): Promise<boolean> => {
   return false;
 };
 
+const loadAccessModel = async (sessionUser: SupabaseAuthUser): Promise<AccessModel> => {
+  const userPromise = supabase.from('users').select('*').eq('id', sessionUser.id).maybeSingle();
+  const profilePromise = supabase.from('profiles').select('*').eq('id', sessionUser.id).maybeSingle();
+  const entitlementPromise = supabase
+    .from('entitlements')
+    .select('*')
+    .eq('user_id', sessionUser.id)
+    .eq('active', true)
+    .limit(1)
+    .maybeSingle();
+
+  const [{ data: userRow, error: userError }, { data: profileRow, error: profileError }, entitlementResponse] =
+    await Promise.all([userPromise, profilePromise, entitlementPromise]);
+
+  if (userError && userError.code !== 'PGRST116') {
+    console.warn('[Auth] user fetch error', userError.message);
+  }
+  if (profileError && profileError.code !== 'PGRST116') {
+    console.warn('[Auth] profile fetch error', profileError.message);
+  }
+
+  let planRow = null;
+  const subscriptionPlanId = userRow?.subscription_plan_id ?? null;
+  if (subscriptionPlanId) {
+    const { data: planData, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('id', subscriptionPlanId)
+      .maybeSingle();
+    if (planError && planError.code !== 'PGRST116') {
+      console.warn('[Auth] subscription plan fetch error', planError.message);
+    }
+    planRow = planData ?? null;
+  }
+
+  const entitlementRow = entitlementResponse.error ? null : entitlementResponse.data ?? null;
+
+  return buildAccessModel({
+    user: userRow ?? null,
+    profile: profileRow ?? null,
+    plan: planRow,
+    entitlement: entitlementRow,
+    fallbackEmail: sessionUser.email ?? undefined,
+    fallbackId: sessionUser.id,
+  });
+};
+
 const hydrateUser = async (sessionUser: SupabaseAuthUser | null): Promise<AppUser | null> => {
   if (!sessionUser) return null;
-  const profile = await fetchProfile(sessionUser.id);
-
-  const role = (profile.row?.role as string) ?? (profile.row?.is_admin ? 'admin' : 'user');
-
+  const access = await loadAccessModel(sessionUser);
   return {
-    id: sessionUser.id,
-    email: sessionUser.email ?? '',
-    full_name: coalesceName(sessionUser, profile.row),
-    role,
-    plan_type: profile.row?.plan_type ?? null,
-    features: parseFeatures(profile.row?.features_json ?? profile.row?.features),
+    id: access.id,
+    email: access.email,
+    full_name: access.displayName,
+    role: access.role,
+    plan_type: access.plan.name,
+    features: access.features,
+    avatar_url: access.avatarUrl,
+    access,
   };
 };
 
@@ -223,9 +238,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const assignPlan = async (planId: number) => {
+  const assignPlan = async (planId: string | null) => {
     if (!user) return;
-    await supabase.from('users').update({ plan_type: String(planId) }).eq('id', user.id);
+    await supabase.from('users').update({ subscription_plan_id: planId }).eq('id', user.id);
     await refreshUser();
   };
 

@@ -6,50 +6,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { Play, Filter, Clock, Target, Dumbbell, Heart, Zap } from 'lucide-react';
 import { useContentLibrary } from '@/hooks/api/use-content-library';
+import type { ContentLibraryItem } from '@/hooks/api/use-content-library';
 import { getYouTubeThumbnail } from '@/utils/youtube';
-
-interface Exercise {
-  id: number;
-  title: string;
-  description: string;
-  video_url: string;
-  category: string;
-  subcategory: string;
-  duration?: string;
-  difficulty?: string;
-}
 
 const ExercisesPage: React.FC = () => {
   const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = React.useState('all');
   
-  // Use React Query hook for exercise category
   const { data: exercises = [], isLoading, error } = useContentLibrary('exercise');
 
-  // Filter exercises based on selected category
+  const getCategoryLabel = React.useCallback((subcategory: string | null) => {
+    if (subcategory && subcategory.trim().length > 0) {
+      return subcategory.trim();
+    }
+    return 'General';
+  }, []);
+
   const filteredExercises = React.useMemo(() => {
     if (selectedCategory === 'all') {
       return exercises;
     }
-    return exercises.filter((ex: Exercise) => ex.subcategory === selectedCategory);
-  }, [exercises, selectedCategory]);
+    return exercises.filter((ex) => getCategoryLabel(ex.subcategory ?? null) === selectedCategory);
+  }, [exercises, selectedCategory, getCategoryLabel]);
 
-  // Get unique categories from exercises
   const uniqueCategories = React.useMemo(() => {
-    const categories = [...new Set(exercises.map((ex: Exercise) => ex.subcategory).filter(Boolean))];
-    return categories;
-  }, [exercises]);
-
-  // Group exercises by category
-  const groupedExercises = React.useMemo(() => {
-    const grouped: {[key: string]: Exercise[]} = {};
-    
-    uniqueCategories.forEach(category => {
-      grouped[category] = exercises.filter((ex: Exercise) => ex.subcategory === category);
+    const categorySet = new Set<string>();
+    exercises.forEach((ex) => {
+      categorySet.add(getCategoryLabel(ex.subcategory ?? null));
     });
+    return Array.from(categorySet).sort();
+  }, [exercises, getCategoryLabel]);
 
-    return grouped;
-  }, [exercises, uniqueCategories]);
+  const groupedEntries = React.useMemo(() => {
+    const groups = new Map<string, ContentLibraryItem[]>();
+    exercises.forEach((ex) => {
+      const label = getCategoryLabel(ex.subcategory ?? null);
+      const current = groups.get(label);
+      if (current) {
+        current.push(ex);
+      } else {
+        groups.set(label, [ex]);
+      }
+    });
+    return Array.from(groups.entries());
+  }, [exercises, getCategoryLabel]);
 
   const getCategoryIcon = (category: string) => {
     const lowerCategory = category?.toLowerCase() || '';
@@ -69,7 +69,7 @@ const ExercisesPage: React.FC = () => {
     return <Play className="w-5 h-5 text-gray-500" />;
   };
 
-  const openVideo = (videoUrl: string, title: string) => {
+  const openVideo = (videoUrl: string | null, title: string) => {
     if (videoUrl && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))) {
       window.open(videoUrl, '_blank');
     } else {
@@ -141,8 +141,8 @@ const ExercisesPage: React.FC = () => {
         </Card>
 
         {/* Exercises by Category */}
-        {Object.keys(groupedExercises).length > 0 ? (
-          Object.entries(groupedExercises).map(([category, categoryExercises]) => (
+        {groupedEntries.length > 0 ? (
+          groupedEntries.map(([category, categoryExercises]) => (
             <Card key={category} className="border-l-4 border-l-primary">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -203,10 +203,10 @@ const ExercisesPage: React.FC = () => {
                         </CardHeader>
                         
                         <CardContent className="space-y-4">
-                          {exercise.duration && (
+                          {exercise.duration_minutes && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="w-4 h-4" />
-                              <span>{exercise.duration}</span>
+                              <span>{`${exercise.duration_minutes} min`}</span>
                             </div>
                           )}
                           

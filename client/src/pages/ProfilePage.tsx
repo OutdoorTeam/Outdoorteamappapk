@@ -18,8 +18,15 @@ import { apiRequest, parseApiError, getErrorMessage } from '@/utils/error-handli
 
 const ProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth();
-  const { data: userStats, isLoading: statsLoading, error: statsError } = useUserStats(user?.id || 0);
+  const { data: userStats, isLoading: statsLoading, error: statsError } = useUserStats(user?.id);
   const { toast } = useToast();
+  const createdAt = user?.access.raw.user?.created_at ?? null;
+  const habitCompletion = {
+    training: userStats?.habit_completion?.training ?? 0,
+    nutrition: userStats?.habit_completion?.nutrition ?? 0,
+    movement: userStats?.habit_completion?.movement ?? 0,
+    meditation: userStats?.habit_completion?.meditation ?? 0,
+  };
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
@@ -127,7 +134,7 @@ const ProfilePage: React.FC = () => {
                     <Label>Fecha de Registro</Label>
                     <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
                       <Calendar className="w-4 h-4 text-gray-600" />
-                      <span className="text-gray-600">{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</span>
+                      <span className="text-gray-600">{createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A'}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -230,9 +237,36 @@ const ProfilePage: React.FC = () => {
               <StatsSummary weeklyStats={{ totalPoints: userStats.weekly_points, totalSteps: userStats.average_steps * 7, totalMeditationSessions: 0, totalMeditationMinutes: 0, averageDailyPoints: userStats.average_daily_points }} monthlyStats={{ totalPoints: userStats.weekly_points * 4, totalSteps: userStats.average_steps * 30, totalMeditationSessions: 0, totalMeditationMinutes: 0 }} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <WeeklyPointsChart data={userStats.weekly_data?.map(day => ({ ...day, steps: userStats.average_steps, meditationSessions: 0, meditationMinutes: 0 })) || []} />
-                <HabitCompletionDonut data={userStats.habit_completion || {}} />
+                <HabitCompletionDonut data={habitCompletion} />
               </div>
-              <MonthlyHabitsChart data={[{ name: 'Entrenamiento', completed: Math.round((userStats.habit_completion?.training / 100 || 0) * userStats.total_active_days), total: userStats.total_active_days, percentage: Math.round(userStats.habit_completion?.training || 0) }, { name: 'Nutrición', completed: Math.round((userStats.habit_completion?.nutrition / 100 || 0) * userStats.total_active_days), total: userStats.total_active_days, percentage: Math.round(userStats.habit_completion?.nutrition || 0) }, { name: 'Movimiento', completed: Math.round((userStats.habit_completion?.movement / 100 || 0) * userStats.total_active_days), total: userStats.total_active_days, percentage: Math.round(userStats.habit_completion?.movement || 0) }, { name: 'Meditación', completed: Math.round((userStats.habit_completion?.meditation / 100 || 0) * userStats.total_active_days), total: userStats.total_active_days, percentage: Math.round(userStats.habit_completion?.meditation || 0) }]} />
+                            <MonthlyHabitsChart
+                data={[
+                  {
+                    name: "Entrenamiento",
+                    completed: Math.round((habitCompletion.training / 100) * (userStats.total_active_days ?? 0)),
+                    total: userStats.total_active_days ?? 0,
+                    percentage: Math.round(habitCompletion.training),
+                  },
+                  {
+                    name: "Nutrici�n",
+                    completed: Math.round((habitCompletion.nutrition / 100) * (userStats.total_active_days ?? 0)),
+                    total: userStats.total_active_days ?? 0,
+                    percentage: Math.round(habitCompletion.nutrition),
+                  },
+                  {
+                    name: "Movimiento",
+                    completed: Math.round((habitCompletion.movement / 100) * (userStats.total_active_days ?? 0)),
+                    total: userStats.total_active_days ?? 0,
+                    percentage: Math.round(habitCompletion.movement),
+                  },
+                  {
+                    name: "Meditaci�n",
+                    completed: Math.round((habitCompletion.meditation / 100) * (userStats.total_active_days ?? 0)),
+                    total: userStats.total_active_days ?? 0,
+                    percentage: Math.round(habitCompletion.meditation),
+                  },
+                ]}
+              />
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Puntos Totales</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-primary">{userStats.weekly_points * 4 || 0}</div><div className="text-xs text-muted-foreground">Últimos 30 días</div></CardContent></Card>
                 <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Pasos Promedio</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600">{userStats.average_steps?.toLocaleString() || 0}</div><div className="text-xs text-muted-foreground">Por día</div></CardContent></Card>
@@ -252,3 +286,7 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+
+
+
+

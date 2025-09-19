@@ -1,28 +1,49 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/utils/error-handling';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import type { Tables } from '@/lib/database.types';
 
 export interface UserGoals {
-  id: number;
-  user_id: number;
+  user_id: string;
   daily_steps_goal: number;
   weekly_points_goal: number;
-  created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
-// Query keys
 export const USER_GOALS_KEYS = {
   all: ['user-goals'] as const,
-  byUser: (userId: number) => [...USER_GOALS_KEYS.all, 'user', userId] as const,
-  my: () => [...USER_GOALS_KEYS.all, 'my-goals'] as const,
+  my: (userId?: string) => ['user-goals', 'my', userId ?? 'anonymous'] as const,
 };
 
-// Hook to get current user's goals
+const mapGoalsRow = (row: Tables<'goals'>): UserGoals => ({
+  user_id: row.user_id,
+  daily_steps_goal: row.daily_steps_goal ?? 8000,
+  weekly_points_goal: row.week_points_goal ?? 28,
+  updated_at: row.updated_at ?? null,
+});
+
 export function useMyGoals() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: USER_GOALS_KEYS.my(),
-    queryFn: () => apiRequest<UserGoals>('/api/my-goals'),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryKey: USER_GOALS_KEYS.my(user?.id),
+    enabled: Boolean(user?.id),
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
+    queryFn: async () => {
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return data ? mapGoalsRow(data) : null;
+    },
   });
 }

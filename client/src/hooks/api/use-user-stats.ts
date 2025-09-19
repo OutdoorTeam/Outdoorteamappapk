@@ -30,15 +30,15 @@ export interface UserStats {
 // Query keys
 export const USER_STATS_KEYS = {
   all: ['user-stats'] as const,
-  byUser: (userId: number) => [...USER_STATS_KEYS.all, 'user', userId] as const,
+  byUser: (userId: string | null | undefined) => [...USER_STATS_KEYS.all, 'user', userId ?? ''] as const,
 };
 
 // Hook to get user statistics (admin view)
-export function useUserStats(userId: number) {
+export function useUserStats(userId: string | null | undefined) {
   return useQuery({
     queryKey: USER_STATS_KEYS.byUser(userId),
     queryFn: () => apiRequest<UserStats>(`/api/stats/user/${userId}`),
-    enabled: !!userId,
+    enabled: Boolean(userId),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

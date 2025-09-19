@@ -1,18 +1,23 @@
-// Stub de cliente API para desarrollo sin backend
-type Resp<T = any> = Promise<{ data: T }>;
-const ok = <T = any>(data: T = null as any): Resp<T> => Promise.resolve({ data });
+// client/src/lib/apiClient.ts
+export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+    ...init,
+  });
 
-const DISABLED = import.meta.env.VITE_DISABLE_API === 'true';
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`HTTP ${response.status} ñ ${text}`.trim());
+  }
 
-// Interface "axios-like" m√≠nima
-export const api = DISABLED
-  ? {
-      get: ok,
-      post: ok,
-      put: ok,
-      delete: ok,
-    }
-  : (await import('axios')).default.create({ baseURL: '/api' });
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
 
 export default api;
-

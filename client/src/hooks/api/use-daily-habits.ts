@@ -1,105 +1,217 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/utils/error-handling';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
+import { toBool } from '@/utils/normalize';
+import type { Tables } from '@/lib/database.types';
 
-// Query keys
-export const DAILY_HABITS_KEYS = {
-  all: ['daily-habits'] as const,
-  today: () => [...DAILY_HABITS_KEYS.all, 'today'] as const,
-  weeklyPoints: () => [...DAILY_HABITS_KEYS.all, 'weekly-points'] as const,
-  calendar: () => [...DAILY_HABITS_KEYS.all, 'calendar'] as const,
+const formatISODate = (date: Date): string => date.toISOString().split('T')[0];
+
+const computePoints = (row: Tables<'habit_logs'>): number =>
+  (toBool(row.exercise) ? 1 : 0) +
+  (toBool(row.nutrition) ? 1 : 0) +
+  (toBool(row.movement) ? 1 : 0) +
+  (toBool(row.meditation) ? 1 : 0);
+
+const mapHabitRow = (row: Tables<'habit_logs'>) => ({
+  training_completed: toBool(row.exercise),
+  nutrition_completed: toBool(row.nutrition),
+  movement_completed: toBool(row.movement),
+  meditation_completed: toBool(row.meditation),
+  steps: row.steps ?? 0,
+  daily_points: computePoints(row),
+});
+
+const ensureHabitLog = async (userId: string, date: string): Promise<Tables<'habit_logs'>> => {
+  let { data, error } = await supabase
+    .from('habit_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('day', date)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw error;
+  }
+
+  if (!data) {
+    const insertPayload = {
+      user_id: userId,
+      day: date,
+      exercise: false,
+      nutrition: false,
+      movement: false,
+      meditation: false,
+      steps: 0,
+    };
+
+    const inserted = await supabase
+      .from('habit_logs')
+      .insert(insertPayload)
+      .select('*')
+      .single();
+
+    if (inserted.error) {
+      throw inserted.error;
+    }
+
+    data = inserted.data;
+  }
+
+  return data;
 };
 
-// Hook for today's habits
+export const DAILY_HABITS_KEYS = {
+  all: ['daily-habits'] as const,
+  today: (userId?: string) => ['daily-habits', 'today', userId ?? 'anonymous'] as const,
+  weeklyPoints: (userId?: string) => ['daily-habits', 'weekly-points', userId ?? 'anonymous'] as const,
+  calendar: (userId?: string) => ['daily-habits', 'calendar', userId ?? 'anonymous'] as const,
+};
+
 export function useTodayHabits() {
+  const { user } = useAuth();
+  const todayIso = formatISODate(new Date());
+
   return useQuery({
-    queryKey: DAILY_HABITS_KEYS.today(),
-    queryFn: () => apiRequest('/api/daily-habits/today'),
-    staleTime: 30 * 1000, // 30 seconds for real-time data
-    refetchInterval: 60 * 1000, // Refresh every minute when tab is active
+    queryKey: DAILY_HABITS_KEYS.today(user?.id),
+    enabled: Boolean(user?.id),
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
     refetchOnWindowFocus: true,
+    queryFn: async () => {
+      if (!user) throw new Error('Usuario no autenticado');
+      const habitRow = await ensureHabitLog(user.id, todayIso);
+      return mapHabitRow(habitRow);
+    },
   });
 }
 
-// Hook for weekly points
 export function useWeeklyPoints() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: DAILY_HABITS_KEYS.weeklyPoints(),
-    queryFn: () => apiRequest('/api/daily-habits/weekly-points'),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryKey: DAILY_HABITS_KEYS.weeklyPoints(user?.id),
+    enabled: Boolean(user?.id),
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
+    queryFn: async () => {
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+
+      const fromIso = formatISODate(weekStart);
+      const toIso = formatISODate(today);
+
+      const { data, error } = await supabase
+        .from('habit_logs')
+        .select('day, exercise, nutrition, movement, meditation')
+        .eq('user_id', user.id)
+        .gte('day', fromIso)
+        .lte('day', toIso)
+        .order('day', { ascending: true });
+
+      if (error) throw error;
+
+      const dailyData = (data ?? []).map((row) => ({
+        date: row.day,
+        daily_points: computePoints(row as Tables<'habit_logs'>),
+      }));
+
+      const totalPoints = dailyData.reduce((sum, entry) => sum + entry.daily_points, 0);
+
+      return { total_points: totalPoints, daily_data: dailyData, week_start: fromIso };
+    },
   });
 }
 
-// Hook for calendar data
 export function useCalendarData() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: DAILY_HABITS_KEYS.calendar(),
-    queryFn: () => apiRequest('/api/daily-habits/calendar'),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: DAILY_HABITS_KEYS.calendar(user?.id),
+    enabled: Boolean(user?.id),
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    queryFn: async () => {
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const today = new Date();
+      const start = new Date(today);
+      start.setMonth(start.getMonth() - 3);
+
+      const fromIso = formatISODate(start);
+      const toIso = formatISODate(today);
+
+      const { data, error } = await supabase
+        .from('habit_logs')
+        .select('day, exercise, nutrition, movement, meditation')
+        .eq('user_id', user.id)
+        .gte('day', fromIso)
+        .lte('day', toIso);
+
+      if (error) throw error;
+
+      return (data ?? []).map((row) => ({
+        date: row.day,
+        daily_points: computePoints(row as Tables<'habit_logs'>),
+      }));
+    },
   });
 }
 
-// Mutation for updating habits
 export function useUpdateHabit() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       date: string;
       training_completed?: boolean;
       nutrition_completed?: boolean;
       movement_completed?: boolean;
       meditation_completed?: boolean;
       steps?: number;
-    }) => 
-      apiRequest('/api/daily-habits/update', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    onSuccess: (data, variables) => {
-      // Invalidate and refetch related queries
-      queryClient.invalidateQueries({ queryKey: DAILY_HABITS_KEYS.today() });
-      queryClient.invalidateQueries({ queryKey: DAILY_HABITS_KEYS.weeklyPoints() });
-      queryClient.invalidateQueries({ queryKey: DAILY_HABITS_KEYS.calendar() });
+    }) => {
+      if (!user) throw new Error('Usuario no autenticado');
 
-      // Optimistic update for today's habits
-      queryClient.setQueryData(DAILY_HABITS_KEYS.today(), (oldData: any) => ({
-        ...oldData,
-        ...variables,
-        daily_points: data.daily_points,
-      }));
+      await ensureHabitLog(user.id, data.date);
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+      if (typeof data.training_completed !== 'undefined') {
+        updates.exercise = data.training_completed;
+      }
+      if (typeof data.nutrition_completed !== 'undefined') {
+        updates.nutrition = data.nutrition_completed;
+      }
+      if (typeof data.movement_completed !== 'undefined') {
+        updates.movement = data.movement_completed;
+      }
+      if (typeof data.meditation_completed !== 'undefined') {
+        updates.meditation = data.meditation_completed;
+      }
+      if (typeof data.steps !== 'undefined') {
+        updates.steps = data.steps;
+      }
+
+      const { data: updatedRows, error } = await supabase
+        .from('habit_logs')
+        .update(updates)
+        .eq('id', habitRow.id)
+        .select('*')
+
+      if (error) throw error;
+      const updated = updatedRows?.[0] as Tables<'habit_logs'>;
+      return mapHabitRow(updated);
+    },
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(DAILY_HABITS_KEYS.today(user?.id), result);
+      queryClient.invalidateQueries({ queryKey: DAILY_HABITS_KEYS.weeklyPoints(user?.id) });
+      queryClient.invalidateQueries({ queryKey: DAILY_HABITS_KEYS.calendar(user?.id) });
     },
   });
 }
 
-/**
- * Composite hook that aggregates all daily habits related functionality.
- * 
- * ARCHITECTURE DECISION: Opción B - Wrapper Hook
- * 
- * Why this approach over refactoring all imports (Opción A)?
- * 
- * 1. BACKWARD COMPATIBILITY: Existing components importing useDailyHabits continue working
- *    without breaking changes, following semantic versioning principles.
- * 
- * 2. DEVELOPER EXPERIENCE: Provides a single import for components that need multiple 
- *    habits operations, reducing import complexity and cognitive load.
- * 
- * 3. CONSISTENCY: Matches the expected pattern where components expect a unified interface
- *    for related operations (habits data + mutation in one place).
- * 
- * 4. COMPOSITION OVER FRAGMENTATION: Follows React Query best practices of composing
- *    multiple queries/mutations into logical units while keeping individual hooks available
- *    for granular use cases.
- * 
- * 5. FUTURE EXTENSIBILITY: Easy to add new habits-related functionality to this wrapper
- *    without changing consumer components.
- * 
- * 6. SEPARATION OF CONCERNS: Maintains granular hooks (useTodayHabits, useWeeklyPoints, etc.)
- *    for components that only need specific functionality, while providing a unified API
- *    for complex use cases.
- */
 export function useDailyHabits() {
   const todayHabits = useTodayHabits();
   const weeklyPoints = useWeeklyPoints();
@@ -107,25 +219,16 @@ export function useDailyHabits() {
   const updateHabitMutation = useUpdateHabit();
 
   return {
-    // Today's habits data and loading state
     data: todayHabits.data,
     isLoading: todayHabits.isLoading,
     error: todayHabits.error,
-    
-    // Weekly summary
     weeklyData: weeklyPoints.data,
     weeklyLoading: weeklyPoints.isLoading,
-    
-    // Calendar view data (fixed duplicate key)
     calendarHabits: calendarData.data,
     calendarLoading: calendarData.isLoading,
-    
-    // Mutation function for updating habits
     mutate: updateHabitMutation.mutateAsync,
     updateHabit: updateHabitMutation.mutateAsync,
     isPending: updateHabitMutation.isPending,
-    
-    // Individual hook access for advanced use cases
     todayHabits,
     weeklyPoints,
     updateHabitMutation,

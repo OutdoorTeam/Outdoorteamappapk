@@ -8,7 +8,7 @@ export interface ContentLibraryItem {
   video_url: string | null;
   category: string;
   subcategory: string | null;
-  is_active: number;
+  is_active: boolean;
   created_at: string;
   video_type?: string;
   duration_minutes?: number;
@@ -16,23 +16,30 @@ export interface ContentLibraryItem {
   tags?: string;
 }
 
+type RawContentLibraryItem = Omit<ContentLibraryItem, 'is_active'> & { is_active: number };
+
+const normalizeItem = (item: RawContentLibraryItem): ContentLibraryItem => ({
+  ...item,
+  is_active: Boolean(item.is_active),
+});
+
 // Query keys
 export const CONTENT_LIBRARY_KEYS = {
   all: ['content-library'] as const,
-  byCategory: (category?: string) => category 
-    ? [...CONTENT_LIBRARY_KEYS.all, 'category', category] 
-    : CONTENT_LIBRARY_KEYS.all,
+  byCategory: (category?: string) =>
+    category ? [...CONTENT_LIBRARY_KEYS.all, 'category', category] : CONTENT_LIBRARY_KEYS.all,
 };
 
 // Hook to get content library items
 export function useContentLibrary(category?: string) {
   return useQuery({
     queryKey: CONTENT_LIBRARY_KEYS.byCategory(category),
-    queryFn: () => {
-      const url = category 
+    queryFn: async () => {
+      const url = category
         ? `/api/content-library?category=${encodeURIComponent(category)}`
         : '/api/content-library';
-      return apiRequest<ContentLibraryItem[]>(url);
+      const items = await apiRequest<RawContentLibraryItem[]>(url);
+      return items.map(normalizeItem);
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

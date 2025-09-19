@@ -8,7 +8,7 @@ import { Play, Clock, RotateCcw, BookOpen, Calendar } from "lucide-react";
 
 const TrainingPage: React.FC = () => {
   const { user } = useAuth();
-  const { data: scheduleData, isLoading: scheduleLoading } = useUserTrainingSchedule(user?.id || 0);
+  const { data: scheduleData, isLoading: scheduleLoading } = useUserTrainingSchedule(user?.id);
   const { data: contentLibrary, isLoading: contentLoading } = useContentLibrary('exercise');
 
   // Get video thumbnail from YouTube URL

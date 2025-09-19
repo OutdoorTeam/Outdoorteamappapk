@@ -15,12 +15,14 @@ import { useTodayNote, useSaveNote } from "@/hooks/api/use-daily-notes";
 import { useSaveMeditationSession } from "@/hooks/api/use-meditation";
 import { useMyGoals } from "@/hooks/api/use-user-goals";
 
+type HabitField = 'training_completed' | 'nutrition_completed' | 'movement_completed' | 'meditation_completed';
+
 const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [dailyNote, setDailyNote] = React.useState("");
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
-  const [isUpdating, setIsUpdating] = React.useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = React.useState<HabitField | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -47,7 +49,7 @@ const DashboardPage: React.FC = () => {
     }
   }, [todayNoteData]);
 
-  const handleUpdateHabit = async (habitType: string, completed: boolean) => {
+  const handleUpdateHabit = async (habitType: HabitField, completed: boolean) => {
     setIsUpdating(habitType);
     
     try {
@@ -122,7 +124,7 @@ const DashboardPage: React.FC = () => {
 
   const handleMeditationComplete = async (
     duration: number,
-    type: string,
+    type: 'guided' | 'free',
     comment: string,
   ) => {
     try {

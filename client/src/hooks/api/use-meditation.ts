@@ -1,49 +1,80 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/utils/error-handling';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface MeditationSession {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   duration_minutes: number;
   meditation_type: 'guided' | 'free';
-  breathing_cycle_json: string | null;
   comment: string | null;
   completed_at: string;
 }
 
-// Query keys
+const buildStorageKey = (userId: string) => `meditation-sessions:${userId}`;
+
 export const MEDITATION_KEYS = {
   all: ['meditation'] as const,
-  sessions: () => [...MEDITATION_KEYS.all, 'sessions'] as const,
+  sessions: (userId?: string) => ['meditation', 'sessions', userId ?? 'anonymous'] as const,
 };
 
-// Hook for meditation sessions
 export function useMeditationSessions() {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: MEDITATION_KEYS.sessions(),
-    queryFn: () => apiRequest<MeditationSession[]>('/api/meditation-sessions'),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryKey: MEDITATION_KEYS.sessions(user?.id),
+    enabled: Boolean(user?.id),
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+    queryFn: async (): Promise<MeditationSession[]> => {
+      if (!user || typeof window === 'undefined') return [];
+      const stored = window.localStorage.getItem(buildStorageKey(user.id));
+      if (!stored) return [];
+      try {
+        return JSON.parse(stored) as MeditationSession[];
+      } catch {
+        return [];
+      }
+    },
   });
 }
 
-// Mutation for saving meditation sessions
 export function useSaveMeditationSession() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: (data: {
-      duration_minutes: number;
-      meditation_type: 'guided' | 'free';
-      comment?: string;
-      breathing_cycle_json?: string;
-    }) =>
-      apiRequest<MeditationSession>('/api/meditation-sessions', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+    mutationFn: async (data: { duration_minutes: number; meditation_type: 'guided' | 'free'; comment?: string }) => {
+      if (!user) throw new Error('Usuario no autenticado');
+      if (typeof window === 'undefined') {
+        return null;
+      }
+
+      const storageKey = buildStorageKey(user.id);
+      const stored = window.localStorage.getItem(storageKey);
+      let sessions: MeditationSession[] = [];
+      if (stored) {
+        try {
+          sessions = JSON.parse(stored) as MeditationSession[];
+        } catch {
+          sessions = [];
+        }
+      }
+
+      const newSession: MeditationSession = {
+        id: `${Date.now()}`,
+        user_id: user.id,
+        duration_minutes: data.duration_minutes,
+        meditation_type: data.meditation_type,
+        comment: data.comment ?? null,
+        completed_at: new Date().toISOString(),
+      };
+
+      sessions.push(newSession);
+      window.localStorage.setItem(storageKey, JSON.stringify(sessions));
+      return newSession;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MEDITATION_KEYS.sessions() });
+      queryClient.invalidateQueries({ queryKey: MEDITATION_KEYS.sessions(user?.id) });
     },
   });
 }

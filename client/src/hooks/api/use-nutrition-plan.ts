@@ -2,12 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/utils/error-handling';
 
 export interface NutritionPlan {
-  id: number;
-  user_id: number;
+  id: number | string;
+  user_id: number | string;
   content_md: string | null;
   version: number;
   status: 'draft' | 'published';
-  created_by: number | null;
+  created_by: number | string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,22 +19,22 @@ export interface NutritionPlanResponse {
 
 // Query keys
 export const NUTRITION_PLAN_KEYS = {
-  all: ['nutrition-plans'] as const,
-  byUser: (userId: number) => [...NUTRITION_PLAN_KEYS.all, 'user', userId] as const,
+  all: ['nutrition-plan'] as const,
+  byUser: (userId: string | null | undefined) => ['nutrition-plan', userId ?? ''] as const,
 };
 
 // Get nutrition plan for a user
-export function useNutritionPlan(userId: number) {
+export function useNutritionPlan(userId: string | null | undefined) {
   return useQuery({
     queryKey: NUTRITION_PLAN_KEYS.byUser(userId),
     queryFn: () => apiRequest<NutritionPlanResponse>(`/api/nutrition-plan/${userId}`),
     staleTime: 2 * 60 * 1000, // 2 minutes
-    enabled: !!userId,
+    enabled: Boolean(userId),
   });
 }
 
 // Upsert nutrition plan (admin only)
-export function useUpsertNutritionPlan(userId: number) {
+export function useUpsertNutritionPlan(userId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -49,3 +49,4 @@ export function useUpsertNutritionPlan(userId: number) {
     },
   });
 }
+

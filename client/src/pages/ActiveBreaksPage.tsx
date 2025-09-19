@@ -195,7 +195,7 @@ const ActiveBreaksPage: React.FC = () => {
                         <Button 
                           size="sm" 
                           className="w-full"
-                          onClick={() => handleOpenVideo(video.video_url)}
+                          onClick={() => handleOpenVideo(video.video_url!)}
                         >
                           <ExternalLink className="w-4 h-4 mr-2" />
                           Ver Video

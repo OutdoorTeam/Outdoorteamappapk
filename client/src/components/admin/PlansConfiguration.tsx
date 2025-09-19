@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, DollarSign, Package, Settings, Save, X } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, Package, Settings, Save, X, Check } from 'lucide-react';
 import { apiRequest, parseApiError, getErrorMessage } from '@/utils/error-handling';
 
 interface ServicePlan {
@@ -149,7 +149,7 @@ const PlansConfiguration: React.FC = () => {
       }
 
       const requestData = { ...formData };
-      let savedPlan;
+      let savedPlan: ServicePlan;
 
       if (editingPlan) {
         savedPlan = await apiRequest<ServicePlan>(`/api/admin/plans-management/${editingPlan.id}`, {

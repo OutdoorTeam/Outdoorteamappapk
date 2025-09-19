@@ -17,7 +17,7 @@ interface ContentItem {
   video_url: string | null;
   category: string;
   subcategory: string | null;
-  is_active: number;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -94,7 +94,7 @@ const ContentManagement: React.FC = () => {
       video_url: content.video_url || '',
       category: content.category,
       subcategory: content.subcategory || '',
-      is_active: Boolean(content.is_active)
+      is_active: content.is_active
     });
     setIsFormOpen(true);
   };

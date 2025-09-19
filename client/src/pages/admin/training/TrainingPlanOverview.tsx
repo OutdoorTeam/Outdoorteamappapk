@@ -107,14 +107,14 @@ export const TrainingPlanOverview: React.FC<TrainingPlanOverviewProps> = ({
                 .map((day) => (
                   <Card 
                     key={day.id} 
-                    className={`cursor-pointer transition-colors hover:shadow-md ${getDayIntensityColor(day.exercises)}`}
+                    className={`cursor-pointer transition-colors hover:shadow-md ${getDayIntensityColor(day.exercises ?? [])}`}
                     onClick={() => onDaySelect(day.id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-medium">{day.title || `Día ${day.day_index}`}</h3>
                         <Badge variant="secondary" className="bg-white/50">
-                          {day.exercises.length} ejercicios
+                          {(day.exercises ?? []).length} ejercicios
                         </Badge>
                       </div>
                       
@@ -125,7 +125,7 @@ export const TrainingPlanOverview: React.FC<TrainingPlanOverviewProps> = ({
                       )}
 
                       <div className="space-y-2">
-                        {day.exercises.slice(0, 3).map((exercise, index) => (
+                        {(day.exercises ?? []).slice(0, 3).map((exercise, index) => (
                           <div key={exercise.id} className="text-sm">
                             <span className="font-medium">{exercise.exercise_name}</span>
                             {exercise.sets && exercise.reps && (
@@ -141,13 +141,13 @@ export const TrainingPlanOverview: React.FC<TrainingPlanOverviewProps> = ({
                           </div>
                         ))}
                         
-                        {day.exercises.length > 3 && (
+                        {(day.exercises ?? []).length > 3 && (
                           <p className="text-xs text-gray-500">
-                            +{day.exercises.length - 3} ejercicios más
+                            +{(day.exercises ?? []).length - 3} ejercicios más
                           </p>
                         )}
                         
-                        {day.exercises.length === 0 && (
+                        {(day.exercises ?? []).length === 0 && (
                           <p className="text-sm text-gray-500 italic">
                             Sin ejercicios asignados
                           </p>

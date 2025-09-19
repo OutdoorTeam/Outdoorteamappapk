@@ -1,3 +1,5 @@
+export type NotificationOptionsCompat = NotificationOptions & { vibrate?: number[] };
+
 // Check if browser supports notifications
 export const isNotificationSupported = (): boolean => {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -246,14 +248,16 @@ export const sendTestNotification = async () => {
       throw new Error('Notificaciones no disponibles');
     }
 
-    new Notification('Outdoor Team - Test', {
-      body: 'Esta es una notificaciÃ³n de prueba desde el navegador',
+    const options: NotificationOptionsCompat = {
+      body: 'Esta es una notificación de prueba desde el navegador',
       icon: '/assets/logo-gold.png',
       badge: '/assets/logo-gold.png',
       vibrate: [100, 50, 100],
       tag: 'test-notification',
-      requireInteraction: false
-    });
+      requireInteraction: false,
+    };
+
+    new Notification('Outdoor Team - Test', options as NotificationOptions);
   } catch (error) {
     console.error('Error sending test notification:', error);
     throw error;
@@ -273,3 +277,5 @@ export interface HabitNotification {
   time: string;
   enabled: boolean;
 }
+
+

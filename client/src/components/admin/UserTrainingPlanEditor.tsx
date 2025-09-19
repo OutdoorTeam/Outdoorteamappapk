@@ -21,9 +21,9 @@ interface UserTrainingPlanEditorProps {
 }
 
 interface ExerciseRow {
-  id?: number;
+  id?: number | string;
   exercise_name: string;
-  content_library_id: number | null;
+  content_library_id: number | string | null;
   video_url: string;
   sets: number | null;
   reps: string;

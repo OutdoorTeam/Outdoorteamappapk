@@ -135,15 +135,17 @@ const DiagnosticsPage: React.FC = () => {
   };
 
   const getLevelBadge = (level: string) => {
-    const variants = {
-      info: "default",
-      warn: "secondary",
-      error: "destructive",
-      critical: "destructive"
+    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      info: 'default',
+      warn: 'secondary',
+      error: 'destructive',
+      critical: 'destructive',
     };
-    
+
+    const badgeVariant = variants[level] ?? 'default';
+
     return (
-      <Badge variant={variants[level as keyof typeof variants] || "default"}>
+      <Badge variant={badgeVariant}>
         {level.toUpperCase()}
       </Badge>
     );
@@ -409,3 +411,4 @@ const DiagnosticsPage: React.FC = () => {
 };
 
 export default DiagnosticsPage;
+

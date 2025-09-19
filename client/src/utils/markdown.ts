@@ -6,6 +6,11 @@ marked.setOptions({
   gfm: true,
 });
 
+const parseMarkdown = (markdown: string): string => {
+  const parsed = marked.parse(markdown);
+  return typeof parsed === 'string' ? parsed : '';
+};
+
 export function markdownToSafeHtml(markdown: string): string {
   if (!markdown || typeof markdown !== 'string') {
     return '';
@@ -13,8 +18,8 @@ export function markdownToSafeHtml(markdown: string): string {
 
   try {
     // Convert markdown to HTML
-    const html = marked(markdown);
-    
+    const html = parseMarkdown(markdown);
+
     // Basic HTML sanitization - removing dangerous tags and attributes
     const safeHtml = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -36,7 +41,7 @@ export function stripMarkdown(markdown: string): string {
 
   try {
     // Convert to HTML first
-    const html = marked(markdown);
+    const html = parseMarkdown(markdown);
     // Strip all HTML tags
     return html.replace(/<[^>]*>/g, '').trim();
   } catch (error) {
