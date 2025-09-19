@@ -1,4 +1,4 @@
-
+﻿
 import express from 'express';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -68,7 +68,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 
 // Enable trust proxy for deployment platforms
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 // Initialize schedulers
 let resetScheduler: DailyResetScheduler;
@@ -154,6 +154,8 @@ if (!isDeploymentMode) {
 }
 
 // Health check endpoint (FIRST - no auth needed)
+app.get('/healthz', (_req, res) => res.send('ok'));
+
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -776,3 +778,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export default app;
+
+
+

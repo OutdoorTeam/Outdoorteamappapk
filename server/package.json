@@ -1,0 +1,42 @@
+﻿{
+  "name": "outdoorteam-server",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/index.js",
+    "dev": "tsx watch index.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^12.2.0",
+    "cors": "^2.8.5",
+    "dompurify": "^3.2.6",
+    "dotenv": "^16.4.7",
+    "express": "5.1.0",
+    "jsdom": "^26.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "kysely": "^0.28.5",
+    "marked": "^16.1.2",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "web-push": "^3.6.7",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/cors": "^2.8.19",
+    "@types/dompurify": "^3.0.5",
+    "@types/express": "5.0.0",
+    "@types/jsdom": "^21.1.7",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "22.13.5",
+    "@types/node-cron": "^3.0.11",
+    "@types/web-push": "^3.3.6",
+    "tsx": "4.19.3",
+    "typescript": "5.8.2"
+  }
+}
