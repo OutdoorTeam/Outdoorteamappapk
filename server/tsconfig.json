@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "types": ["node"],
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "noEmitOnError": false   // <-- AGREGADA
   },
   "include": ["**/*.ts", "types/**/*.d.ts"],
   "exclude": ["dist", "node_modules"]
