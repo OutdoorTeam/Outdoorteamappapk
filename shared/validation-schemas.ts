@@ -75,7 +75,7 @@ export const broadcastMessageSchema = z.object({
 
 // Plan assignment schema
 export const planAssignmentSchema = z.object({
-  planId: z.number().positive()
+  pla nId:z.string().uuid()
 });
 
 // Toggle user status schema
