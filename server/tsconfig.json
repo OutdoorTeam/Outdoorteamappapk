@@ -11,6 +11,6 @@
     "types": ["node"],
     "noEmitOnError": true
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts"],
-  "exclude": ["dist", "node_modules", "client", "android", "scripts"]
+  "include": ["./**/*.ts", "../shared/**/*.ts"],
+  "exclude": ["dist", "node_modules", "../client", "../android", "../scripts"]
 }
