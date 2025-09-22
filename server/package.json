@@ -3,12 +3,11 @@
   "private": true,
   "type": "module",
   "engines": {
-   "node": "20.x"
-      },
-
+    "node": "20.x"
+  },
   "scripts": {
-    "buildtsc -p .",
-    "start": "node dist/server/index.js
+    "build": "tsc -p .",
+    "start": "node dist/server/index.js",
     "dev": "tsx watch index.ts"
   },
   "dependencies": {
