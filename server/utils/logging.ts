@@ -1,4 +1,4 @@
-import { Request } from 'express';
+﻿import { Request } from 'express';
 import { db } from '../database.js';
 
 // Define the system log data interface
@@ -232,7 +232,7 @@ export class SystemLogger {
     try {
       const stats = await db
         .selectFrom('system_logs')
-        .select(['level', db.fn.count<number>('id').as('count')])
+        .select(['level', db.fn?.count('id').as('count')])
         .where('created_at', '>', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
         .groupBy('level')
         .execute();

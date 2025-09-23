@@ -72,7 +72,7 @@ const DATA_DIRECTORY = process.env.DATA_DIRECTORY || './data';
 app.set('trust proxy', 1);
 
 // Initialize schedulers
-let resetScheduler: DailyResetScheduler;
+let resetScheduler: DailyResetScheduler | null = null;
 let notificationScheduler: NotificationScheduler;
 
 const checkVapidConfiguration = () => {

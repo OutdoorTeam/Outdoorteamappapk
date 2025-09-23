@@ -1,17 +1,17 @@
-{
+﻿{
   "compilerOptions": {
     "target": "ES2021",
-    "module": "ES2020",
-    "moduleResolution": "Bundler",
+    "module": "ES2022",
+    "moduleResolution": "node",
     "outDir": "dist",
-    "rootDir": ".",
+    "rootDir": "..",
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "types": ["node"],
     "noImplicitAny": false,
-    "noEmitOnError": false   // <-- AGREGADA
+    "noEmitOnError": true
   },
-  "include": ["**/*.ts", "types/**/*.d.ts"],
-  "exclude": ["dist", "node_modules"]
+  "include": ["./**/*.ts", "../shared/**/*.ts"],
+  "exclude": ["../dist", "../node_modules", "../client", "../android", "../scripts"]
 }

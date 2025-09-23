@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 // User registration schema
 export const registerSchema = z.object({
@@ -26,7 +26,7 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 
 // Daily habits update schema
 export const dailyHabitsUpdateSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido'),
+  date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, 'Formato de fecha inválido'),
   training_completed: z.boolean().optional(),
   nutrition_completed: z.boolean().optional(),
   movement_completed: z.boolean().optional(),
@@ -37,7 +37,7 @@ export const dailyHabitsUpdateSchema = z.object({
 // Daily note schema
 export const dailyNoteSchema = z.object({
   content: z.string().max(2000, 'La nota no puede exceder 2000 caracteres'),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido').optional()
+  date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, 'Formato de fecha inválido').optional()
 });
 
 // Meditation session schema
@@ -75,7 +75,7 @@ export const broadcastMessageSchema = z.object({
 
 // Plan assignment schema
 export const planAssignmentSchema = z.object({
-  planId: z.number().positive()
+  planId: z.string().uuid()
 });
 
 // Toggle user status schema
